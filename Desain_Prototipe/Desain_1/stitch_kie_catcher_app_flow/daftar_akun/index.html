@@ -1,10 +1,14 @@
 <!DOCTYPE html>
-<html lang="en" style="">
+<html lang="id">
 
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     name="viewport">
+  <title>Daftar Akun Baru | Panen Kunci - Monetisasi API Key</title>
+  <meta name="description" content="Daftar akun Panen Kunci sekarang. Mulai kumpulkan pundi saldo dengan setor API Key secara aman, presisi, dan terpercaya.">
+  
+  <!-- Google Fonts & Icons -->
   <link href="https://fonts.googleapis.com" rel="preconnect">
   <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
   <link
@@ -16,81 +20,51 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
     rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script
-    id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-surface": "#0b1c30", "on-secondary": "#ffffff", "on-primary": "#ffffff", "error": "#ba1a1a", "warning-amber": "#F59E0B", "on-tertiary-container": "#8f92ff", "surface": "#f8f9ff", "surface-tint": "#3d57ba", "on-secondary-fixed-variant": "#005236", "surface-container-lowest": "#ffffff", "secondary": "#006c49", "surface-container": "#e6eeff", "success-emerald": "#6cf8bb", "surface-dim": "#cbdbf6", "on-error": "#ffffff", "primary-container": "#00288e", "on-primary-fixed": "#001453", "on-secondary-fixed": "#002113", "surface-container-high": "#dde9ff", "error-ruby": "#E11D48", "error-container": "#ffdad6", "on-error-container": "#93000a", "on-background": "#0b1c30", "on-secondary-container": "#0c714d", "on-primary-fixed-variant": "#213da0", "surface-container-low": "#eff4ff", "outline-variant": "#c5c5d4", "on-tertiary-fixed": "#07006c", "surface-bright": "#f8f9ff", "primary-fixed-dim": "#b8c4ff", "surface-container-highest": "#d3e3ff", "secondary-fixed": "#9df4c8", "background": "#f8f9ff", "inverse-surface": "#213146", "secondary-fixed-dim": "#81d8ad", "outline": "#757684", "inverse-on-surface": "#ebf1ff", "on-tertiary": "#ffffff", "tertiary-fixed-dim": "#c0c1ff", "tertiary": "#080077", "tertiary-fixed": "#e1e0ff", "inverse-primary": "#b8c4ff", "secondary-container": "#9af2c5", "surface-variant": "#d3e3ff", "primary-fixed": "#dde1ff", "on-surface-variant": "#444652", "on-tertiary-fixed-variant": "#2f2dbe", "primary": "#00175c", "tertiary-container": "#170bae", "on-primary-container": "#7e97fe" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "margin-desktop": "32px", "gutter": "16px", "margin-mobile": "16px", "xs": "4px", "base": "4px", "md": "16px", "lg": "24px", "sm": "8px", "xl": "32px" }, fontFamily: { "headline-lg-mobile": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"], "label-sm": ["Space Grotesk"], "display-lg": ["Plus Jakarta Sans"], "body-md": ["Inter"], "body-lg": ["Inter"], "label-md": ["Space Grotesk"] }, fontSize: { "headline-lg-mobile": ["24px", { lineHeight: "32px", fontWeight: "700" }], "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.01em", fontWeight: "700" }], "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }], "label-sm": ["12px", { lineHeight: "16px", fontWeight: "600" }], "display-lg": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "700" }], "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }], "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }], "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.02em", fontWeight: "500" }] } } } } </script>
-  <style>
-    @layer base {
-
-      html,
-      body {
-        width: 100%;
-        margin: 0;
-        padding: 0;
-      }
-
-      body {
-        overscroll-behavior-y: none;
-      }
-
-      .pb-safe {
-        padding-bottom: env(safe-area-inset-bottom, 0px);
-      }
-
-      .pt-safe {
-        padding-top: env(safe-area-inset-top, 0px);
-      }
-
-      main>:first-child {
-        margin-top: 0 !important;
-      }
-
-      main>:last-child {
-        margin-bottom: 0 !important;
-      }
-    }
-
-    ::-webkit-scrollbar {
-      display: none;
-    }
-  </style>
 </head>
 
 <body
   class="bg-surface font-body-md text-body-md text-on-surface min-h-screen flex flex-col selection:bg-secondary-container selection:text-on-secondary-container">
-  <header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+  <!-- Top Navigation Bar -->
+  <header class="fixed top-0 w-full z-40 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
     <div class="h-16 px-margin-mobile flex items-center justify-between">
-      <div class="flex items-center gap-sm"><button aria-label="Go Back"
-          class="w-11 h-11 -ml-sm flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container transition-colors"
-          onclick="history.back()" type="button"><span
-            class="material-symbols-outlined text-[24px]">arrow_back</span></button><img
-          alt="Minimalist modern geometric vector logo for fintech app Panen Kunci, featuring a stylized key forming the letter K, vibrant emerald green and deep navy blue colors, clean white background, high resolution app icon style"
+      <div class="flex items-center gap-sm">
+        <button id="btnBack" aria-label="Go Back"
+          class="w-11 h-11 -ml-sm flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+          type="button">
+          <span class="material-symbols-outlined text-[24px]">arrow_back</span>
+        </button>
+        <img
+          alt="Panen Kunci Logo"
           class="h-8 w-auto object-contain"
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9ngjnA4IPiznVpJo_29RZiMAutJqfLhJDqtKKXIuHBWT6eifgnjCfIS4E_yEXIK3E_HU7fbHOW9Hf-0NsY1wG7OQf0-9tqu5CUFS2NqafrBQUIDPxEH5d9ePWfGHjfeHxs4j5-AL23UL2o4aARgIbPxozqg0MW3qyYtGGwWfYonZ5j0jYvxCPFL7cxtC4PPPz5gUIJm-i6wTp5ak9wULXuixY8hicrxn1Dq_fpp4yKDjiDuMDj9wiNoGsKpqPMZf6mg"><span
-          class="font-headline-md text-headline-md text-primary tracking-tight ml-xs">Panen Kunci</span></div>
-      <div class="flex items-center gap-sm"><span
-          class="font-label-md text-label-md text-on-surface-variant font-medium">Login</span>
-        <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span
-            class="material-symbols-outlined text-on-primary text-[18px]">person</span></div>
+          src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9ngjnA4IPiznVpJo_29RZiMAutJqfLhJDqtKKXIuHBWT6eifgnjCfIS4E_yEXIK3E_HU7fbHOW9Hf-0NsY1wG7OQf0-9tqu5CUFS2NqafrBQUIDPxEH5d9ePWfGHjfeHxs4j5-AL23UL2o4aARgIbPxozqg0MW3qyYtGGwWfYonZ5j0jYvxCPFL7cxtC4PPPz5gUIJm-i6wTp5ak9wULXuixY8hicrxn1Dq_fpp4yKDjiDuMDj9wiNoGsKpqPMZf6mg">
+        <span class="font-headline-md text-headline-md text-primary tracking-tight ml-xs">Panen Kunci</span>
+      </div>
+      <div class="flex items-center gap-sm">
+        <a href="#login" class="font-label-md text-label-md text-on-surface-variant font-medium hover:text-primary transition-colors">Login</a>
+        <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+          <span class="material-symbols-outlined text-on-primary text-[18px]">person</span>
+        </div>
       </div>
     </div>
   </header>
+
+  <!-- Main Content -->
   <main class="flex-1 flex flex-col relative w-full pt-16 bg-surface px-margin-mobile pb-safe">
     <div class="flex flex-col w-full pb-8">
-      <!-- Subtle decorative ambient gradient blur -->
+      <!-- Ambient Gradient Blur Accents -->
       <div class="relative w-full overflow-hidden flex flex-col items-center">
         <div
           class="absolute -top-12 -left-12 w-44 h-44 bg-secondary-fixed/30 rounded-full blur-3xl pointer-events-none">
         </div>
         <div class="absolute top-20 -right-10 w-52 h-52 bg-primary-fixed/40 rounded-full blur-3xl pointer-events-none">
         </div>
+
         <!-- Header Section with Logo & Welcome Note -->
         <div class="relative z-10 flex flex-col items-center text-center pt-2 pb-6 px-1">
           <div
             class="relative p-1 mb-3 rounded-xl bg-surface-container-lowest shadow-md shadow-primary/5 flex items-center justify-center">
-            <img alt="Panen Kunci Logo" class="w-16 h-16 rounded-lg object-contain"
+            <img alt="Panen Kunci App Icon" class="w-16 h-16 rounded-lg object-contain"
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5BAK13rqO_9Rvesn0jCzxa3CI7nsoTWj1UCQdfvUXikSJ1MwmouM7ucPQJ_hPSDzFbPAzCGeidFwkLpdv786XY3aTAya5xkJhFcUvqfydUPXDR94hjJknKZhtpslvVlvduEMukNKkQ5N9157Sj-3BgVsyX0NFkNeH6s7yvZGgDYO6y_p_xyGlWWcSHDHzoYoVqWLuJ9a2QP7btpVQ3YuIKB0t3C-SfwMmdEW-dDSI5q90AOjnKcn0_diaYewjBdJj_g">
-
           </div>
           <h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary tracking-tight">
             Daftar Akun Baru
@@ -98,17 +72,16 @@
           <p class="font-body-md text-body-md text-on-surface-variant mt-1.5 max-w-xs text-balance">
             Mulai kumpulkan pundi saldo dengan setor API Key sekarang.
           </p>
-          <!-- Trust Micro-Badge -->
-
         </div>
+
         <!-- Registration Form Card -->
         <div class="w-full bg-surface-container-lowest rounded-xl shadow-sm p-4 sm:p-5 flex flex-col gap-4">
-          <form class="flex flex-col gap-3.5" id="registerForm" onsubmit="event.preventDefault(); handleRegister();">
+          <form class="flex flex-col gap-3.5" id="registerForm">
             <!-- Field 1: Nama Lengkap -->
             <div class="flex flex-col gap-1.5">
               <label class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1"
                 for="fullName">
-                <span class="">Nama Lengkap</span>
+                <span>Nama Lengkap</span>
                 <span class="text-error">*</span>
               </label>
               <div
@@ -116,14 +89,15 @@
                 <span class="material-symbols-outlined text-outline mr-2.5 text-[20px]">person</span>
                 <input
                   class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none"
-                  id="fullName" name="fullName" placeholder="Masukkan nama lengkap" required="" type="text">
+                  id="fullName" name="fullName" placeholder="Masukkan nama lengkap" required type="text">
               </div>
             </div>
+
             <!-- Field 2: Email -->
             <div class="flex flex-col gap-1.5">
               <label class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1"
                 for="email">
-                <span class="">Alamat Email</span>
+                <span>Alamat Email</span>
                 <span class="text-error">*</span>
               </label>
               <div
@@ -131,9 +105,10 @@
                 <span class="material-symbols-outlined text-outline mr-2.5 text-[20px]">mail</span>
                 <input
                   class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none"
-                  id="email" name="email" placeholder="nama@email.com" required="" type="email">
+                  id="email" name="email" placeholder="nama@email.com" required type="email">
               </div>
             </div>
+
             <!-- Field 3: Nomor Telepon / WA -->
             <div class="flex flex-col gap-1.5">
               <div class="flex justify-between items-center">
@@ -145,19 +120,20 @@
                 class="flex items-center bg-surface-container-low rounded-lg px-3 py-2.5 transition-all focus-within:bg-surface-container-lowest focus-within:shadow-sm">
                 <div
                   class="flex items-center gap-1 pr-2 mr-2 bg-surface-container-high/60 px-2 py-0.5 rounded text-on-surface font-label-sm text-label-sm font-semibold">
-                  <span class="">🇮🇩</span>
-                  <span class="">+62</span>
+                  <span>🇮🇩</span>
+                  <span>+62</span>
                 </div>
                 <input
                   class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none"
                   id="phone" inputmode="numeric" name="phone" placeholder="812-xxxx-xxxx" type="tel">
               </div>
             </div>
+
             <!-- Field 4: Kata Sandi -->
             <div class="flex flex-col gap-1.5">
               <label class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1"
                 for="password">
-                <span class="">Kata Sandi</span>
+                <span>Kata Sandi</span>
                 <span class="text-error">*</span>
               </label>
               <div
@@ -165,10 +141,10 @@
                 <span class="material-symbols-outlined text-outline mr-2.5 text-[20px]">lock</span>
                 <input
                   class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none pr-8"
-                  id="password" minlength="8" name="password" oninput="checkPasswordStrength(this.value)"
-                  placeholder="Buat sandi yang kuat" required="" type="password">
+                  id="password" minlength="8" name="password"
+                  placeholder="Buat sandi yang kuat" required type="password">
                 <button aria-label="Tampilkan sandi"
-                  class="absolute right-3 text-outline hover:text-on-surface focus:outline-none p-1"
+                  class="absolute right-3 text-outline hover:text-on-surface focus:outline-none p-1 cursor-pointer"
                   onclick="togglePasswordVisibility('password', 'toggleIcon1')" type="button">
                   <span class="material-symbols-outlined text-[20px]" id="toggleIcon1">visibility_off</span>
                 </button>
@@ -186,11 +162,12 @@
                 </div>
               </div>
             </div>
+
             <!-- Field 5: Konfirmasi Sandi -->
             <div class="flex flex-col gap-1.5">
               <label class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1"
                 for="confirmPassword">
-                <span class="">Konfirmasi Kata Sandi</span>
+                <span>Konfirmasi Kata Sandi</span>
                 <span class="text-error">*</span>
               </label>
               <div
@@ -198,24 +175,24 @@
                 <span class="material-symbols-outlined text-outline mr-2.5 text-[20px]">lock_reset</span>
                 <input
                   class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none pr-8"
-                  id="confirmPassword" name="confirmPassword" placeholder="Ulangi kata sandi" required=""
+                  id="confirmPassword" name="confirmPassword" placeholder="Ulangi kata sandi" required
                   type="password">
                 <button aria-label="Tampilkan sandi"
-                  class="absolute right-3 text-outline hover:text-on-surface focus:outline-none p-1"
+                  class="absolute right-3 text-outline hover:text-on-surface focus:outline-none p-1 cursor-pointer"
                   onclick="togglePasswordVisibility('confirmPassword', 'toggleIcon2')" type="button">
                   <span class="material-symbols-outlined text-[20px]" id="toggleIcon2">visibility_off</span>
                 </button>
               </div>
             </div>
+
             <!-- Field 6: Referral Code Accordion-style -->
             <div class="flex flex-col gap-1.5 pt-1">
               <div class="flex items-center justify-between">
                 <label class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1"
                   for="referralCode">
                   <span class="material-symbols-outlined text-[18px] text-secondary">card_giftcard</span>
-                  <span class="">Kode Referral</span>
+                  <span>Kode Referral</span>
                 </label>
-
               </div>
               <div
                 class="flex items-center bg-surface-container-low rounded-lg px-3 py-2.5 transition-all focus-within:bg-surface-container-lowest focus-within:shadow-sm">
@@ -225,11 +202,12 @@
                   id="referralCode" name="referralCode" placeholder="Punya kode referral? (Opsional)" type="text">
               </div>
             </div>
+
             <!-- Terms and Condition Checkbox -->
             <div class="pt-2">
               <label class="flex items-start gap-2.5 cursor-pointer select-none">
                 <input class="mt-1 w-4 h-4 rounded text-secondary accent-primary focus:ring-0 cursor-pointer"
-                  id="agreeTerms" required="" type="checkbox">
+                  id="agreeTerms" required type="checkbox">
                 <span class="font-label-sm text-label-sm text-on-surface-variant leading-tight">
                   Saya setuju dengan
                   <a class="text-primary-container font-semibold hover:underline" href="#">Syarat &amp; Ketentuan</a>
@@ -239,15 +217,17 @@
                 </span>
               </label>
             </div>
-            <!-- Primary CTA -->
+
+            <!-- Primary CTA Button -->
             <button
-              class="w-full mt-2 py-3.5 px-6 rounded-xl bg-primary text-on-primary font-headline-md text-headline-md tracking-wide shadow-md shadow-primary/20 active:scale-[0.98] transition-transform flex items-center justify-center gap-2 group hover:bg-primary-container"
+              class="w-full mt-2 py-3.5 px-6 rounded-xl bg-primary text-on-primary font-headline-md text-headline-md tracking-wide shadow-md shadow-primary/20 active:scale-[0.98] transition-transform flex items-center justify-center gap-2 group hover:bg-primary-container cursor-pointer"
               id="btnSubmit" type="submit">
-              <span class="">Daftar Sekarang</span>
+              <span>Daftar Sekarang</span>
               <span
                 class="material-symbols-outlined text-[20px] transition-transform group-hover:translate-x-1">arrow_forward</span>
             </button>
           </form>
+
           <!-- Divider -->
           <div class="relative flex items-center justify-center my-2">
             <div class="w-full h-px bg-surface-container-highest"></div>
@@ -256,11 +236,11 @@
               atau daftar dengan
             </span>
           </div>
+
           <!-- Social Login Buttons -->
           <div class="grid gap-2.5 w-full">
-            <!-- Google Button -->
             <button
-              class="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-surface-container-low hover:bg-surface-container active:scale-[0.98] transition-colors"
+              class="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-surface-container-low hover:bg-surface-container active:scale-[0.98] transition-colors cursor-pointer"
               onclick="handleSocialLogin('Google')" type="button">
               <svg aria-hidden="true" class="w-4 h-4" viewBox="0 0 24 24">
                 <path
@@ -278,10 +258,9 @@
               </svg>
               <span class="font-label-md text-label-md text-on-surface font-medium truncate">Google</span>
             </button>
-            <!-- Apple Button -->
-
           </div>
         </div>
+
         <!-- Referral Perks Banner -->
         <div class="w-full mt-4 p-3.5 rounded-xl bg-surface-container-low flex items-center gap-3">
           <div class="w-10 h-10 rounded-lg bg-secondary-container flex items-center justify-center shrink-0">
@@ -293,98 +272,23 @@
               key pertama.</span>
           </div>
         </div>
+
         <!-- Footer Redirect to Login -->
         <div class="mt-6 text-center pb-4">
           <p class="font-body-md text-body-md text-on-surface-variant">
             Sudah punya akun?
             <a class="font-headline-md text-headline-md text-primary font-semibold hover:underline inline-flex items-center gap-0.5 align-middle ml-1"
               href="#login">
-              <span class="">Masuk Sekarang</span>
+              <span>Masuk Sekarang</span>
               <span class="material-symbols-outlined text-[18px]">chevron_right</span>
             </a>
           </p>
         </div>
       </div>
     </div>
-    <script>
-      function togglePasswordVisibility(inputId, iconId) {
-        const input = document.getElementById(inputId);
-        const icon = document.getElementById(iconId);
-        if (!input || !icon) return;
-
-        if (input.type === 'password') {
-          input.type = 'text';
-          icon.textContent = 'visibility';
-          icon.classList.add('text-primary');
-        } else {
-          input.type = 'password';
-          icon.textContent = 'visibility_off';
-          icon.classList.remove('text-primary');
-        }
-      }
-
-      function checkPasswordStrength(val) {
-        const s1 = document.getElementById('str1');
-        const s2 = document.getElementById('str2');
-        const s3 = document.getElementById('str3');
-        if (!s1 || !s2 || !s3) return;
-
-        // Reset
-        s1.className = 'w-5 h-1 rounded-full bg-surface-container-highest transition-colors';
-        s2.className = 'w-5 h-1 rounded-full bg-surface-container-highest transition-colors';
-        s3.className = 'w-5 h-1 rounded-full bg-surface-container-highest transition-colors';
-
-        if (val.length === 0) return;
-
-        if (val.length >= 8) {
-          s1.className = 'w-5 h-1 rounded-full bg-warning-amber transition-colors';
-          if (/[A-Z]/.test(val) && /[0-9]/.test(val)) {
-            s2.className = 'w-5 h-1 rounded-full bg-secondary transition-colors';
-          }
-          if (val.length >= 12 && /[^A-Za-z0-9]/.test(val)) {
-            s3.className = 'w-5 h-1 rounded-full bg-secondary-container transition-colors';
-          }
-        } else {
-          s1.className = 'w-5 h-1 rounded-full bg-error-ruby transition-colors';
-        }
-      }
-
-      function handleRegister() {
-        const pass = document.getElementById('password')?.value;
-        const confirmPass = document.getElementById('confirmPassword')?.value;
-
-        if (pass !== confirmPass) {
-          alert('Konfirmasi kata sandi tidak cocok. Harap periksa kembali.');
-          return;
-        }
-
-        const btn = document.getElementById('btnSubmit');
-        if (btn) {
-          const originalText = btn.innerHTML;
-          btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Memproses...</span>';
-          btn.disabled = true;
-
-          setTimeout(() => {
-            btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">check_circle</span><span>Pendaftaran Berhasil!</span>';
-            btn.classList.remove('bg-primary');
-            btn.classList.add('bg-secondary');
-            setTimeout(() => {
-              alert('Selamat datang di Panen Kunci! Silakan verifikasi email Anda untuk mulai menyetor API Key.');
-              btn.innerHTML = originalText;
-              btn.disabled = false;
-              btn.classList.add('bg-primary');
-              btn.classList.remove('bg-secondary');
-            }, 1200);
-          }, 1500);
-        }
-      }
-
-      function handleSocialLogin(provider) {
-        alert('Mengarahkan ke pendaftaran via ' + provider + '...');
-      }
-    </script>
   </main>
 
+  <script type="module" src="/src/main.js"></script>
 </body>
 
 </html>

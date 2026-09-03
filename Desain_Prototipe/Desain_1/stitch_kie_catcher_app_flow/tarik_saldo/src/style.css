@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base { body { -webkit-tap-highlight-color: transparent; } .pt-safe { padding-top: env(safe-area-inset-top); } } .glass { background: rgba(248, 249, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+body {
+      min-height: max(884px, 100dvh);
+    }
+
+@keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }

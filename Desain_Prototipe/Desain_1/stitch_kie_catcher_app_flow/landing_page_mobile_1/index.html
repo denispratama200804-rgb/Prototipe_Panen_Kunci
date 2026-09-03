@@ -1,0 +1,113 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;family=Space+Grotesk:wght@500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+  </head><body class="bg-background text-on-surface font-body-md"><header class="fixed top-0 w-full z-50 glass shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin-mobile flex items-center pt-safe"><button class="w-10 h-10 -ml-2 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-colors" onclick="history.back()"><span class="material-symbols-outlined">arrow_back</span></button><h1 class="ml-2 font-headline-md text-headline-md">Setor API Key</h1></div></header><main class="relative pt-16 min-h-screen bg-background"><div class="px-margin-mobile py-lg"><div class="flex flex-col w-full gap-lg">
+<!-- Mini Tutorial -->
+<section class="flex flex-col gap-sm">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary text-[20px]" style="font-variation-settings: &quot;FILL&quot; 1;">info</span>
+<h2 class="font-headline-md text-headline-md text-on-background">Cara Mendapatkan API Key</h2>
+</div>
+<div class="grid grid-cols-1 gap-3 relative">
+<!-- Step 1 -->
+<div class="bg-surface-container rounded-xl p-md flex gap-4 items-start shadow-sm relative z-10">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md">1</div>
+<div class="flex flex-col gap-1">
+<h3 class="font-label-md text-label-md text-on-surface">Daftar di Kie.ai</h3>
+<p class="font-body-md text-body-md text-text-body text-sm">Buat akun atau masuk ke dashboard pengembang Kie.ai.</p>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="bg-surface-container rounded-xl p-md flex gap-4 items-start shadow-sm relative z-10">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md">2</div>
+<div class="flex flex-col gap-1">
+<h3 class="font-label-md text-label-md text-on-surface">Salin API Key</h3>
+<p class="font-body-md text-body-md text-text-body text-sm">Masuk ke menu API Settings dan klik tombol salin pada secret key.</p>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="bg-surface-container rounded-xl p-md flex gap-4 items-start shadow-sm relative z-10">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md">3</div>
+<div class="flex flex-col gap-1">
+<h3 class="font-label-md text-label-md text-on-surface">Tempel di Sini</h3>
+<p class="font-body-md text-body-md text-text-body text-sm">Masukkan API key yang telah disalin ke kolom di bawah ini.</p>
+</div>
+</div>
+<!-- Connecting Line -->
+<div class="absolute left-8 top-8 bottom-8 w-0.5 bg-outline-variant/30 z-0"></div>
+</div>
+</section>
+<!-- Input Section -->
+<section class="bg-surface-card rounded-xl p-lg shadow-sm flex flex-col gap-md">
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface" for="apiKeyInput">Masukkan API Key Anda</label>
+<div class="relative">
+<input class="w-full bg-surface-bright rounded-lg py-3 pl-4 pr-12 text-on-surface font-body-md shadow-inner outline-none focus:ring-2 focus:ring-primary/50 font-mono tracking-tight" id="apiKeyInput" placeholder="sk-kie-..." type="text">
+<button aria-label="Paste from clipboard" class="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-outline hover:text-primary transition-colors" id="pasteBtn">
+<span class="material-symbols-outlined text-[20px]">content_paste</span>
+</button>
+</div>
+<p class="font-label-sm text-label-sm text-outline flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[14px]">lock</span>
+        Disimpan secara aman dan terenkripsi.
+      </p>
+</div>
+<!-- Submit Button & Feedback -->
+<div class="flex flex-col gap-3">
+<button class="w-full bg-primary text-on-primary rounded-full py-4 font-label-md text-label-md shadow-md shadow-primary/20 hover:bg-primary-container transition-all active:scale-[0.98] flex items-center justify-center gap-2" id="submitBtn"><span class="">Setor API Key</span><span class="material-symbols-outlined text-[20px]">arrow_forward</span></button>
+<!-- Feedback Placeholder -->
+<div class="hidden h-10 flex items-center justify-center gap-2 rounded-lg bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm animate-pulse" id="feedbackContainer">
+<span class="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+        Sistem sedang memvalidasi...
+      </div>
+</div>
+</section>
+<!-- Recent Submissions -->
+<section class="flex flex-col gap-md">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-md text-[18px] text-on-background">Riwayat API Key</h2>
+<span class="font-label-sm text-label-sm text-primary">Lihat Semua</span>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Valid Item -->
+<div class="bg-surface-card rounded-xl p-md flex items-center justify-between shadow-sm relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary"></div>
+<div class="flex flex-col gap-1 pl-2">
+<div class="font-mono text-[13px] text-on-surface truncate w-32 sm:w-48">sk-kie-8f92a1...</div>
+<div class="font-label-sm text-label-sm text-text-body">Hari ini, 09:41</div>
+</div>
+<div class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-[11px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+          Valid
+        </div>
+</div>
+<!-- Invalid Item -->
+<div class="bg-surface-card rounded-xl p-md flex items-center justify-between shadow-sm relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-error-ruby"></div>
+<div class="flex flex-col gap-1 pl-2">
+<div class="font-mono text-[13px] text-on-surface truncate w-32 sm:w-48">sk-kie-x7b9c2...</div>
+<div class="font-label-sm text-label-sm text-text-body">Kemarin, 14:22</div>
+</div>
+<div class="bg-error-container text-on-error-container px-3 py-1 rounded-full font-label-sm text-[11px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">error</span>
+          Tidak Valid
+        </div>
+</div>
+<!-- Valid Item -->
+<div class="bg-surface-card rounded-xl p-md flex items-center justify-between shadow-sm relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary"></div>
+<div class="flex flex-col gap-1 pl-2">
+<div class="font-mono text-[13px] text-on-surface truncate w-32 sm:w-48">sk-kie-3m5n8p...</div>
+<div class="font-label-sm text-label-sm text-text-body">12 Okt, 11:05</div>
+</div>
+<div class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-[11px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+          Valid
+        </div>
+</div>
+</div>
+</section>
+</div>
+</div></main>
+
+  <script type="module" src="/src/main.js"></script>
+</body></html>
