@@ -1,0 +1,185 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;family=Space+Grotesk:wght@500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline-variant": "#c4c5d5", "surface-bright": "#f8f9ff", "primary-fixed": "#dde1ff", "tertiary-container": "#3433c3", "surface-card": "#FFFFFF", "warning-amber": "#F59E0B", "on-tertiary-container": "#b3b5ff", "on-primary": "#ffffff", "surface-container": "#e5eeff", "outline": "#757684", "on-tertiary-fixed-variant": "#2f2ebe", "on-secondary-fixed": "#002113", "on-secondary": "#ffffff", "primary-fixed-dim": "#b8c4ff", "surface-container-low": "#eff4ff", "text-body": "#475569", "on-surface-variant": "#444653", "surface-dim": "#cbdbf5", "on-primary-fixed-variant": "#173bab", "surface-container-lowest": "#ffffff", "secondary": "#006c49", "on-tertiary-fixed": "#07006c", "secondary-container": "#6cf8bb", "bg-subtle": "#F8FAFC", "error": "#ba1a1a", "primary": "#00288e", "text-heading": "#0F172A", "background": "#f8f9ff", "on-primary-container": "#a8b8ff", "tertiary-fixed-dim": "#c0c1ff", "error-ruby": "#E11D48", "inverse-surface": "#213145", "on-secondary-container": "#00714d", "error-container": "#ffdad6", "surface-container-highest": "#d3e4fe", "on-secondary-fixed-variant": "#005236", "on-background": "#0b1c30", "tertiary": "#170cae", "on-tertiary": "#ffffff", "surface-variant": "#d3e4fe", "secondary-fixed": "#6ffbbe", "on-surface": "#0b1c30", "on-primary-fixed": "#001453", "inverse-on-surface": "#eaf1ff", "on-error": "#ffffff", "surface-container-high": "#dce9ff", "on-error-container": "#93000a", "surface-tint": "#3755c3", "secondary-fixed-dim": "#4edea3", "inverse-primary": "#b8c4ff", "tertiary-fixed": "#e1e0ff", "surface": "#f8f9ff", "primary-container": "#1e40af" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "lg": "24px", "margin-mobile": "16px", "base": "4px", "gutter": "16px", "margin-desktop": "32px", "md": "16px", "xs": "4px", "xl": "32px", "sm": "8px" }, "fontFamily": { "label-sm": ["Space Grotesk"], "body-md": ["Inter"], "label-md": ["Space Grotesk"], "body-lg": ["Inter"], "headline-md": ["Plus Jakarta Sans"], "headline-lg-mobile": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"] } } } }</script><style>@layer base { body { -webkit-tap-highlight-color: transparent; } .pt-safe { padding-top: env(safe-area-inset-top); } } .glass { background: rgba(248, 249, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head><body class="bg-background text-on-surface font-body-md"><header class="fixed top-0 w-full z-50 glass shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin-mobile flex items-center pt-safe"><button class="w-10 h-10 -ml-2 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-colors" onclick="history.back()"><span class="material-symbols-outlined">arrow_back</span></button><h1 class="ml-2 font-headline-md text-headline-md">Submit Key</h1></div></header><main class="relative pt-16 min-h-screen bg-background"><div class="px-margin-mobile py-lg"><div class="flex flex-col w-full gap-lg">
+<!-- Mini Tutorial -->
+<section class="flex flex-col gap-sm">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">info</span>
+<h2 class="font-headline-md text-headline-md text-on-background">Cara Mendapatkan API Key</h2>
+</div>
+<div class="grid grid-cols-1 gap-3 relative">
+<!-- Step 1 -->
+<div class="bg-surface-container rounded-xl p-md flex gap-4 items-start shadow-sm relative z-10">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md">1</div>
+<div class="flex flex-col gap-1">
+<h3 class="font-label-md text-label-md text-on-surface">Daftar di Kie.ai</h3>
+<p class="font-body-md text-body-md text-text-body text-sm">Buat akun atau masuk ke dashboard pengembang Kie.ai.</p>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="bg-surface-container rounded-xl p-md flex gap-4 items-start shadow-sm relative z-10">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md">2</div>
+<div class="flex flex-col gap-1">
+<h3 class="font-label-md text-label-md text-on-surface">Salin API Key</h3>
+<p class="font-body-md text-body-md text-text-body text-sm">Masuk ke menu API Settings dan klik tombol salin pada secret key.</p>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="bg-surface-container rounded-xl p-md flex gap-4 items-start shadow-sm relative z-10">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md">3</div>
+<div class="flex flex-col gap-1">
+<h3 class="font-label-md text-label-md text-on-surface">Tempel di Sini</h3>
+<p class="font-body-md text-body-md text-text-body text-sm">Masukkan API key yang telah disalin ke kolom di bawah ini.</p>
+</div>
+</div>
+<!-- Connecting Line -->
+<div class="absolute left-8 top-8 bottom-8 w-0.5 bg-outline-variant/30 z-0"></div>
+</div>
+</section>
+<!-- Input Section -->
+<section class="bg-surface-card rounded-xl p-lg shadow-sm flex flex-col gap-md">
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface" for="apiKeyInput">Masukkan API Key Anda</label>
+<div class="relative">
+<input class="w-full bg-surface-bright rounded-lg py-3 pl-4 pr-12 text-on-surface font-body-md shadow-inner outline-none focus:ring-2 focus:ring-primary/50 font-mono tracking-tight" id="apiKeyInput" placeholder="sk-kie-..." type="text">
+<button aria-label="Paste from clipboard" class="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-outline hover:text-primary transition-colors" id="pasteBtn">
+<span class="material-symbols-outlined text-[20px]">content_paste</span>
+</button>
+</div>
+<p class="font-label-sm text-label-sm text-outline flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[14px]">lock</span>
+        Disimpan secara aman dan terenkripsi.
+      </p>
+</div>
+<!-- Submit Button & Feedback -->
+<div class="flex flex-col gap-3">
+<button class="w-full bg-primary text-on-primary rounded-full py-4 font-label-md text-label-md shadow-md shadow-primary/20 hover:bg-primary-container transition-all active:scale-[0.98] flex items-center justify-center gap-2" id="submitBtn">
+<span>Submit API Key</span>
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+<!-- Feedback Placeholder -->
+<div class="hidden h-10 flex items-center justify-center gap-2 rounded-lg bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm animate-pulse" id="feedbackContainer">
+<span class="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+        Sistem sedang memvalidasi...
+      </div>
+</div>
+</section>
+<!-- Recent Submissions -->
+<section class="flex flex-col gap-md">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-md text-[18px] text-on-background">Riwayat API Key</h2>
+<span class="font-label-sm text-label-sm text-primary">Lihat Semua</span>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Valid Item -->
+<div class="bg-surface-card rounded-xl p-md flex items-center justify-between shadow-sm relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary"></div>
+<div class="flex flex-col gap-1 pl-2">
+<div class="font-mono text-[13px] text-on-surface truncate w-32 sm:w-48">sk-kie-8f92a1...</div>
+<div class="font-label-sm text-label-sm text-text-body">Hari ini, 09:41</div>
+</div>
+<div class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-[11px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+          Valid
+        </div>
+</div>
+<!-- Invalid Item -->
+<div class="bg-surface-card rounded-xl p-md flex items-center justify-between shadow-sm relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-error-ruby"></div>
+<div class="flex flex-col gap-1 pl-2">
+<div class="font-mono text-[13px] text-on-surface truncate w-32 sm:w-48">sk-kie-x7b9c2...</div>
+<div class="font-label-sm text-label-sm text-text-body">Kemarin, 14:22</div>
+</div>
+<div class="bg-error-container text-on-error-container px-3 py-1 rounded-full font-label-sm text-[11px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">error</span>
+          Tidak Valid
+        </div>
+</div>
+<!-- Valid Item -->
+<div class="bg-surface-card rounded-xl p-md flex items-center justify-between shadow-sm relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary"></div>
+<div class="flex flex-col gap-1 pl-2">
+<div class="font-mono text-[13px] text-on-surface truncate w-32 sm:w-48">sk-kie-3m5n8p...</div>
+<div class="font-label-sm text-label-sm text-text-body">12 Okt, 11:05</div>
+</div>
+<div class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-[11px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+          Valid
+        </div>
+</div>
+</div>
+</section>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const pasteBtn = document.getElementById('pasteBtn');
+    const input = document.getElementById('apiKeyInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const feedback = document.getElementById('feedbackContainer');
+
+    // Simulate paste
+    pasteBtn.addEventListener('click', () => {
+      // In a real app this would use navigator.clipboard.readText()
+      // which requires permissions/HTTPS context. Simulating for demo.
+      input.value = 'sk-kie-' + Math.random().toString(36).substring(2, 10) + '...';
+      input.classList.add('bg-primary-fixed/20');
+      setTimeout(() => input.classList.remove('bg-primary-fixed/20'), 300);
+    });
+
+    // Simulate submit
+    submitBtn.addEventListener('click', () => {
+      if(!input.value.trim()) {
+        input.focus();
+        return;
+      }
+      
+      // UI state change
+      submitBtn.classList.add('hidden');
+      feedback.classList.remove('hidden');
+      feedback.classList.add('flex');
+      
+      // Reset after simulation
+      setTimeout(() => {
+        submitBtn.classList.remove('hidden');
+        feedback.classList.add('hidden');
+        feedback.classList.remove('flex');
+        input.value = '';
+        
+        // Show a brief success toast (simplified for this demo)
+        const toast = document.createElement('div');
+        toast.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 bg-secondary text-on-secondary px-4 py-2 rounded-full shadow-lg font-label-sm z-50 transition-opacity duration-300';
+        toast.textContent = 'API Key berhasil disubmit!';
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          setTimeout(() => toast.remove(), 300);
+        }, 2000);
+        
+      }, 2000);
+    });
+  });
+</script></div></main><div class="fixed inset-0 z-[100] flex items-center justify-center p-margin-mobile" id="successModal">
+<!-- Backdrop -->
+<div class="absolute inset-0 bg-on-background/40 backdrop-blur-sm"></div>
+<!-- Modal Content -->
+<div class="relative bg-surface-card w-full max-w-sm rounded-xl p-lg shadow-md flex flex-col items-center text-center gap-lg animate-in fade-in zoom-in duration-300">
+<!-- Success Icon -->
+<div class="w-16 h-16 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined text-[40px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<!-- Text Content -->
+<div class="flex flex-col gap-2">
+<h3 class="font-headline-md text-headline-md text-on-surface">Setoran Berhasil!</h3>
+<p class="font-body-md text-body-md text-text-body">API Key valid dan saldo Anda telah bertambah <span class="text-secondary font-label-md">Rp3.000</span>.</p>
+</div>
+<!-- Action Button -->
+<button class="w-full bg-primary text-on-primary rounded-full py-4 font-label-md text-label-md shadow-md shadow-primary/20 hover:bg-primary-container transition-all active:scale-[0.98]" onclick="document.getElementById('successModal').remove()">
+      Selesai
+    </button>
+</div>
+</div></body></html>

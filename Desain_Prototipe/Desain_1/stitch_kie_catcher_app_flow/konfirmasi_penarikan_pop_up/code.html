@@ -1,0 +1,111 @@
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;family=Space+Grotesk:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline-variant": "#c4c5d5", "surface-bright": "#f8f9ff", "primary-fixed": "#dde1ff", "tertiary-container": "#3433c3", "surface-card": "#FFFFFF", "warning-amber": "#F59E0B", "on-tertiary-container": "#b3b5ff", "on-primary": "#ffffff", "surface-container": "#e5eeff", "outline": "#757684", "on-tertiary-fixed-variant": "#2f2ebe", "on-secondary-fixed": "#002113", "on-secondary": "#ffffff", "primary-fixed-dim": "#b8c4ff", "surface-container-low": "#eff4ff", "text-body": "#475569", "on-surface-variant": "#444653", "surface-dim": "#cbdbf5", "on-primary-fixed-variant": "#173bab", "surface-container-lowest": "#ffffff", "secondary": "#006c49", "on-tertiary-fixed": "#07006c", "secondary-container": "#6cf8bb", "bg-subtle": "#F8FAFC", "error": "#ba1a1a", "primary": "#00288e", "text-heading": "#0F172A", "background": "#f8f9ff", "on-primary-container": "#a8b8ff", "tertiary-fixed-dim": "#c0c1ff", "error-ruby": "#E11D48", "inverse-surface": "#213145", "on-secondary-container": "#00714d", "error-container": "#ffdad6", "surface-container-highest": "#d3e4fe", "on-secondary-fixed-variant": "#005236", "on-background": "#0b1c30", "tertiary": "#170cae", "on-tertiary": "#ffffff", "surface-variant": "#d3e4fe", "secondary-fixed": "#6ffbbe", "on-surface": "#0b1c30", "on-primary-fixed": "#001453", "inverse-on-surface": "#eaf1ff", "on-error": "#ffffff", "surface-container-high": "#dce9ff", "on-error-container": "#93000a", "surface-tint": "#3755c3", "secondary-fixed-dim": "#4edea3", "inverse-primary": "#b8c4ff", "tertiary-fixed": "#e1e0ff", "surface": "#f8f9ff", "primary-container": "#1e40af" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "lg": "24px", "margin-mobile": "16px", "base": "4px", "gutter": "16px", "margin-desktop": "32px", "md": "16px", "xs": "4px", "xl": "32px", "sm": "8px" }, "fontFamily": { "label-sm": ["Space Grotesk"], "body-md": ["Inter"], "label-md": ["Space Grotesk"], "body-lg": ["Inter"], "headline-md": ["Plus Jakarta Sans"], "headline-lg-mobile": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"] } } } }</script><style>@layer base { body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: contain; } .pt-safe { padding-top: env(safe-area-inset-top); } .pb-safe { padding-bottom: env(safe-area-inset-bottom); } } .glass { background: rgba(248, 249, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-background text-on-surface font-body-md"><header class="fixed top-0 w-full z-50 glass shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin-mobile flex items-center justify-between pt-safe"><div class="flex items-center gap-sm"><img alt="Kie Catcher Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2Fwib7SUIUPPKcJBes6nFpQh4N_Ad3DG0amKUTqIZpaG7vjX0iYURjJ1oU7kON_ukR314JOoeh8TGScVTliV1qM42iypBlZp3N0mCtwjfVb4mTB5RAM1esQIoelHcvObZaZYsalHSPxMdnRiY3kwEBQPLQDldW0ZTBh2ZD0oe_FpI0IWpqxtxUAZ8tVqazb0a8DtaX3r27j7VsHuAPIEg3UzQpvsHuS9Xf6suq5X2fyNbdt6cimyI"/><span class="font-headline-md text-headline-md text-primary">Kie Catcher</span></div><div class="flex items-center gap-md"><h1 class="hidden sm:block font-label-md text-label-md text-on-surface-variant">Dashboard</h1><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-surface-container-high" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJ06NwJvkMq5wnCKysow5prhzpnH7g6zRgYA4RYuyUgHK6g6xTot1wP7xXFVyjpvOcWMlIE07keEdOWlft-yWU3CY4OVQMVo94yYOErwizdVXrl3EnYkqJACecBLnDr-S_NAdc1h3mhBXs7Yf_5t7uzJSd4NfiLJMj78zcHOSK_2Kq3hpEg-uS5V6DqYBCxlY-gzwH25PqPD9gGdd_JtpdkqIo28boAKfZVg2uxTR-oSCUsDPPZ9GT"/></div></div></header><main class="relative pt-16 min-h-screen bg-background pb-24"><div class="px-margin-mobile py-lg"><div class="flex flex-col w-full h-full relative" id="withdrawal-modal">
+<!-- Dimmed overlay -->
+<div class="fixed inset-0 bg-on-background/40 backdrop-blur-sm z-40 transition-opacity duration-300" id="overlay"></div>
+<!-- Modal Container -->
+<div class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[calc(100%-32px)] max-w-sm bg-surface-card rounded-xl shadow-xl z-50 overflow-hidden scale-95 opacity-0 transition-all duration-300" id="modal-card">
+<!-- Header -->
+<div class="p-lg pb-md flex items-center justify-between border-b border-outline-variant/30">
+<h2 class="font-headline-md text-headline-md text-on-surface">Konfirmasi Penarikan</h2>
+<button class="text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-sm rounded-full" id="close-btn-top">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<!-- Content -->
+<div class="p-lg space-y-md">
+<div class="bg-surface-container-low rounded-lg p-md space-y-sm">
+<!-- Nominal -->
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md text-on-surface-variant">Nominal</span>
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold">Rp 150.000</span>
+</div>
+<!-- Biaya Admin -->
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md text-on-surface-variant">Biaya Admin</span>
+<span class="font-body-md text-body-md text-error-ruby">-Rp 2.500</span>
+</div>
+<div class="h-[1px] w-full bg-outline-variant/50 my-sm"></div>
+<!-- Total Diterima -->
+<div class="flex justify-between items-center bg-primary/5 p-sm rounded-md -mx-sm">
+<span class="font-label-md text-label-md text-primary font-bold">Total Diterima</span>
+<span class="font-headline-md text-headline-md text-primary font-bold">Rp 147.500</span>
+</div>
+</div>
+<!-- Tujuan -->
+<div class="bg-surface-container-highest/30 rounded-lg p-md flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-surface-card shadow-sm flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary">account_balance</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Tujuan</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">BCA - ****5678</span>
+</div>
+</div>
+<!-- Description -->
+<p class="font-label-md text-label-md text-on-surface-variant text-center bg-warning-amber/10 p-sm rounded-md flex items-start gap-sm">
+<span class="material-symbols-outlined text-[16px] text-warning-amber mt-[2px]">info</span>
+<span class="text-left leading-tight">Pastikan data di atas sudah benar sebelum melanjutkan.</span>
+</p>
+</div>
+<!-- Actions -->
+<div class="p-lg pt-0 flex gap-sm mt-sm">
+<button class="flex-1 py-md px-lg rounded-lg font-label-md text-label-md text-primary bg-primary/10 hover:bg-primary/20 transition-colors" id="btn-cancel">
+                Batal
+            </button>
+<button class="flex-[2] py-md px-lg rounded-lg font-label-md text-label-md text-on-primary bg-primary hover:bg-primary-container shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-sm relative overflow-hidden group" id="btn-confirm">
+<span class="relative z-10">Tarik Sekarang</span>
+<span class="material-symbols-outlined text-[18px] relative z-10 transition-transform group-hover:translate-x-1">arrow_forward</span>
+<div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+</button>
+</div>
+</div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const overlay = document.getElementById('overlay');
+        const modalCard = document.getElementById('modal-card');
+        const btnCancel = document.getElementById('btn-cancel');
+        const btnConfirm = document.getElementById('btn-confirm');
+        const btnCloseTop = document.getElementById('close-btn-top');
+
+        // Animate in
+        setTimeout(() => {
+            modalCard.classList.remove('scale-95', 'opacity-0');
+            modalCard.classList.add('scale-100', 'opacity-100');
+        }, 50);
+
+        const closeModal = () => {
+            modalCard.classList.remove('scale-100', 'opacity-100');
+            modalCard.classList.add('scale-95', 'opacity-0');
+            overlay.classList.add('opacity-0');
+            
+            setTimeout(() => {
+                document.getElementById('withdrawal-modal').style.display = 'none';
+            }, 300);
+        };
+
+        const handleConfirm = () => {
+            // Success state simulation
+            btnConfirm.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span><span class="ml-2">Memproses...</span>';
+            btnConfirm.classList.add('opacity-80', 'cursor-not-allowed');
+            
+            setTimeout(() => {
+                btnConfirm.innerHTML = '<span class="material-symbols-outlined">check_circle</span><span class="ml-2">Berhasil</span>';
+                btnConfirm.classList.replace('bg-primary', 'bg-secondary');
+                btnConfirm.classList.replace('hover:bg-primary-container', 'hover:bg-secondary-container');
+                
+                setTimeout(closeModal, 1000);
+            }, 1500);
+        };
+
+        overlay.addEventListener('click', closeModal);
+        btnCancel.addEventListener('click', closeModal);
+        btnCloseTop.addEventListener('click', closeModal);
+        btnConfirm.addEventListener('click', handleConfirm);
+    });
+</script></div></main><nav class="fixed bottom-0 w-full z-50 pb-safe glass" data-active-classes="text-primary font-bold"><div class="h-16 px-lg flex items-center justify-around"><a aria-current="page" class="flex flex-col items-center justify-center gap-xs transition-colors min-w-[64px] text-primary font-bold" data-path="dashboard" href="#"><span class="material-symbols-outlined">dashboard</span><span class="font-label-sm text-label-sm">Home</span></a><a class="flex flex-col items-center justify-center gap-xs text-on-surface-variant transition-colors min-w-[64px]" data-path="history" href="#"><span class="material-symbols-outlined">history</span><span class="font-label-sm text-label-sm">History</span></a><a class="flex flex-col items-center justify-center gap-xs text-on-surface-variant transition-colors min-w-[64px]" data-path="profile" href="#"><span class="material-symbols-outlined">person</span><span class="font-label-sm text-label-sm">Profile</span></a></div></nav></body></html>

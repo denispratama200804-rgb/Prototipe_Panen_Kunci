@@ -1,0 +1,134 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;family=Space+Grotesk:wght@500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline-variant": "#c4c5d5", "surface-bright": "#f8f9ff", "primary-fixed": "#dde1ff", "tertiary-container": "#3433c3", "surface-card": "#FFFFFF", "warning-amber": "#F59E0B", "on-tertiary-container": "#b3b5ff", "on-primary": "#ffffff", "surface-container": "#e5eeff", "outline": "#757684", "on-tertiary-fixed-variant": "#2f2ebe", "on-secondary-fixed": "#002113", "on-secondary": "#ffffff", "primary-fixed-dim": "#b8c4ff", "surface-container-low": "#eff4ff", "text-body": "#475569", "on-surface-variant": "#444653", "surface-dim": "#cbdbf5", "on-primary-fixed-variant": "#173bab", "surface-container-lowest": "#ffffff", "secondary": "#006c49", "on-tertiary-fixed": "#07006c", "secondary-container": "#6cf8bb", "bg-subtle": "#F8FAFC", "error": "#ba1a1a", "primary": "#00288e", "text-heading": "#0F172A", "background": "#f8f9ff", "on-primary-container": "#a8b8ff", "tertiary-fixed-dim": "#c0c1ff", "error-ruby": "#E11D48", "inverse-surface": "#213145", "on-secondary-container": "#00714d", "error-container": "#ffdad6", "surface-container-highest": "#d3e4fe", "on-secondary-fixed-variant": "#005236", "on-background": "#0b1c30", "tertiary": "#170cae", "on-tertiary": "#ffffff", "surface-variant": "#d3e4fe", "secondary-fixed": "#6ffbbe", "on-surface": "#0b1c30", "on-primary-fixed": "#001453", "inverse-on-surface": "#eaf1ff", "on-error": "#ffffff", "surface-container-high": "#dce9ff", "on-error-container": "#93000a", "surface-tint": "#3755c3", "secondary-fixed-dim": "#4edea3", "inverse-primary": "#b8c4ff", "tertiary-fixed": "#e1e0ff", "surface": "#f8f9ff", "primary-container": "#1e40af" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "lg": "24px", "margin-mobile": "16px", "base": "4px", "gutter": "16px", "margin-desktop": "32px", "md": "16px", "xs": "4px", "xl": "32px", "sm": "8px" }, "fontFamily": { "label-sm": ["Space Grotesk"], "body-md": ["Inter"], "label-md": ["Space Grotesk"], "body-lg": ["Inter"], "headline-md": ["Plus Jakarta Sans"], "headline-lg-mobile": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"] } } } }</script><style>@layer base { body { -webkit-tap-highlight-color: transparent; } .pt-safe { padding-top: env(safe-area-inset-top); } } .glass { background: rgba(248, 249, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-background text-on-surface font-body-md"><header class="fixed top-0 w-full z-50 glass shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin-mobile flex items-center pt-safe"><button class="w-10 h-10 -ml-2 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-colors" onclick="history.back()"><span class="material-symbols-outlined">arrow_back</span></button><h1 class="ml-2 font-headline-md text-headline-md">Transaksi Detail</h1></div></header><main class="relative pt-16 min-h-screen bg-background"><div class="px-margin-mobile py-lg"><div class="flex flex-col w-full gap-lg">
+<!-- Balance Card -->
+<section class="bg-primary text-on-primary rounded-xl p-lg relative overflow-hidden shadow-lg">
+<!-- Decorative background elements -->
+<div class="absolute -right-8 -top-8 w-32 h-32 bg-primary-fixed-dim/20 rounded-full blur-2xl"></div>
+<div class="absolute -left-12 -bottom-12 w-48 h-48 bg-tertiary-container/30 rounded-full blur-3xl"></div>
+<div class="relative z-10 flex flex-col gap-6">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1">
+<span class="font-label-md text-primary-fixed-dim uppercase tracking-wider">Saldo Tersedia</span>
+<h2 class="font-display-lg">Rp 85.000</h2>
+</div>
+<button aria-label="Info Saldo" class="w-10 h-10 rounded-full bg-primary-container/50 flex items-center justify-center hover:bg-primary-container transition-colors">
+<span class="material-symbols-outlined text-primary-fixed">info</span>
+</button>
+</div>
+<div class="bg-inverse-surface/10 rounded-lg p-sm flex items-center gap-sm">
+<span class="material-symbols-outlined text-secondary-fixed">trending_up</span>
+<span class="font-body-md text-primary-fixed">Total Pendapatan (Lifetime): <strong class="text-on-primary">Rp 450.000</strong></span>
+</div>
+</div>
+</section>
+<!-- Withdrawal Progress -->
+<section class="bg-surface-card rounded-xl p-md shadow-sm border border-surface-container flex flex-col gap-sm">
+<div class="flex justify-between items-end mb-2">
+<div class="flex flex-col gap-xs">
+<span class="font-headline-md text-text-heading">Penarikan</span>
+<span class="font-body-md text-text-body">Minimum: Rp 100.000</span>
+</div>
+<span class="font-label-md text-primary font-bold">85%</span>
+</div>
+<!-- Custom Progress Bar -->
+<div class="h-4 w-full bg-surface-container rounded-full overflow-hidden relative">
+<div class="absolute top-0 left-0 h-full bg-gradient-to-r from-secondary to-secondary-fixed w-[85%] rounded-full shadow-[0_0_10px_rgba(111,251,190,0.5)] transition-all duration-1000 ease-out" id="progress-bar" style="width: 85%;"></div>
+</div>
+<p class="font-label-sm text-text-body mt-1 text-center">Rp 15.000 lagi untuk penarikan</p>
+<button class="w-full mt-4 py-3 rounded-lg font-label-md bg-surface-container-high text-outline font-semibold uppercase tracking-wide transition-all disabled:opacity-70 disabled:cursor-not-allowed" disabled="">
+      Tarik Saldo
+    </button>
+<p class="text-center font-label-sm text-outline-variant mt-1">Tombol akan aktif setelah mencapai limit minimum.</p>
+</section>
+<!-- Recent Withdrawals -->
+<section class="flex flex-col gap-sm mt-4">
+<div class="flex justify-between items-center px-1">
+<h3 class="font-headline-md text-text-heading">Riwayat Penarikan</h3>
+<button class="font-label-md text-primary flex items-center gap-1 hover:text-primary-container transition-colors">
+        Lihat Semua <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+<div class="flex flex-col gap-xs">
+<!-- Item 1 -->
+<div class="bg-surface-card rounded-lg p-md shadow-sm border border-surface-container flex justify-between items-center group hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary relative">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">account_balance_wallet</span>
+<!-- Status Dot -->
+<div class="absolute -bottom-1 -right-1 w-4 h-4 bg-secondary rounded-full border-2 border-surface-card flex items-center justify-center">
+<span class="material-symbols-outlined text-on-secondary text-[10px] font-bold">check</span>
+</div>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-label-md text-text-heading">Transfer Bank BCA</span>
+<span class="font-label-sm text-text-body">12 Okt 2023, 14:30</span>
+</div>
+</div>
+<div class="flex flex-col items-end gap-xs">
+<span class="font-label-md text-text-heading font-bold">- Rp 100.000</span>
+<span class="px-2 py-1 bg-secondary/10 text-secondary rounded-md font-label-sm">Berhasil</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="bg-surface-card rounded-lg p-md shadow-sm border border-surface-container flex justify-between items-center group hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary relative">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">account_balance</span>
+<!-- Status Dot -->
+<div class="absolute -bottom-1 -right-1 w-4 h-4 bg-secondary rounded-full border-2 border-surface-card flex items-center justify-center">
+<span class="material-symbols-outlined text-on-secondary text-[10px] font-bold">check</span>
+</div>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-label-md text-text-heading">GoPay</span>
+<span class="font-label-sm text-text-body">28 Sep 2023, 09:15</span>
+</div>
+</div>
+<div class="flex flex-col items-end gap-xs">
+<span class="font-label-md text-text-heading font-bold">- Rp 150.000</span>
+<span class="px-2 py-1 bg-secondary/10 text-secondary rounded-md font-label-sm">Berhasil</span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="bg-surface-card rounded-lg p-md shadow-sm border border-surface-container flex justify-between items-center group hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary relative">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">account_balance_wallet</span>
+<!-- Status Dot -->
+<div class="absolute -bottom-1 -right-1 w-4 h-4 bg-secondary rounded-full border-2 border-surface-card flex items-center justify-center">
+<span class="material-symbols-outlined text-on-secondary text-[10px] font-bold">check</span>
+</div>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-label-md text-text-heading">Transfer Bank Mandiri</span>
+<span class="font-label-sm text-text-body">05 Sep 2023, 11:20</span>
+</div>
+</div>
+<div class="flex flex-col items-end gap-xs">
+<span class="font-label-md text-text-heading font-bold">- Rp 100.000</span>
+<span class="px-2 py-1 bg-secondary/10 text-secondary rounded-md font-label-sm">Berhasil</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<script>
+  // Simple entrance animation for the progress bar
+  document.addEventListener('DOMContentLoaded', () => {
+    const progressBar = document.getElementById('progress-bar');
+    if(progressBar) {
+        // Reset to 0 then animate to 85%
+        progressBar.style.width = '0%';
+        setTimeout(() => {
+            progressBar.style.width = '85%';
+        }, 100);
+    }
+  });
+</script></div></main>
+
+</body></html>
