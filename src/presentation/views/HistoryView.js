@@ -1,0 +1,167 @@
+import { IComponent } from '../../core/interfaces/IComponent.js';
+
+/**
+ * HistoryView
+ * Prinsip: Single Responsibility Principle (SRP) & Liskov Substitution Principle (LSP)
+ * Halaman riwayat transaksi dengan dua tab interaktif: Riwayat Setoran Key & Riwayat Penarikan Saldo.
+ */
+export class HistoryView extends IComponent {
+  /**
+   * @param {import('../../core/container/ServiceContainer.js').ServiceContainer} container
+   */
+  constructor(container) {
+    super();
+    this._container = container;
+    this._apiKeyService = container.resolve('ApiKeyService');
+    this._walletService = container.resolve('WalletService');
+    this._activeTab = 'setoran'; // 'setoran' or 'penarikan'
+  }
+
+  render() {
+    const keys = this._apiKeyService.getAllKeys();
+    const withdrawals = this._walletService.getWithdrawals();
+
+    return `
+      <div class="flex flex-col w-full min-h-screen bg-background pb-28 pt-20">
+        <div class="px-margin-mobile max-w-md mx-auto w-full flex flex-col gap-4">
+          
+          <!-- Segmented Tab Controls -->
+          <div class="flex bg-surface-container-low rounded-2xl p-1 gap-1 border border-surface-container shadow-inner">
+            <button
+              type="button"
+              id="tabBtnSetoran"
+              class="flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 ${this._activeTab === 'setoran' ? 'bg-surface-card text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}"
+            >
+              Setoran API Key (${keys.length})
+            </button>
+            <button
+              type="button"
+              id="tabBtnPenarikan"
+              class="flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 ${this._activeTab === 'penarikan' ? 'bg-surface-card text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}"
+            >
+              Penarikan Dana (${withdrawals.length})
+            </button>
+          </div>
+
+          <!-- Tab Content: Setoran API Key -->
+          <div id="tabContentSetoran" class="flex flex-col gap-2.5 ${this._activeTab === 'setoran' ? '' : 'hidden'}">
+            ${keys.length === 0 ? `
+              <div class="bg-surface-card rounded-3xl p-10 text-center flex flex-col items-center border border-surface-container">
+                <span class="material-symbols-outlined text-4xl text-outline mb-2">vpn_key_off</span>
+                <p class="text-sm font-bold text-text-heading">Belum Ada Setoran Key</p>
+                <p class="text-xs text-text-body mt-1">Mulai setorkan API Key valid dari Kie.ai untuk mendapatkan saldo.</p>
+                <a href="#/setor" class="mt-4 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold shadow-sm">
+                  Setor Key Sekarang
+                </a>
+              </div>
+            ` : keys.map(k => {
+              const isValid = k.status === 'valid';
+              const dateStr = new Date(k.createdAt).toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+
+              return `
+                <div class="bg-surface-card border border-surface-container rounded-2xl p-4 shadow-sm flex items-center justify-between relative overflow-hidden group">
+                  <div class="absolute left-0 top-0 bottom-0 w-1.5 ${isValid ? 'bg-secondary' : 'bg-error-ruby'}"></div>
+                  
+                  <div class="flex flex-col gap-1 pl-2">
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono text-xs font-bold text-text-heading bg-surface-container-low px-2 py-0.5 rounded-md border border-surface-container">
+                        ${k.getMaskedKey()}
+                      </span>
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isValid ? 'bg-secondary-container text-on-secondary-container' : 'bg-error-container text-on-error-container'}">
+                        ${isValid ? 'Valid' : 'Invalid'}
+                      </span>
+                    </div>
+                    <span class="text-[11px] text-text-body">${dateStr}</span>
+                    ${k.errorMessage ? `<span class="text-[11px] text-error-ruby">${k.errorMessage}</span>` : ''}
+                  </div>
+
+                  <div class="flex flex-col items-end shrink-0">
+                    <span class="font-headline-md text-sm font-extrabold ${isValid ? 'text-secondary' : 'text-outline'}">
+                      ${isValid ? `+Rp ${k.rewardAmount.toLocaleString('id-ID')}` : '+Rp 0'}
+                    </span>
+                    <span class="text-[10px] text-outline font-semibold">Kie.ai 80 Kredit</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <!-- Tab Content: Penarikan Dana -->
+          <div id="tabContentPenarikan" class="flex flex-col gap-2.5 ${this._activeTab === 'penarikan' ? '' : 'hidden'}">
+            ${withdrawals.length === 0 ? `
+              <div class="bg-surface-card rounded-3xl p-10 text-center flex flex-col items-center border border-surface-container">
+                <span class="material-symbols-outlined text-4xl text-outline mb-2">receipt_long</span>
+                <p class="text-sm font-bold text-text-heading">Belum Ada Riwayat Penarikan</p>
+                <p class="text-xs text-text-body mt-1">Kumpulkan saldo dari setoran API key untuk melakukan penarikan pertama Anda.</p>
+                <a href="#/tarik" class="mt-4 px-4 py-2 bg-secondary text-white rounded-xl text-xs font-bold shadow-sm">
+                  Tarik Saldo
+                </a>
+              </div>
+            ` : withdrawals.map(w => {
+              const dateStr = new Date(w.createdAt).toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+
+              return `
+                <div class="bg-surface-card border border-surface-container rounded-2xl p-4 shadow-sm flex items-center justify-between relative overflow-hidden">
+                  <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary"></div>
+
+                  <div class="flex flex-col gap-1 pl-2">
+                    <div class="flex items-center gap-2">
+                      <span class="font-label-md text-xs font-bold text-text-heading">${w.title}</span>
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/10 text-secondary">
+                        Berhasil
+                      </span>
+                    </div>
+                    <span class="text-[11px] text-text-body">${w.description} • ${dateStr}</span>
+                  </div>
+
+                  <div class="flex flex-col items-end shrink-0">
+                    <span class="font-headline-md text-sm font-extrabold text-error-ruby">
+                      -Rp ${w.amount.toLocaleString('id-ID')}
+                    </span>
+                    <span class="text-[10px] text-secondary font-semibold">Bebas Biaya Admin</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+        </div>
+      </div>
+    `;
+  }
+
+  mount(container) {
+    const tabBtnSetoran = container.querySelector('#tabBtnSetoran');
+    const tabBtnPenarikan = container.querySelector('#tabBtnPenarikan');
+    const contentSetoran = container.querySelector('#tabContentSetoran');
+    const contentPenarikan = container.querySelector('#tabContentPenarikan');
+
+    tabBtnSetoran?.addEventListener('click', () => {
+      this._activeTab = 'setoran';
+      tabBtnSetoran.className = 'flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 bg-surface-card text-primary shadow-sm';
+      tabBtnPenarikan.className = 'flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 text-on-surface-variant hover:text-on-surface';
+      contentSetoran.classList.remove('hidden');
+      contentPenarikan.classList.add('hidden');
+    });
+
+    tabBtnPenarikan?.addEventListener('click', () => {
+      this._activeTab = 'penarikan';
+      tabBtnPenarikan.className = 'flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 bg-surface-card text-primary shadow-sm';
+      tabBtnSetoran.className = 'flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 text-on-surface-variant hover:text-on-surface';
+      contentPenarikan.classList.remove('hidden');
+      contentSetoran.classList.add('hidden');
+    });
+  }
+}
