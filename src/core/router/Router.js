@@ -55,6 +55,12 @@ export class Router {
     const rawHash = window.location.hash.slice(1) || '/';
     const [path] = rawHash.split('?');
     
+    // Jika user membuka hash #/admin atau #/admin_panel di aplikasi utama, redirect langsung
+    if (path === '/admin' || path === '/admin_panel') {
+      window.location.href = '/admin_panel/index.html';
+      return;
+    }
+
     // Cari route yang cocok
     let route = this._routes.find(r => r.path === path);
     if (!route) {
