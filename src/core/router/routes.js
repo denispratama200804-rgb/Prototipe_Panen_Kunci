@@ -17,7 +17,7 @@ export const routes = [
   {
     path: '/',
     viewClass: LandingView,
-    title: 'Ubah API Key Menjadi Rupiah',
+    title: 'Panen Kunci',
     requiresAuth: false
   },
   {

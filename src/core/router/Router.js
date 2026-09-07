@@ -91,7 +91,9 @@ export class Router {
 
     // Set judul halaman
     if (route.title) {
-      document.title = `${route.title} - Panen Kunci`;
+      document.title = route.title === 'Panen Kunci' ? 'Panen Kunci' : `${route.title} - Panen Kunci`;
+    } else {
+      document.title = 'Panen Kunci';
     }
 
     // Render view baru
