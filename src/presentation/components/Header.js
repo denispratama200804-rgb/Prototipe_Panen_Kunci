@@ -64,7 +64,7 @@ export class HeaderComponent {
       this._element.innerHTML = `
         <div class="h-16 max-w-md mx-auto px-4 flex items-center justify-between">
           <div class="flex items-center gap-2.5">
-            <img src="/logo.png" alt="Panen Kunci Logo" class="h-8 w-auto object-contain rounded-md" onerror="this.src='https://lh3.googleusercontent.com/aida-public/AB6AXuB2Fwib7SUIUPPKcJBes6nFpQh4N_Ad3DG0amKUTqIZpaG7vjX0iYURjJ1oU7kON_ukR314JOoeh8TGScVTliV1qM42iypBlZp3N0mCtwjfVb4mTB5RAM1esQIoelHcvObZaZYsalHSPxMdnRiY3kwEBQPLQDldW0ZTBh2ZD0oe_FpI0IWpqxtxUAZ8tVqazb0a8DtaX3r27j7VsHuAPIEg3UzQpvsHuS9Xf6suq5X2fyNbdt6cimyI'"/>
+            <img src="/Logo_PK.jpg" alt="Panen Kunci Logo" class="h-8 w-auto object-contain rounded-md" onerror="this.src='/logo.png'"/>
             <span class="font-headline-md text-lg font-bold text-primary tracking-tight">Panen Kunci</span>
           </div>
           <div class="flex items-center gap-2">
@@ -91,7 +91,7 @@ export class HeaderComponent {
               <span class="material-symbols-outlined text-[22px]">arrow_back</span>
             </button>
           ` : `
-            <img src="/logo.png" alt="Logo" class="h-8 w-auto object-contain rounded-md" onerror="this.src='https://lh3.googleusercontent.com/aida-public/AB6AXuB2Fwib7SUIUPPKcJBes6nFpQh4N_Ad3DG0amKUTqIZpaG7vjX0iYURjJ1oU7kON_ukR314JOoeh8TGScVTliV1qM42iypBlZp3N0mCtwjfVb4mTB5RAM1esQIoelHcvObZaZYsalHSPxMdnRiY3kwEBQPLQDldW0ZTBh2ZD0oe_FpI0IWpqxtxUAZ8tVqazb0a8DtaX3r27j7VsHuAPIEg3UzQpvsHuS9Xf6suq5X2fyNbdt6cimyI'"/>
+            <img src="/Logo_PK.jpg" alt="Logo" class="h-8 w-auto object-contain rounded-md" onerror="this.src='/logo.png'"/>
           `}
           <h1 class="font-headline-md text-base sm:text-lg font-bold text-on-surface truncate">${title}</h1>
         </div>

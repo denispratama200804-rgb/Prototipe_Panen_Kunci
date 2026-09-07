@@ -27,7 +27,7 @@ export class LoginView extends IComponent {
         <div class="w-full max-w-[400px] bg-surface-card rounded-3xl shadow-xl border border-surface-container p-6 relative z-10">
           <!-- Logo & Heading -->
           <div class="flex flex-col items-center mb-6">
-            <img src="/logo.png" alt="Panen Kunci Logo" class="w-14 h-14 object-contain mb-3 rounded-xl shadow-sm" onerror="this.src='https://lh3.googleusercontent.com/aida-public/AB6AXuB2Fwib7SUIUPPKcJBes6nFpQh4N_Ad3DG0amKUTqIZpaG7vjX0iYURjJ1oU7kON_ukR314JOoeh8TGScVTliV1qM42iypBlZp3F54000'"/>
+            <img src="/Logo_PK.jpg" alt="Panen Kunci Logo" class="w-14 h-14 object-contain mb-3 rounded-xl shadow-sm" onerror="this.src='/logo.png'"/>
             <h1 class="font-headline-md text-2xl font-bold text-text-heading text-center">Selamat Datang Kembali</h1>
             <p class="font-body-md text-xs text-text-body mt-1 text-center">Silakan masuk ke akun Panen Kunci Anda</p>
           </div>

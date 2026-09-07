@@ -49,7 +49,7 @@ function bootstrap() {
   const apiKeyValidator = new ApiKeyValidator();
   container.registerSingleton('ApiKeyValidator', apiKeyValidator);
 
-  const withdrawalValidator = new WithdrawalValidator(15000);
+  const withdrawalValidator = new WithdrawalValidator(50000);
   container.registerSingleton('WithdrawalValidator', withdrawalValidator);
 
   // 3. Register Strategy Factory (OCP)

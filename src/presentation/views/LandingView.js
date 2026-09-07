@@ -95,7 +95,7 @@ export class LandingView extends IComponent {
                 </div>
                 <div class="flex items-center gap-1.5">
                   <span class="material-symbols-outlined text-[16px] text-secondary-fixed">payments</span>
-                  <span>Min. Penarikan Rp15.000</span>
+                  <span>Min. Penarikan Rp50.000</span>
                 </div>
               </div>
             </div>

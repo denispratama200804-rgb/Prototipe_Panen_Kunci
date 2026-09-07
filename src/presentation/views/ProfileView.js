@@ -293,7 +293,7 @@ export class ProfileView extends IComponent {
           },
           terms: {
             title: 'Syarat & Ketentuan',
-            message: 'Setiap API Key yang disetor harus memiliki saldo 80 kredit aktif dari Kie.ai. Key yang sudah terdaftar tidak dapat digunakan kembali. Pencairan saldo dilakukan sesuai limit minimum Rp 15.000.'
+            message: 'Setiap API Key yang disetor harus memiliki saldo 80 kredit aktif dari Kie.ai. Key yang sudah terdaftar tidak dapat digunakan kembali. Pencairan saldo dilakukan sesuai limit minimum Rp 50.000.'
           },
           privacy: {
             title: 'Kebijakan Privasi',

@@ -6,7 +6,7 @@ import { IValidator } from '../../core/interfaces/IValidator.js';
  * Menangani validasi penarikan saldo (nominal minimum, saldo cukup, kelayakan rekening tujuan).
  */
 export class WithdrawalValidator extends IValidator {
-  constructor(minWithdrawal = 15000) {
+  constructor(minWithdrawal = 50000) {
     super();
     this.minWithdrawal = minWithdrawal;
   }

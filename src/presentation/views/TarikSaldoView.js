@@ -58,9 +58,9 @@ export class TarikSaldoView extends IComponent {
                   id="withdrawAmount"
                   type="number"
                   placeholder="0"
-                  min="15000"
+                  min="50000"
                   step="5000"
-                  value="${Math.min(balance, 50000)}"
+                  value="50000"
                   class="w-full bg-surface-container-low rounded-2xl py-3.5 pl-12 pr-28 text-lg font-bold text-text-heading border border-surface-container focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-mono"
                 />
                 <button
@@ -74,20 +74,20 @@ export class TarikSaldoView extends IComponent {
 
               <!-- Quick Denomination Chips -->
               <div class="grid grid-cols-4 gap-2 mt-1">
-                <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="20000">
-                  20 rb
-                </button>
                 <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="50000">
                   50 rb
                 </button>
                 <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="100000">
                   100 rb
                 </button>
-                <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="250000">
-                  250 rb
+                <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="200000">
+                  200 rb
+                </button>
+                <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="500000">
+                  500 rb
                 </button>
               </div>
-              <p class="text-[11px] text-outline">Batas minimal penarikan adalah Rp 15.000.</p>
+              <p class="text-[11px] text-outline">Batas minimal penarikan adalah Rp 50.000.</p>
             </div>
 
             <!-- Method Selection Grid -->
@@ -260,8 +260,8 @@ export class TarikSaldoView extends IComponent {
         this._notification.error('Nominal penarikan harus valid.');
         return;
       }
-      if (amount < 15000) {
-        this._notification.error('Batas minimal penarikan adalah Rp 15.000.');
+      if (amount < 50000) {
+        this._notification.error('Batas minimal penarikan adalah Rp 50.000.');
         return;
       }
       if (amount > currentBalance) {

@@ -33,7 +33,7 @@ async function runTests() {
   const storage = new MemoryStorageAdapter();
   const authValidator = new AuthValidator();
   const apiKeyValidator = new ApiKeyValidator();
-  const withdrawalValidator = new WithdrawalValidator(15000);
+  const withdrawalValidator = new WithdrawalValidator(50000);
   const strategyFactory = new WithdrawalStrategyFactory();
 
   container.registerSingleton('EventBus', eventBus);
@@ -104,18 +104,30 @@ async function runTests() {
   assert(dupResult.success === false, 'Duplicate API Key correctly rejected');
   assert(dupResult.message.includes('sudah pernah'), 'Rejection message explains duplication');
 
-  // Test 7: Withdrawal Execution
-  console.log('\n[7] Testing Withdrawal:');
-  const curBal = walletService.getBalance();
-  const withdrawAmount = 20000;
-  const withdrawResult = await walletService.withdraw({
-    amount: withdrawAmount,
+  // Test 7: Withdrawal Execution & Minimum Threshold
+  console.log('\n[7] Testing Withdrawal & Minimum Limit (Rp 50.000):');
+  
+  // Test below 50.000 (should fail)
+  const lowAmountResult = await walletService.withdraw({
+    amount: 20000,
     method: 'dana',
     accountIdentifier: '081234567890',
     userId: 'usr_denis'
   });
-  assert(withdrawResult.success === true, 'Withdrawal processed successfully');
-  assert(walletService.getBalance() === curBal - withdrawAmount, 'Balance deducted accurately');
+  assert(lowAmountResult.success === false, 'Withdrawal below Rp 50.000 is rejected');
+  assert(lowAmountResult.message.includes('50.000'), 'Error message states minimum is Rp 50.000');
+
+  // Test valid withdrawal >= 50.000 (should succeed)
+  const curBal = walletService.getBalance();
+  const validWithdrawAmount = 50000;
+  const withdrawResult = await walletService.withdraw({
+    amount: validWithdrawAmount,
+    method: 'dana',
+    accountIdentifier: '081234567890',
+    userId: 'usr_denis'
+  });
+  assert(withdrawResult.success === true, 'Withdrawal Rp 50.000 processed successfully');
+  assert(walletService.getBalance() === curBal - validWithdrawAmount, 'Balance deducted accurately');
 
   console.log(`\n=== Tests Completed: ${passed} Passed, ${failed} Failed ===`);
   if (failed > 0) process.exit(1);
