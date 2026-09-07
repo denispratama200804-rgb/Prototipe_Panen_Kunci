@@ -1,4 +1,5 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
+import { AppEvents } from '../../core/events/EventBus.js';
 
 /**
  * DashboardView
@@ -15,6 +16,7 @@ export class DashboardView extends IComponent {
     this._walletService = container.resolve('WalletService');
     this._apiKeyService = container.resolve('ApiKeyService');
     this._authService = container.resolve('AuthService');
+    this._eventBus = container.resolve('EventBus');
   }
 
   render() {
@@ -135,12 +137,137 @@ export class DashboardView extends IComponent {
             </div>
           </div>
 
+          <!-- Download App Button -->
+          <div class="pt-1">
+            <button type="button" id="btn-dashboard-download" class="w-full bg-primary text-on-primary rounded-2xl py-3.5 px-5 flex items-center justify-center gap-2.5 shadow-md shadow-primary/20 hover:bg-primary-container transition-all active:scale-95 font-label-md text-sm font-bold group">
+              <span class="material-symbols-outlined text-[20px] group-hover:translate-y-0.5 transition-transform">download</span>
+              <span>Download Aplikasi Panen Kunci</span>
+            </button>
+          </div>
+
         </div>
       </div>
     `;
   }
 
   mount(container) {
-    // Dynamic interactions handled via hash routing
+    const downloadBtn = container.querySelector('#btn-dashboard-download');
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._handleInstall(downloadBtn);
+      });
+    }
+  }
+
+  /**
+   * Langsung trigger PWA install prompt saat tombol diklik.
+   * @param {HTMLButtonElement} btn
+   */
+  async _handleInstall(btn) {
+    const originalHTML = btn.innerHTML;
+
+    // Loading state
+    btn.disabled = true;
+    btn.innerHTML = `
+      <span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
+      <span>Menyiapkan Instalasi...</span>
+    `;
+
+    // Cek apakah sudah terinstall sebagai PWA
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+    if (isStandalone) {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+      this._eventBus.emit(AppEvents.SHOW_TOAST, {
+        message: '✅ Panen Kunci sudah terinstal di perangkat Anda!',
+        type: 'success',
+        duration: 3000
+      });
+      return;
+    }
+
+    // Native install prompt (Chrome Android / Desktop)
+    if (window.deferredInstallPrompt) {
+      try {
+        await window.deferredInstallPrompt.prompt();
+        const { outcome } = await window.deferredInstallPrompt.userChoice;
+        window.deferredInstallPrompt = null;
+
+        if (outcome === 'accepted') {
+          btn.innerHTML = `
+            <span class="material-symbols-outlined text-[20px]">check_circle</span>
+            <span>Berhasil Dipasang!</span>
+          `;
+          this._eventBus.emit(AppEvents.SHOW_TOAST, {
+            message: '🎉 Panen Kunci berhasil dipasang di perangkat Anda!',
+            type: 'success',
+            duration: 4000
+          });
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+          }, 3000);
+        } else {
+          btn.disabled = false;
+          btn.innerHTML = originalHTML;
+        }
+      } catch (err) {
+        console.warn('[PWA] Install prompt error:', err);
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+      return;
+    }
+
+    // Fallback jika tidak ada prompt native
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
+    const isAndroid = /android/.test(ua);
+
+    if (isIOS && isSafari) {
+      this._eventBus.emit(AppEvents.SHOW_MODAL, {
+        title: '📲 Install di iPhone / iPad',
+        message: `
+          <div class="flex flex-col gap-3 text-left mt-2">
+            <div class="flex gap-3 items-start">
+              <div class="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 text-xs font-bold">1</div>
+              <p class="text-sm text-on-surface-variant pt-0.5">Ketuk ikon <strong class="text-on-surface">Bagikan □↑</strong> di bawah layar Safari.</p>
+            </div>
+            <div class="flex gap-3 items-start">
+              <div class="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 text-xs font-bold">2</div>
+              <p class="text-sm text-on-surface-variant pt-0.5">Pilih <strong class="text-on-surface">"Add to Home Screen"</strong>.</p>
+            </div>
+            <div class="flex gap-3 items-start">
+              <div class="w-7 h-7 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0 text-xs font-bold">3</div>
+              <p class="text-sm text-on-surface-variant pt-0.5">Ketuk <strong class="text-on-surface">Add</strong> — selesai!</p>
+            </div>
+          </div>`,
+        type: 'info',
+        confirmText: 'Siap!',
+        onConfirm: () => { }
+      });
+      return;
+    }
+
+    if (isAndroid) {
+      this._eventBus.emit(AppEvents.SHOW_TOAST, {
+        message: '💡 Ketuk ⋮ Menu Chrome → "Tambahkan ke layar utama" untuk install.',
+        type: 'info',
+        duration: 5000
+      });
+      return;
+    }
+
+    this._eventBus.emit(AppEvents.SHOW_TOAST, {
+      message: '💡 Buka halaman ini di Chrome Android atau klik ikon install di address bar.',
+      type: 'info',
+      duration: 5000
+    });
   }
 }
