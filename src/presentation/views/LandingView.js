@@ -156,85 +156,132 @@ export class LandingView extends IComponent {
 
   mount(container) {
     const downloadBtn = container.querySelector('#btn-download-app');
-    if (downloadBtn) {
-      downloadBtn.addEventListener('click', (e) => {
-        e.preventDefault();
+    if (!downloadBtn) return;
 
-        // 1. Tampilkan state loading
-        downloadBtn.disabled = true;
-        downloadBtn.innerHTML = `
-          <span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
-          <span>Menyiapkan Unduhan...</span>
-        `;
+    downloadBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      this._handleInstall(downloadBtn);
+    });
+  }
 
-        // 2. Jika browser mendukung PWA Install prompt, munculkan dialog instalasi
-        if (window.deferredInstallPrompt) {
-          try {
-            window.deferredInstallPrompt.prompt();
-            window.deferredInstallPrompt.userChoice.then((choiceResult) => {
-              if (choiceResult.outcome === 'accepted') {
-                this._eventBus.emit(AppEvents.SHOW_TOAST, {
-                  message: 'Aplikasi Panen Kunci berhasil dipasang di perangkat Anda!',
-                  type: 'success'
-                });
-              }
-              window.deferredInstallPrompt = null;
-            });
-          } catch (err) {
-            console.warn('PWA prompt skipped:', err);
-          }
-        }
+  /**
+   * Langsung trigger PWA install prompt saat tombol diklik.
+   * - Jika deferredInstallPrompt tersedia → install native langsung (Android Chrome)
+   * - Jika iOS Safari → modal panduan Share → Add to Home Screen
+   * - Jika Android tanpa prompt → toast singkat panduan manual
+   * - Jika sudah terinstall → notifikasi sudah terpasang
+   * @param {HTMLButtonElement} btn
+   */
+  async _handleInstall(btn) {
+    const originalHTML = btn.innerHTML;
 
-        // 3. Trigger Download File APK Panen Kunci
-        setTimeout(() => {
-          try {
-            const downloadLink = document.createElement('a');
-            downloadLink.href = '/downloads/PanenKunci-v1.2.0.apk';
-            downloadLink.setAttribute('download', 'PanenKunci-v1.2.0.apk');
-            downloadLink.style.display = 'none';
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
+    // ── Loading state ─────────────────────────────────────────────────────────
+    btn.disabled = true;
+    btn.innerHTML = `
+      <span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
+      <span>Menyiapkan Instalasi...</span>
+    `;
 
-            // Ubah tampilan tombol menjadi status sukses
-            downloadBtn.innerHTML = `
-              <span class="material-symbols-outlined text-[20px] text-secondary">check_circle</span>
-              <span class="text-secondary font-bold">Unduhan Berhasil!</span>
-            `;
-
-            // Notifikasi Toast
-            this._eventBus.emit(AppEvents.SHOW_TOAST, {
-              message: 'File PanenKunci-v1.2.0.apk berhasil diunduh ke folder Download!',
-              type: 'success',
-              duration: 4000
-            });
-
-            // Tampilkan Modal Panduan Instalasi
-            this._eventBus.emit(AppEvents.SHOW_MODAL, {
-              title: 'Unduhan Aplikasi Berhasil!',
-              message: 'File installer Panen Kunci (PanenKunci-v1.2.0.apk) telah tersimpan di perangkat Anda. Buka file dari panel notifikasi atau folder Download untuk menginstal aplikasi.',
-              type: 'success',
-              confirmText: 'Mengerti',
-              onConfirm: () => { }
-            });
-          } catch (error) {
-            console.error('Download error:', error);
-            this._eventBus.emit(AppEvents.SHOW_TOAST, {
-              message: 'Gagal memulai unduhan file aplikasi.',
-              type: 'error'
-            });
-          }
-
-          // Kembalikan tombol ke keadaan semula setelah 3.5 detik
-          setTimeout(() => {
-            downloadBtn.disabled = false;
-            downloadBtn.innerHTML = `
-              <span>Download Apps Sekarang</span>
-              <span class="material-symbols-outlined text-[20px]">download</span>
-            `;
-          }, 3500);
-        }, 800);
+    // ── Sudah terinstall sebagai PWA? ─────────────────────────────────────────
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+    if (isStandalone) {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+      this._eventBus.emit(AppEvents.SHOW_TOAST, {
+        message: '✅ Panen Kunci sudah terinstal di perangkat Anda!',
+        type: 'success',
+        duration: 3000
       });
+      return;
     }
+
+    // ── Native install prompt (Android Chrome / Desktop Chrome) ───────────────
+    if (window.deferredInstallPrompt) {
+      try {
+        await window.deferredInstallPrompt.prompt();
+        const { outcome } = await window.deferredInstallPrompt.userChoice;
+        window.deferredInstallPrompt = null;
+
+        if (outcome === 'accepted') {
+          // Tampilkan konfirmasi sukses di tombol
+          btn.innerHTML = `
+            <span class="material-symbols-outlined text-[20px]">check_circle</span>
+            <span>Berhasil Dipasang!</span>
+          `;
+          this._eventBus.emit(AppEvents.SHOW_TOAST, {
+            message: '🎉 Panen Kunci berhasil dipasang di perangkat Anda!',
+            type: 'success',
+            duration: 4000
+          });
+          // Kembalikan tombol ke semula setelah 3 detik
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+          }, 3000);
+        } else {
+          // User batalkan install
+          btn.disabled = false;
+          btn.innerHTML = originalHTML;
+        }
+      } catch (err) {
+        console.warn('[PWA] Install prompt error:', err);
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+      return;
+    }
+
+    // ── Fallback: Tidak ada native prompt ────────────────────────────────────
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
+    const isAndroid = /android/.test(ua);
+
+    // iOS Safari — wajib pakai Share → Add to Home Screen
+    if (isIOS && isSafari) {
+      this._eventBus.emit(AppEvents.SHOW_MODAL, {
+        title: '📲 Install di iPhone / iPad',
+        message: `
+          <div class="flex flex-col gap-3 text-left mt-2">
+            <div class="flex gap-3 items-start">
+              <div class="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 text-xs font-bold">1</div>
+              <p class="text-sm text-on-surface-variant pt-0.5">Ketuk ikon <strong class="text-on-surface">Bagikan □↑</strong> di bawah layar Safari.</p>
+            </div>
+            <div class="flex gap-3 items-start">
+              <div class="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 text-xs font-bold">2</div>
+              <p class="text-sm text-on-surface-variant pt-0.5">Pilih <strong class="text-on-surface">"Add to Home Screen"</strong>.</p>
+            </div>
+            <div class="flex gap-3 items-start">
+              <div class="w-7 h-7 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0 text-xs font-bold">3</div>
+              <p class="text-sm text-on-surface-variant pt-0.5">Ketuk <strong class="text-on-surface">Add</strong> — selesai!</p>
+            </div>
+          </div>`,
+        type: 'info',
+        confirmText: 'Siap!',
+        onConfirm: () => { }
+      });
+      return;
+    }
+
+    // Android Chrome tapi prompt belum siap (belum memenuhi kriteria install)
+    if (isAndroid) {
+      this._eventBus.emit(AppEvents.SHOW_TOAST, {
+        message: '💡 Ketuk ⋮ Menu Chrome → "Tambahkan ke layar utama" untuk install.',
+        type: 'info',
+        duration: 5000
+      });
+      return;
+    }
+
+    // Desktop atau browser lain
+    this._eventBus.emit(AppEvents.SHOW_TOAST, {
+      message: '💡 Buka halaman ini di Chrome Android untuk install aplikasi.',
+      type: 'info',
+      duration: 5000
+    });
   }
 }

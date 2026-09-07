@@ -32,7 +32,28 @@ import { routes } from './core/router/routes.js';
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   window.deferredInstallPrompt = e;
+  console.log('[PWA] Install prompt captured and ready.');
 });
+
+// Track when PWA is installed
+window.addEventListener('appinstalled', () => {
+  window.deferredInstallPrompt = null;
+  console.log('[PWA] App installed successfully!');
+});
+
+// Register Service Worker for offline support & PWA install
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => {
+        console.log('[SW] Service Worker registered:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('[SW] Service Worker registration failed:', err);
+      });
+  });
+}
+
 
 /**
  * Bootstrap Application

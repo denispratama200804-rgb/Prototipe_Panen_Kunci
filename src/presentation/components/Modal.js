@@ -99,7 +99,7 @@ export class ModalComponent {
         <!-- Heading & Body -->
         <div class="flex flex-col gap-2 w-full">
           <h3 class="font-headline-md text-xl text-text-heading font-bold">${title}</h3>
-          ${message ? `<p class="font-body-md text-sm text-text-body leading-relaxed">${message}</p>` : ''}
+          ${message ? `<div class="font-body-md text-sm text-text-body leading-relaxed w-full">${message}</div>` : ''}
           ${html ? `<div class="modal-custom-html w-full text-left my-2">${html}</div>` : ''}
         </div>
 
