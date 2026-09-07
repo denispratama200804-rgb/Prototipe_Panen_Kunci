@@ -149,6 +149,25 @@ export class LoginView extends IComponent {
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Memverifikasi...</span>';
 
+      // Khusus Akses Admin: Username "admin" dan Password "admin"
+      if (email.toLowerCase() === 'admin' && password === 'admin') {
+        localStorage.setItem('panenkunci:admin_logged_in', 'true');
+        this._notification.showModal({
+          title: 'Login Administrator Berhasil!',
+          message: 'Kredensial Super Admin terverifikasi. Mengalihkan langsung ke Admin Panel...',
+          type: 'success',
+          confirmText: 'Buka Admin Panel Sekarang',
+          onConfirm: () => {
+            window.location.href = '/admin_panel/index.html';
+          }
+        });
+
+        setTimeout(() => {
+          window.location.href = '/admin_panel/index.html';
+        }, 1100);
+        return;
+      }
+
       const res = await this._authService.login(email, password);
 
       if (res.success) {

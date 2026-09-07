@@ -134,6 +134,15 @@ export class Sidebar {
             <span class="material-symbols-outlined text-sm">database</span>
             <span>Isi / Reset Demo Data</span>
           </button>
+
+          <button
+            type="button"
+            id="btn-logout-admin"
+            class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-600/30 border border-rose-500/20 transition-all"
+          >
+            <span class="material-symbols-outlined text-sm">logout</span>
+            <span>Keluar Admin</span>
+          </button>
         </div>
       </aside>
     `;
@@ -152,6 +161,14 @@ export class Sidebar {
     if (seedBtn) {
       seedBtn.addEventListener('click', () => {
         this.onSeed();
+      });
+    }
+
+    const logoutBtn = container.querySelector('#btn-logout-admin');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('panenkunci:admin_logged_in');
+        window.location.href = '/#/login';
       });
     }
   }
