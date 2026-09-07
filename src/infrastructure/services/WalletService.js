@@ -228,7 +228,7 @@ export class WalletService {
     // 4. Kurangi saldo
     this._balance -= numAmount;
 
-    // 5. Catat transaksi
+    // 5. Catat transaksi dengan status 'pending' (Wajib diproses/disetujui manual oleh Admin)
     const tx = new Transaction({
       id: result.transactionId || 'tx_' + Math.random().toString(36).substring(2, 9),
       userId,
@@ -236,7 +236,7 @@ export class WalletService {
       amount: numAmount,
       title: `${strategy.getLabel()}`,
       description: `Penarikan ke ${accountIdentifier}`,
-      status: 'success',
+      status: 'pending',
       method,
       recipient: accountIdentifier,
       fee,

@@ -68,15 +68,6 @@ export class Sidebar {
           </div>
         </div>
 
-        <!-- System Status Bar -->
-        <div class="px-6 py-3 bg-slate-900/40 border-b border-slate-800/50 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-ping"></span>
-            <span class="text-[11px] font-medium text-emerald-400">Live Storage Sync</span>
-          </div>
-          <span class="text-[10px] text-slate-400 font-mono">v1.2.0</span>
-        </div>
-
         <!-- Navigation Links -->
         <nav class="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto custom-scrollbar">
           <div class="px-3 mb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">

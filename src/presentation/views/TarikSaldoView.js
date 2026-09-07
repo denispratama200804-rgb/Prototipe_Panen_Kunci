@@ -318,10 +318,10 @@ export class TarikSaldoView extends IComponent {
 
           if (res.success) {
             this._notification.showModal({
-              title: 'Penarikan Berhasil Diproses!',
-              message: `Dana sebesar <strong class="text-secondary font-bold">Rp ${amount.toLocaleString('id-ID')}</strong> sedang dikirim ke ${methodLabel} (${account}). Perkiraan dana masuk: 1-5 menit.`,
-              type: 'success',
-              confirmText: 'Lihat Riwayat Transaksi',
+              title: 'Permintaan Penarikan Berhasil Diajukan!',
+              message: `Permintaan penarikan dana sebesar <strong class="text-primary font-bold">Rp ${amount.toLocaleString('id-ID')}</strong> ke <strong>${methodLabel} (${account})</strong> telah tercatat di sistem dan <strong>sedang menunggu persetujuan manual oleh admin</strong>. Anda dapat memantau status transfer di riwayat transaksi.`,
+              type: 'info',
+              confirmText: 'Lihat Status di Riwayat',
               onConfirm: () => {
                 window.location.hash = '/riwayat';
               }

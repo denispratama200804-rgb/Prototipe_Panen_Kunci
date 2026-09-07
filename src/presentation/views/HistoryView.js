@@ -112,25 +112,40 @@ export class HistoryView extends IComponent {
                 minute: '2-digit'
               });
 
+              const isPending = w.status === 'pending';
+              const isSuccess = w.status === 'success';
+              const isFailed = w.status === 'failed';
+
+              let stripeColor = 'bg-warning-amber';
+              let badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-amber/15 text-warning-amber border border-warning-amber/30 animate-pulse">Menunggu Persetujuan Admin</span>';
+
+              if (isSuccess) {
+                stripeColor = 'bg-secondary';
+                badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary">Berhasil Ditransfer</span>';
+              } else if (isFailed) {
+                stripeColor = 'bg-error-ruby';
+                badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container">Ditolak (Dana Di-refund)</span>';
+              }
+
               return `
                 <div class="bg-surface-card border border-surface-container rounded-2xl p-4 shadow-sm flex items-center justify-between relative overflow-hidden">
-                  <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary"></div>
+                  <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}"></div>
 
                   <div class="flex flex-col gap-1 pl-2">
                     <div class="flex items-center gap-2">
                       <span class="font-label-md text-xs font-bold text-text-heading">${w.title}</span>
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/10 text-secondary">
-                        Berhasil
-                      </span>
+                      ${badgeHtml}
                     </div>
                     <span class="text-[11px] text-text-body">${w.description} • ${dateStr}</span>
                   </div>
 
                   <div class="flex flex-col items-end shrink-0">
-                    <span class="font-headline-md text-sm font-extrabold text-error-ruby">
+                    <span class="font-headline-md text-sm font-extrabold ${isFailed ? 'text-text-body line-through' : 'text-error-ruby'}">
                       -Rp ${w.amount.toLocaleString('id-ID')}
                     </span>
-                    <span class="text-[10px] text-secondary font-semibold">Bebas Biaya Admin</span>
+                    <span class="text-[10px] ${isSuccess ? 'text-secondary' : isPending ? 'text-warning-amber' : 'text-text-body'} font-semibold">
+                      ${isSuccess ? 'Ditransfer' : isPending ? 'Dalam Antrean' : 'Dikembalikan ke Saldo'}
+                    </span>
                   </div>
                 </div>
               `;
