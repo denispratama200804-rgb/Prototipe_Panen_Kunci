@@ -25,14 +25,14 @@ export const routes = [
     viewClass: LoginView,
     title: 'Masuk Akun',
     requiresAuth: false,
-    guestOnly: true
+    guestOnly: false
   },
   {
     path: '/register',
     viewClass: RegisterView,
     title: 'Daftar Akun Baru',
     requiresAuth: false,
-    guestOnly: true
+    guestOnly: false
   },
   {
     path: '/dashboard',

@@ -68,15 +68,9 @@ export class HeaderComponent {
             <span class="font-headline-md text-lg font-bold text-primary tracking-tight">Panen Kunci</span>
           </div>
           <div class="flex items-center gap-2">
-            ${isAuth ? `
-              <a href="#/dashboard" class="px-3.5 py-1.5 rounded-full bg-primary text-white text-xs font-semibold hover:bg-primary-container transition-all">
-                Dashboard
-              </a>
-            ` : `
-              <a href="#/login" class="px-3.5 py-1.5 rounded-full bg-primary text-white text-xs font-semibold hover:bg-primary-container transition-all">
-                Masuk
-              </a>
-            `}
+            <a href="#/login" class="px-3.5 py-1.5 rounded-full bg-primary text-white text-xs font-semibold hover:bg-primary-container transition-all">
+              Login
+            </a>
           </div>
         </div>
       `;
@@ -86,13 +80,10 @@ export class HeaderComponent {
     this._element.innerHTML = `
       <div class="h-16 max-w-md mx-auto px-4 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          ${isSubPage ? `
-            <button type="button" class="w-9 h-9 -ml-1 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-colors" onclick="window.history.back()" aria-label="Kembali">
-              <span class="material-symbols-outlined text-[22px]">arrow_back</span>
-            </button>
-          ` : `
-            <img src="/Logo_PK.jpg" alt="Logo" class="h-8 w-auto object-contain rounded-md" onerror="this.src='/logo.png'"/>
-          `}
+          <button type="button" id="header-back-btn" class="w-9 h-9 -ml-1 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-colors active:scale-95 cursor-pointer" aria-label="Kembali">
+            <span class="material-symbols-outlined text-[22px]">arrow_back</span>
+          </button>
+          <img src="/Logo_PK.jpg" alt="Logo" class="h-8 w-auto object-contain rounded-md" onerror="this.src='/logo.png'"/>
           <h1 class="font-headline-md text-base sm:text-lg font-bold text-on-surface truncate">${title}</h1>
         </div>
 
@@ -108,5 +99,18 @@ export class HeaderComponent {
         </div>
       </div>
     `;
+
+    const backBtn = this._element.querySelector('#header-back-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        const currentHash = window.location.hash;
+        window.history.back();
+        setTimeout(() => {
+          if (window.location.hash === currentHash) {
+            window.location.hash = '/';
+          }
+        }, 200);
+      });
+    }
   }
 }

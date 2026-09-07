@@ -28,6 +28,12 @@ import { ShaderCanvasComponent } from './presentation/components/ShaderCanvas.js
 import { Router } from './core/router/Router.js';
 import { routes } from './core/router/routes.js';
 
+// Listen for PWA installation prompt
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.deferredInstallPrompt = e;
+});
+
 /**
  * Bootstrap Application
  * Prinsip: Dependency Inversion Principle (DIP) & Single Responsibility Principle (SRP)
