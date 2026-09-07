@@ -196,6 +196,18 @@ export class ProfileView extends IComponent {
             </div>
           </section>
 
+          <!-- Admin Panel Shortcut Button -->
+          <div class="mt-1">
+            <a
+              href="/admin_panel/"
+              target="_blank"
+              class="w-full flex items-center justify-center gap-2 py-3.5 bg-primary/10 text-primary border border-primary/20 rounded-2xl font-label-md text-sm font-bold hover:bg-primary hover:text-white transition-all shadow-sm active:scale-[0.98]"
+            >
+              <span class="material-symbols-outlined text-[20px]">admin_panel_settings</span>
+              <span>Buka Admin Panel (Operasional)</span>
+            </a>
+          </div>
+
           <!-- Logout Button -->
           <div class="mt-1">
             <button

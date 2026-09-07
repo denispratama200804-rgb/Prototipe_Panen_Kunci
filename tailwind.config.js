@@ -3,6 +3,7 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx,html}",
+    "./admin_panel/**/*.{js,ts,jsx,tsx,html}",
   ],
   darkMode: "class",
   theme: {

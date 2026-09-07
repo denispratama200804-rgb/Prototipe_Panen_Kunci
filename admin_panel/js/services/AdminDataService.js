@@ -1,0 +1,628 @@
+/**
+ * AdminDataService
+ * Mengelola interaksi langsung dengan localStorage aplikasi Panen Kunci ('panenkunci:*')
+ * Mendukung Two-Way Data Sync, analitik real-time, manajemen approval penarikan,
+ * manajemen gudang API key, pengguna, dan pengaturan sistem.
+ */
+export class AdminDataService {
+  constructor(prefix = 'panenkunci:') {
+    this.prefix = prefix;
+  }
+
+  // Helper localStorage aman
+  _get(key, defaultValue = null) {
+    try {
+      const raw = localStorage.getItem(`${this.prefix}${key}`);
+      return raw ? JSON.parse(raw) : defaultValue;
+    } catch (e) {
+      console.error(`[AdminDataService] Read error for key "${key}":`, e);
+      return defaultValue;
+    }
+  }
+
+  _set(key, value) {
+    try {
+      localStorage.setItem(`${this.prefix}${key}`, JSON.stringify(value));
+    } catch (e) {
+      console.error(`[AdminDataService] Write error for key "${key}":`, e);
+    }
+  }
+
+  /**
+   * Mengambil ringkasan statistik & KPI utama untuk Dashboard
+   */
+  getStats() {
+    const apiKeys = this.getApiKeys();
+    const transactions = this.getTransactions();
+    const users = this.getUsers();
+    const balance = this._get('wallet_balance', 85000);
+    const lifetime = this._get('lifetime_earnings', 450000);
+
+    const validKeys = apiKeys.filter(k => k.status === 'valid');
+    const invalidKeys = apiKeys.filter(k => k.status === 'invalid');
+    const usedKeys = apiKeys.filter(k => k.status === 'used');
+    const totalCredits = validKeys.reduce((sum, k) => sum + (Number(k.credits) || 80), 0);
+
+    const withdrawals = transactions.filter(t => t.type === 'withdrawal');
+    const pendingWithdrawals = withdrawals.filter(t => t.status === 'pending');
+    const completedWithdrawals = withdrawals.filter(t => t.status === 'success');
+
+    const totalPaidOut = completedWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const pendingPayoutAmount = pendingWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const totalAdminFees = completedWithdrawals.reduce((sum, t) => sum + Number(t.fee || 0), 0);
+
+    return {
+      totalKeys: apiKeys.length,
+      validKeysCount: validKeys.length,
+      invalidKeysCount: invalidKeys.length,
+      usedKeysCount: usedKeys.length,
+      totalCredits,
+      totalPaidOut,
+      pendingPayoutAmount,
+      pendingCount: pendingWithdrawals.length,
+      totalAdminFees,
+      totalUsers: users.length,
+      activeBalance: balance,
+      lifetimeEarnings: lifetime
+    };
+  }
+
+  /**
+   * Data untuk Chart.js (Tren setoran harian & breakdown metode pencairan)
+   */
+  getChartData() {
+    const transactions = this.getTransactions();
+    const apiKeys = this.getApiKeys();
+
+    // 7 hari terakhir
+    const days = [];
+    const keyDepositsPerDay = [];
+    const withdrawalVolumePerDay = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayLabel = d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' });
+      days.push(dayLabel);
+
+      const keysCount = apiKeys.filter(k => {
+        if (!k.createdAt) return false;
+        return k.createdAt.startsWith(dateStr);
+      }).length;
+      keyDepositsPerDay.push(keysCount);
+
+      const wdSum = transactions
+        .filter(t => t.type === 'withdrawal' && t.createdAt && t.createdAt.startsWith(dateStr) && t.status === 'success')
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+      withdrawalVolumePerDay.push(wdSum);
+    }
+
+    // Breakdown metode pembayaran
+    const methodCounts = { DANA: 0, GOPAY: 0, OVO: 0, BANK: 0 };
+    transactions.filter(t => t.type === 'withdrawal').forEach(t => {
+      const m = (t.method || '').toUpperCase();
+      if (m.includes('DANA')) methodCounts.DANA++;
+      else if (m.includes('GOPAY')) methodCounts.GOPAY++;
+      else if (m.includes('OVO')) methodCounts.OVO++;
+      else methodCounts.BANK++;
+    });
+
+    return {
+      labels: days,
+      keyDeposits: keyDepositsPerDay,
+      withdrawalVolume: withdrawalVolumePerDay,
+      methods: methodCounts
+    };
+  }
+
+  /**
+   * Mengambil semua API Key dengan filter dan pencarian
+   */
+  getApiKeys({ status = 'all', search = '' } = {}) {
+    let keys = this._get('api_keys', []);
+
+    // Jika belum ada data di storage, inisialisasi default mock
+    if (!Array.isArray(keys) || keys.length === 0) {
+      keys = this._getInitialApiKeys();
+      this._set('api_keys', keys);
+    }
+
+    return keys.filter(item => {
+      const matchStatus = status === 'all' || item.status === status;
+      const q = search.toLowerCase();
+      const matchSearch = !search ||
+        (item.keyString && item.keyString.toLowerCase().includes(q)) ||
+        (item.id && item.id.toLowerCase().includes(q)) ||
+        (item.userId && item.userId.toLowerCase().includes(q));
+      return matchStatus && matchSearch;
+    });
+  }
+
+  /**
+   * Perbarui status API Key (misal: 'valid', 'invalid', 'used')
+   */
+  updateApiKeyStatus(id, newStatus) {
+    const keys = this.getApiKeys();
+    const idx = keys.findIndex(k => k.id === id);
+    if (idx !== -1) {
+      keys[idx].status = newStatus;
+      this._set('api_keys', keys);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Hapus API Key
+   */
+  deleteApiKey(id) {
+    const keys = this.getApiKeys();
+    const updated = keys.filter(k => k.id !== id);
+    this._set('api_keys', updated);
+    return true;
+  }
+
+  /**
+   * Ekspor API Keys ke berbagai format file
+   */
+  exportApiKeys(format = 'txt', statusFilter = 'valid') {
+    const keys = this.getApiKeys({ status: statusFilter });
+    let content = '';
+    let filename = `panenkunci_apikeys_${statusFilter}_${new Date().toISOString().slice(0, 10)}`;
+    let mimeType = 'text/plain';
+
+    if (format === 'txt') {
+      filename += '.txt';
+      content = keys.map(k => k.keyString).join('\n');
+      mimeType = 'text/plain;charset=utf-8';
+    } else if (format === 'csv') {
+      filename += '.csv';
+      const header = 'ID,API_Key,User_ID,Status,Kredit,Reward,Tanggal_Setor\n';
+      const rows = keys.map(k => `"${k.id}","${k.keyString}","${k.userId}","${k.status}","${k.credits || 80}","${k.rewardAmount || 3000}","${k.createdAt}"`).join('\n');
+      content = header + rows;
+      mimeType = 'text/csv;charset=utf-8';
+    } else if (format === 'json') {
+      filename += '.json';
+      content = JSON.stringify(keys, null, 2);
+      mimeType = 'application/json;charset=utf-8';
+    }
+
+    // Trigger download di browser
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    return { total: keys.length, filename };
+  }
+
+  /**
+   * Mengambil semua transaksi (setoran & penarikan) dengan filter
+   */
+  getTransactions({ type = 'all', status = 'all', search = '' } = {}) {
+    let txs = this._get('transactions', []);
+
+    if (!Array.isArray(txs) || txs.length === 0) {
+      txs = this._getInitialTransactions();
+      this._set('transactions', txs);
+    }
+
+    return txs.filter(t => {
+      const matchType = type === 'all' || t.type === type;
+      const matchStatus = status === 'all' || t.status === status;
+      const q = search.toLowerCase();
+      const matchSearch = !search ||
+        (t.id && t.id.toLowerCase().includes(q)) ||
+        (t.userId && t.userId.toLowerCase().includes(q)) ||
+        (t.recipient && t.recipient.toLowerCase().includes(q)) ||
+        (t.title && t.title.toLowerCase().includes(q));
+      return matchType && matchStatus && matchSearch;
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  /**
+   * Setujui permintaan penarikan dana
+   */
+  approveWithdrawal(transactionId) {
+    const txs = this.getTransactions();
+    const idx = txs.findIndex(t => t.id === transactionId);
+    if (idx !== -1) {
+      txs[idx].status = 'success';
+      txs[idx].processedAt = new Date().toISOString();
+      this._set('transactions', txs);
+      return { success: true, transaction: txs[idx] };
+    }
+    return { success: false, message: 'Transaksi tidak ditemukan' };
+  }
+
+  /**
+   * Tolak permintaan penarikan dana dan OTOMATIS REFUND saldo ke dompet user
+   */
+  rejectWithdrawal(transactionId, reason = 'Data rekening tidak valid') {
+    const txs = this.getTransactions();
+    const idx = txs.findIndex(t => t.id === transactionId);
+    if (idx === -1) {
+      return { success: false, message: 'Transaksi tidak ditemukan' };
+    }
+
+    const tx = txs[idx];
+    if (tx.status === 'failed') {
+      return { success: false, message: 'Transaksi ini sudah ditolak sebelumnya' };
+    }
+
+    // Update status transaksi
+    tx.status = 'failed';
+    tx.rejectionReason = reason;
+    tx.description = `${tx.description} (Ditolak: ${reason})`;
+    tx.processedAt = new Date().toISOString();
+    this._set('transactions', txs);
+
+    // Kembalikan saldo pengguna (Refund)
+    const refundAmount = Number(tx.amount || 0);
+    const currentBalance = Number(this._get('wallet_balance', 0));
+    const newBalance = currentBalance + refundAmount;
+    this._set('wallet_balance', newBalance);
+
+    // Tambah record mutasi pengembalian saldo
+    const refundTx = {
+      id: 'tx_ref_' + Math.random().toString(36).substring(2, 8),
+      userId: tx.userId || 'usr_budi_01',
+      type: 'deposit',
+      amount: refundAmount,
+      title: 'Pengembalian Dana (Refund)',
+      description: `Refund penarikan #${tx.id}: ${reason}`,
+      status: 'success',
+      createdAt: new Date().toISOString()
+    };
+    txs.unshift(refundTx);
+    this._set('transactions', txs);
+
+    return { success: true, refundAmount, newBalance, transaction: tx };
+  }
+
+  /**
+   * Mengambil daftar seluruh pengguna
+   */
+  getUsers({ search = '' } = {}) {
+    let users = this._get('all_users', []);
+
+    if (!Array.isArray(users) || users.length === 0) {
+      // Ambil current_user utama dari aplikasi
+      const currentUser = this._get('current_user', {
+        id: 'usr_budi_01',
+        name: 'Budi Santoso',
+        email: 'budi.santoso@example.com',
+        phone: '081234567890',
+        bankName: 'Bank Central Asia (BCA)',
+        accountNumber: '5410987654',
+        accountHolder: 'BUDI SANTOSO',
+        isVerified: true,
+        createdAt: new Date(Date.now() - 86400000 * 30).toISOString()
+      });
+
+      users = [
+        currentUser,
+        {
+          id: 'usr_siti_02',
+          name: 'Siti Rahmawati',
+          email: 'siti.rahma@gmail.com',
+          phone: '085712345678',
+          bankName: 'DANA E-Wallet',
+          accountNumber: '085712345678',
+          accountHolder: 'SITI RAHMAWATI',
+          isVerified: true,
+          createdAt: new Date(Date.now() - 86400000 * 14).toISOString()
+        },
+        {
+          id: 'usr_ahmad_03',
+          name: 'Ahmad Fauzi',
+          email: 'fauzi.ahmad@yahoo.com',
+          phone: '087890123456',
+          bankName: 'GoPay',
+          accountNumber: '087890123456',
+          accountHolder: 'AHMAD FAUZI',
+          isVerified: false,
+          createdAt: new Date(Date.now() - 86400000 * 5).toISOString()
+        },
+        {
+          id: 'usr_dewi_04',
+          name: 'Dewi Lestari',
+          email: 'dewi.kunci@gmail.com',
+          phone: '081399887766',
+          bankName: 'Bank Mandiri',
+          accountNumber: '1370019283746',
+          accountHolder: 'DEWI LESTARI',
+          isVerified: true,
+          createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
+        }
+      ];
+      this._set('all_users', users);
+    }
+
+    // Attach computed stats
+    const apiKeys = this.getApiKeys();
+    const transactions = this.getTransactions();
+    const activeBalance = this._get('wallet_balance', 85000);
+
+    const enriched = users.map(u => {
+      const userKeys = apiKeys.filter(k => k.userId === u.id);
+      const userWithdrawals = transactions.filter(t => t.userId === u.id && t.type === 'withdrawal' && t.status === 'success');
+      const totalWithdrawn = userWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+      // Jika user utama (Budi), pakai saldo live dari app
+      const balance = u.id === 'usr_budi_01' ? activeBalance : (u.customBalance || 45000);
+
+      return {
+        ...u,
+        totalKeys: userKeys.length,
+        validKeys: userKeys.filter(k => k.status === 'valid').length,
+        totalWithdrawn,
+        balance
+      };
+    });
+
+    if (!search) return enriched;
+    const q = search.toLowerCase();
+    return enriched.filter(u =>
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      u.phone.toLowerCase().includes(q) ||
+      u.id.toLowerCase().includes(q)
+    );
+  }
+
+  /**
+   * Perbarui profil / status pengguna
+   */
+  updateUser(userId, updateData) {
+    const users = this._get('all_users', []);
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx !== -1) {
+      users[idx] = { ...users[idx], ...updateData };
+      this._set('all_users', users);
+
+      // Jika yang di-update user utama, sinkronkan ke current_user
+      if (userId === 'usr_budi_01') {
+        const curr = this._get('current_user', {});
+        this._set('current_user', { ...curr, ...updateData });
+      }
+
+      // Jika ada perubahan saldo user utama
+      if (userId === 'usr_budi_01' && updateData.balance !== undefined) {
+        this._set('wallet_balance', updateData.balance);
+      }
+
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Konfigurasi Sistem & Tarif
+   */
+  getConfig() {
+    return this._get('admin_config', {
+      rewardPerKey: 3000,
+      minWithdrawal: 50000,
+      feeDana: 1000,
+      feeGopay: 1000,
+      feeOvo: 1000,
+      feeBank: 2500,
+      validationMode: 'simulation',
+      autoApproveThreshold: 0
+    });
+  }
+
+  saveConfig(newConfig) {
+    this._set('admin_config', newConfig);
+    return true;
+  }
+
+  /**
+   * Seed Mock Realistis untuk demonstrasi admin yang memukau
+   */
+  seedDemoData() {
+    this._set('api_keys', this._getInitialApiKeys(true));
+    this._set('transactions', this._getInitialTransactions(true));
+    this._set('wallet_balance', 125000);
+    this._set('lifetime_earnings', 580000);
+    return true;
+  }
+
+  /**
+   * Mock data awal API Keys
+   */
+  _getInitialApiKeys(extended = false) {
+    const now = Date.now();
+    const base = [
+      {
+        id: 'key_01',
+        keyString: 'sk-kie-8f92a1bc3d4e5f6g7h8i9j0k',
+        userId: 'usr_budi_01',
+        status: 'valid',
+        rewardAmount: 3000,
+        credits: 80,
+        createdAt: new Date(now - 3600000 * 2).toISOString()
+      },
+      {
+        id: 'key_02',
+        keyString: 'sk-kie-x7b9c2da1e4f5a6b7c8d9e0f',
+        userId: 'usr_budi_01',
+        status: 'invalid',
+        rewardAmount: 0,
+        credits: 0,
+        errorMessage: 'Kuota kredit Kie.ai sudah habis / 0 kredit.',
+        createdAt: new Date(now - 86400000 * 1).toISOString()
+      },
+      {
+        id: 'key_03',
+        keyString: 'sk-kie-3m5n8pq7r9s1t2u3v4w5x6y7',
+        userId: 'usr_budi_01',
+        status: 'valid',
+        rewardAmount: 3000,
+        credits: 80,
+        createdAt: new Date(now - 86400000 * 2).toISOString()
+      }
+    ];
+
+    if (!extended) return base;
+
+    return [
+      ...base,
+      {
+        id: 'key_04',
+        keyString: 'sk-kie-9102837465abcde123456789',
+        userId: 'usr_siti_02',
+        status: 'valid',
+        rewardAmount: 3000,
+        credits: 80,
+        createdAt: new Date(now - 3600000 * 5).toISOString()
+      },
+      {
+        id: 'key_05',
+        keyString: 'sk-kie-aa11bb22cc33dd44ee55ff66',
+        userId: 'usr_siti_02',
+        status: 'used',
+        rewardAmount: 3000,
+        credits: 80,
+        createdAt: new Date(now - 86400000 * 3).toISOString()
+      },
+      {
+        id: 'key_06',
+        keyString: 'sk-kie-invalid0000000000deadbeef',
+        userId: 'usr_ahmad_03',
+        status: 'invalid',
+        rewardAmount: 0,
+        credits: 0,
+        errorMessage: 'Kunci tidak ditemukan atau diblokir oleh Kie.ai.',
+        createdAt: new Date(now - 3600000 * 8).toISOString()
+      },
+      {
+        id: 'key_07',
+        keyString: 'sk-kie-778899aabbccddeeff001122',
+        userId: 'usr_dewi_04',
+        status: 'valid',
+        rewardAmount: 3000,
+        credits: 80,
+        createdAt: new Date(now - 3600000 * 12).toISOString()
+      },
+      {
+        id: 'key_08',
+        keyString: 'sk-kie-3344556677889900aabbccdd',
+        userId: 'usr_dewi_04',
+        status: 'valid',
+        rewardAmount: 3000,
+        credits: 80,
+        createdAt: new Date(now - 86400000 * 4).toISOString()
+      }
+    ];
+  }
+
+  /**
+   * Mock data awal Transaksi
+   */
+  _getInitialTransactions(extended = false) {
+    const now = Date.now();
+    const base = [
+      {
+        id: 'tx_01',
+        userId: 'usr_budi_01',
+        type: 'deposit',
+        amount: 3000,
+        title: 'Setoran API Key',
+        description: 'Validasi kredit Kie.ai penuh (80 kredit)',
+        status: 'success',
+        createdAt: new Date(now - 3600000 * 2).toISOString()
+      },
+      {
+        id: 'tx_02',
+        userId: 'usr_budi_01',
+        type: 'withdrawal',
+        amount: 50000,
+        title: 'Penarikan ke DANA',
+        description: 'Pencairan dana ke 081234567890 (a.n. Budi Santoso)',
+        status: 'pending', // PENDING untuk demo persetujuan admin!
+        method: 'dana',
+        recipient: '081234567890',
+        fee: 1000,
+        createdAt: new Date(now - 3600000 * 4).toISOString()
+      },
+      {
+        id: 'tx_03',
+        userId: 'usr_budi_01',
+        type: 'deposit',
+        amount: 3000,
+        title: 'Setoran API Key',
+        description: 'Validasi kredit Kie.ai penuh (80 kredit)',
+        status: 'success',
+        createdAt: new Date(now - 86400000 * 2).toISOString()
+      },
+      {
+        id: 'tx_04',
+        userId: 'usr_budi_01',
+        type: 'withdrawal',
+        amount: 100000,
+        title: 'Penarikan ke BCA',
+        description: 'Pencairan dana ke Rek. 5410987654 (a.n. BUDI SANTOSO)',
+        status: 'success',
+        method: 'bank',
+        recipient: '5410987654 (BCA)',
+        fee: 2500,
+        createdAt: new Date(now - 86400000 * 5).toISOString()
+      }
+    ];
+
+    if (!extended) return base;
+
+    return [
+      ...base,
+      {
+        id: 'tx_05',
+        userId: 'usr_siti_02',
+        type: 'withdrawal',
+        amount: 75000,
+        title: 'Penarikan ke GoPay',
+        description: 'Pencairan ke 085712345678 (a.n. Siti Rahmawati)',
+        status: 'pending',
+        method: 'gopay',
+        recipient: '085712345678',
+        fee: 1000,
+        createdAt: new Date(now - 3600000 * 1).toISOString()
+      },
+      {
+        id: 'tx_06',
+        userId: 'usr_dewi_04',
+        type: 'withdrawal',
+        amount: 60000,
+        title: 'Penarikan ke OVO',
+        description: 'Pencairan ke 081399887766 (a.n. Dewi Lestari)',
+        status: 'success',
+        method: 'ovo',
+        recipient: '081399887766',
+        fee: 1000,
+        createdAt: new Date(now - 86400000 * 1).toISOString()
+      },
+      {
+        id: 'tx_07',
+        userId: 'usr_ahmad_03',
+        type: 'withdrawal',
+        amount: 50000,
+        title: 'Penarikan ke DANA',
+        description: 'Pencairan ke 087890123456 (Ditolak: Akun belum terverifikasi)',
+        status: 'failed',
+        method: 'dana',
+        recipient: '087890123456',
+        fee: 1000,
+        createdAt: new Date(now - 86400000 * 3).toISOString()
+      }
+    ];
+  }
+}
+
+export const adminDataService = new AdminDataService();
