@@ -123,13 +123,8 @@ export class LandingView extends IComponent {
               </div>
             </section>
 
-            <!-- Earnings Highlight & Trust -->
+            <!-- Payment Methods Support -->
             <section class="px-margin-mobile py-8 bg-surface-container-low text-center">
-              <div class="bg-surface-card rounded-2xl p-6 shadow-sm border border-surface-container mb-6">
-                <span class="material-symbols-outlined text-secondary text-4xl mb-2" style="font-variation-settings: 'FILL' 1;">monitoring</span>
-                <h3 class="font-headline-lg-mobile text-2xl font-extrabold mb-1.5 text-secondary">Rp 100.000.000+</h3>
-                <p class="text-body-md text-on-surface-variant text-xs">Telah berhasil dicairkan oleh ribuan pengguna aktif kami bulan ini.</p>
-              </div>
               <h4 class="font-label-md text-xs font-bold text-text-heading uppercase tracking-wider mb-3">Mendukung Penarikan Melalui</h4>
               <div class="flex flex-wrap justify-center gap-2">
                 <!-- Payment Method Pills -->
