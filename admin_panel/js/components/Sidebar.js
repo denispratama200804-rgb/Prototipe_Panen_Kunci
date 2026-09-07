@@ -3,7 +3,7 @@
  * Navigasi samping modern bertema dark cyber glassmorphic
  */
 export class Sidebar {
-  constructor(activeTab = 'dashboard', onNavigate = () => {}, onSeed = () => {}) {
+  constructor(activeTab = 'apikeys', onNavigate = () => {}, onSeed = () => {}) {
     this.activeTab = activeTab;
     this.onNavigate = onNavigate;
     this.onSeed = onSeed;
@@ -15,12 +15,6 @@ export class Sidebar {
     const totalUsers = stats.totalUsers || 4;
 
     const navItems = [
-      {
-        id: 'dashboard',
-        label: 'Dashboard & Analitik',
-        icon: 'space_dashboard',
-        badge: null
-      },
       {
         id: 'apikeys',
         label: 'Gudang API Key',

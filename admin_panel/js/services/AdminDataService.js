@@ -421,6 +421,9 @@ export class AdminDataService {
 
   saveConfig(newConfig) {
     this._set('admin_config', newConfig);
+    try {
+      window.dispatchEvent(new CustomEvent('panenkunci:config_updated', { detail: newConfig }));
+    } catch (e) {}
     return true;
   }
 

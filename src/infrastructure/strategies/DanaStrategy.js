@@ -15,7 +15,16 @@ export class DanaStrategy extends IWithdrawalStrategy {
   }
 
   calculateFee(amount) {
-    return 0; // Bebas biaya admin
+    try {
+      const raw = localStorage.getItem('panenkunci:admin_config');
+      if (raw) {
+        const config = JSON.parse(raw);
+        if (config && config.feeDana !== undefined && !isNaN(Number(config.feeDana))) {
+          return Number(config.feeDana);
+        }
+      }
+    } catch (e) {}
+    return 1000; // Default DANA sesuai konfigurasi admin
   }
 
   async process(amount, accountIdentifier) {

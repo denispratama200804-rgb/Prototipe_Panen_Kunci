@@ -15,7 +15,16 @@ export class GopayStrategy extends IWithdrawalStrategy {
   }
 
   calculateFee(amount) {
-    return 0; // Bebas biaya admin
+    try {
+      const raw = localStorage.getItem('panenkunci:admin_config');
+      if (raw) {
+        const config = JSON.parse(raw);
+        if (config && config.feeGopay !== undefined && !isNaN(Number(config.feeGopay))) {
+          return Number(config.feeGopay);
+        }
+      }
+    } catch (e) {}
+    return 1000;
   }
 
   async process(amount, accountIdentifier) {

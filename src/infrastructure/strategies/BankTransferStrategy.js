@@ -15,7 +15,16 @@ export class BankTransferStrategy extends IWithdrawalStrategy {
   }
 
   calculateFee(amount) {
-    return 0; // Bebas biaya admin promo
+    try {
+      const raw = localStorage.getItem('panenkunci:admin_config');
+      if (raw) {
+        const config = JSON.parse(raw);
+        if (config && config.feeBank !== undefined && !isNaN(Number(config.feeBank))) {
+          return Number(config.feeBank);
+        }
+      }
+    } catch (e) {}
+    return 2500;
   }
 
   async process(amount, accountIdentifier) {

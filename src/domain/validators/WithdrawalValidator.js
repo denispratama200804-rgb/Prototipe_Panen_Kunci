@@ -23,10 +23,12 @@ export class WithdrawalValidator extends IValidator {
     const errors = [];
     const amount = Number(data.amount);
 
+    const min = Number(this.minWithdrawal) || 50000;
+
     if (isNaN(amount) || amount <= 0) {
       errors.push('Nominal penarikan harus berupa angka lebih dari 0.');
-    } else if (amount < this.minWithdrawal) {
-      errors.push(`Batas minimal penarikan adalah Rp ${this.minWithdrawal.toLocaleString('id-ID')}.`);
+    } else if (amount < min) {
+      errors.push(`Batas minimal penarikan adalah Rp ${min.toLocaleString('id-ID')}.`);
     } else if (amount > data.currentBalance) {
       errors.push(`Saldo tidak mencukupi. Saldo aktif Anda: Rp ${data.currentBalance.toLocaleString('id-ID')}.`);
     }

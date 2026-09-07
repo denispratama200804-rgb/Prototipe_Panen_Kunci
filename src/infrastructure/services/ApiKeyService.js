@@ -150,7 +150,10 @@ export class ApiKeyService {
     }
 
     // 4. Sukses: Kuota 80 kredit terverifikasi
-    const rewardAmount = 3000;
+    const config = this._storage.get('admin_config');
+    const rewardAmount = (config && config.rewardPerKey && !isNaN(Number(config.rewardPerKey)))
+      ? Number(config.rewardPerKey)
+      : 3000;
     const newApiKey = new ApiKey({
       id: 'key_' + Math.random().toString(36).substring(2, 9),
       keyString: trimmed,

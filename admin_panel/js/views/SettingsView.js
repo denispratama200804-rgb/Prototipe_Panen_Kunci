@@ -269,13 +269,14 @@ export class SettingsView {
       form.addEventListener('submit', e => {
         e.preventDefault();
         const fd = new FormData(form);
+        const getNum = (val, def) => (val !== null && String(val).trim() !== '' && !isNaN(Number(val))) ? Number(val) : def;
         const newConfig = {
-          rewardPerKey: Number(fd.get('rewardPerKey') || 3000),
-          minWithdrawal: Number(fd.get('minWithdrawal') || 50000),
-          feeDana: Number(fd.get('feeDana') || 1000),
-          feeGopay: Number(fd.get('feeGopay') || 1000),
-          feeOvo: Number(fd.get('feeOvo') || 1000),
-          feeBank: Number(fd.get('feeBank') || 2500),
+          rewardPerKey: getNum(fd.get('rewardPerKey'), 3000),
+          minWithdrawal: getNum(fd.get('minWithdrawal'), 50000),
+          feeDana: getNum(fd.get('feeDana'), 1000),
+          feeGopay: getNum(fd.get('feeGopay'), 1000),
+          feeOvo: getNum(fd.get('feeOvo'), 1000),
+          feeBank: getNum(fd.get('feeBank'), 2500),
           validationMode: fd.get('validationMode') || 'simulation'
         };
 

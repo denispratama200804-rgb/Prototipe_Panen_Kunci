@@ -7,7 +7,6 @@ import { toast } from './services/ToastService.js';
 import { Sidebar } from './components/Sidebar.js';
 import { Navbar } from './components/Navbar.js';
 
-import { DashboardView } from './views/DashboardView.js';
 import { ApiKeysView } from './views/ApiKeysView.js';
 import { WithdrawalsView } from './views/WithdrawalsView.js';
 import { UsersView } from './views/UsersView.js';
@@ -31,7 +30,6 @@ class AdminApp {
     });
 
     this.views = {
-      dashboard: new DashboardView(adminDataService, tab => this.navigate(tab), toast),
       apikeys: new ApiKeysView(adminDataService, toast),
       withdrawals: new WithdrawalsView(adminDataService, toast),
       users: new UsersView(adminDataService, toast),
@@ -41,8 +39,8 @@ class AdminApp {
 
   _getInitialTab() {
     const hash = window.location.hash.replace('#', '');
-    const validTabs = ['dashboard', 'apikeys', 'withdrawals', 'users', 'settings'];
-    return validTabs.includes(hash) ? hash : 'dashboard';
+    const validTabs = ['apikeys', 'withdrawals', 'users', 'settings'];
+    return validTabs.includes(hash) ? hash : 'apikeys';
   }
 
   init() {
@@ -118,8 +116,6 @@ class AdminApp {
 
   _getViewTitle(tab) {
     switch (tab) {
-      case 'dashboard':
-        return 'Dashboard & Analitik';
       case 'apikeys':
         return 'Gudang API Key Kie.ai';
       case 'withdrawals':

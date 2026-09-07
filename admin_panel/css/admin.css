@@ -22,6 +22,18 @@ body.admin-body {
   min-height: 100vh;
 }
 
+/* Remove number input spinner arrows (stepper buttons) */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+
 /* Background Ambient Glows */
 .admin-ambient-glow {
   position: fixed;

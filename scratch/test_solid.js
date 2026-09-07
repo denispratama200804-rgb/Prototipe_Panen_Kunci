@@ -61,7 +61,7 @@ async function runTests() {
   console.log('\n[3] Testing WithdrawalStrategyFactory (OCP & LSP):');
   const danaStrategy = strategyFactory.get('dana');
   assert(danaStrategy.getLabel() === 'DANA', 'Dana strategy resolved');
-  assert(danaStrategy.calculateFee(50000) === 0, 'Dana fee is 0 (free promo)');
+  assert(danaStrategy.calculateFee(50000) === 1000, 'Dana fee is 1000 default (synchronized with admin config)');
   const allStrategies = strategyFactory.getAll();
   assert(allStrategies.length === 4, 'All 4 strategies registered (DANA, GoPay, OVO, Bank)');
 

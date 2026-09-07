@@ -8,7 +8,7 @@ export class Navbar {
     this.onSearch = onSearch;
   }
 
-  render(title = 'Dashboard Overview') {
+  render(title = 'Gudang API Key Kie.ai') {
     return `
       <header class="h-20 bg-[#091124]/70 backdrop-blur-xl border-b border-slate-800/80 sticky top-0 z-30 px-8 flex items-center justify-between">
         <!-- Left: Page Title & Breadcrumbs -->

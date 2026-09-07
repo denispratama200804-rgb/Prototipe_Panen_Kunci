@@ -357,6 +357,7 @@ export class WithdrawalsView {
 
     const amount = Number(tx.amount || 0);
     const fee = Number(tx.fee || 0);
+    const netPayout = tx.netPayout !== undefined ? Number(tx.netPayout) : Math.max(0, amount - fee);
 
     modalMount.innerHTML = `
       <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
@@ -411,7 +412,7 @@ export class WithdrawalsView {
             </div>
             <div class="flex justify-between pt-1 text-sm font-bold">
               <span class="text-slate-200 font-sans">Total Transfer Bersih:</span>
-              <span class="text-emerald-400 font-bold">Rp ${amount.toLocaleString('id-ID')}</span>
+              <span class="text-emerald-400 font-bold">Rp ${netPayout.toLocaleString('id-ID')}</span>
             </div>
           </div>
 

@@ -41,17 +41,31 @@ window.addEventListener('appinstalled', () => {
   console.log('[PWA] App installed successfully!');
 });
 
-// Register Service Worker for offline support & PWA install
+// Service Worker: Hanya aktif di production; di dev/localhost unregister & bersihkan cache agar selalu fresh
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((reg) => {
-        console.log('[SW] Service Worker registered:', reg.scope);
-      })
-      .catch((err) => {
-        console.warn('[SW] Service Worker registration failed:', err);
-      });
-  });
+  const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname) ||
+                  window.location.hostname.startsWith('192.168.') ||
+                  window.location.port !== '';
+  if (isLocal) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const reg of registrations) {
+        reg.unregister();
+      }
+    });
+    if ('caches' in window) {
+      caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+    }
+  } else {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => {
+          console.log('[SW] Service Worker registered:', reg.scope);
+        })
+        .catch((err) => {
+          console.warn('[SW] Service Worker registration failed:', err);
+        });
+    });
+  }
 }
 
 

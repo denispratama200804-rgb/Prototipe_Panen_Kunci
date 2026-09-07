@@ -15,7 +15,16 @@ export class OvoStrategy extends IWithdrawalStrategy {
   }
 
   calculateFee(amount) {
-    return 0; // Bebas biaya admin
+    try {
+      const raw = localStorage.getItem('panenkunci:admin_config');
+      if (raw) {
+        const config = JSON.parse(raw);
+        if (config && config.feeOvo !== undefined && !isNaN(Number(config.feeOvo))) {
+          return Number(config.feeOvo);
+        }
+      }
+    } catch (e) {}
+    return 1000;
   }
 
   async process(amount, accountIdentifier) {

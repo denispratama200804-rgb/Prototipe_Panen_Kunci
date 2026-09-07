@@ -23,9 +23,41 @@ export class WalletService {
     this._balance = 85000;
     this._lifetimeEarnings = 450000;
     this._transactions = [];
-    this.minWithdrawal = 50000; // Minimum penarikan default Rp 50.000
+    this._minWithdrawal = 50000; // Minimum penarikan default Rp 50.000
 
     this._loadWallet();
+  }
+
+  /**
+   * Batas minimal penarikan dinamis dari konfigurasi admin panel
+   * @returns {number}
+   */
+  get minWithdrawal() {
+    const config = this._storage.get('admin_config');
+    if (config && config.minWithdrawal && !isNaN(Number(config.minWithdrawal))) {
+      return Number(config.minWithdrawal);
+    }
+    return this._minWithdrawal || 50000;
+  }
+
+  set minWithdrawal(value) {
+    this._minWithdrawal = Number(value);
+  }
+
+  /**
+   * Ambil seluruh konfigurasi sistem admin
+   * @returns {Object}
+   */
+  getAdminConfig() {
+    return this._storage.get('admin_config') || {
+      rewardPerKey: 3000,
+      minWithdrawal: 50000,
+      feeDana: 1000,
+      feeGopay: 1000,
+      feeOvo: 1000,
+      feeBank: 2500,
+      validationMode: 'simulation'
+    };
   }
 
   _loadWallet() {
@@ -200,10 +232,40 @@ export class WalletService {
    * @param {string} [params.userId]
    * @returns {Promise<{ success: boolean, message: string, transaction?: Transaction }>}
    */
+  /**
+   * Mengambil biaya admin terkini untuk metode penarikan
+   * @param {string} method
+   * @param {number} [amount=0]
+   * @returns {number}
+   */
+  getFeeForMethod(method, amount = 0) {
+    try {
+      const strategy = this._strategyFactory.get(method);
+      return strategy ? strategy.calculateFee(amount) : 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /**
+   * Proses penarikan saldo menggunakan strategi penarikan (OCP & LSP)
+   * @param {Object} params
+   * @param {number} params.amount
+   * @param {string} params.method
+   * @param {string} params.accountIdentifier
+   * @param {string} [params.userId]
+   * @returns {Promise<{ success: boolean, message: string, transaction?: Transaction, fee?: number, totalDeduction?: number }>}
+   */
   async withdraw({ amount, method, accountIdentifier, userId = 'usr_current' }) {
     const numAmount = Number(amount);
 
-    // 1. Validasi penarikan
+    // 1. Dapatkan strategi dan hitung biaya admin sesuai pengaturan admin panel
+    const strategy = this._strategyFactory.get(method);
+    const fee = strategy ? strategy.calculateFee(numAmount) : 0;
+    const totalReceive = Math.max(0, numAmount - fee);
+
+    // 2. Validasi penarikan (selalu sinkronkan minWithdrawal terkini dari admin)
+    this._validator.minWithdrawal = this.minWithdrawal;
     const validation = this._validator.validate({
       amount: numAmount,
       currentBalance: this._balance,
@@ -215,31 +277,28 @@ export class WalletService {
       return { success: false, message: validation.errors[0] };
     }
 
-    // 2. Dapatkan strategi penarikan yang sesuai (Strategy Pattern)
-    const strategy = this._strategyFactory.get(method);
-    const fee = strategy.calculateFee(numAmount);
-
     // 3. Jalankan eksekusi strategi
-    const result = await strategy.process(numAmount, accountIdentifier);
+    const result = await strategy.process(totalReceive, accountIdentifier);
     if (!result.success) {
       return { success: false, message: result.message };
     }
 
-    // 4. Kurangi saldo
+    // 4. Kurangi saldo pengguna
     this._balance -= numAmount;
 
-    // 5. Catat transaksi dengan status 'pending' (Wajib diproses/disetujui manual oleh Admin)
+    // 5. Catat transaksi dengan status 'pending' (Wajib diproses manual oleh Admin)
     const tx = new Transaction({
       id: result.transactionId || 'tx_' + Math.random().toString(36).substring(2, 9),
       userId,
       type: 'withdrawal',
       amount: numAmount,
+      fee,
+      netPayout: totalReceive,
       title: `${strategy.getLabel()}`,
-      description: `Penarikan ke ${accountIdentifier}`,
+      description: `Penarikan ke ${accountIdentifier}${fee > 0 ? ` (Biaya Admin: Rp ${fee.toLocaleString('id-ID')})` : ''}`,
       status: 'pending',
       method,
       recipient: accountIdentifier,
-      fee,
       createdAt: new Date().toISOString()
     });
 
@@ -252,8 +311,10 @@ export class WalletService {
 
     return {
       success: true,
-      message: result.message,
-      transaction: tx
+      transaction: tx,
+      fee,
+      totalReceive,
+      message: `Permintaan penarikan Rp ${numAmount.toLocaleString('id-ID')} berhasil diajukan!`
     };
   }
 }
