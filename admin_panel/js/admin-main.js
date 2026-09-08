@@ -117,7 +117,7 @@ class AdminApp {
   _getViewTitle(tab) {
     switch (tab) {
       case 'apikeys':
-        return 'Gudang API Key Kie.ai';
+        return 'Gudang API Key';
       case 'withdrawals':
         return 'Persetujuan Pencairan Dana (Payouts)';
       case 'users':
