@@ -24,6 +24,7 @@ export class ApiKeysView {
 
     const allKeys = this.dataService.getApiKeys();
     const validCount = allKeys.filter(k => k.status === 'valid').length;
+    const pendingCount = allKeys.filter(k => k.status === 'pending').length;
     const invalidCount = allKeys.filter(k => k.status === 'invalid').length;
     const usedCount = allKeys.filter(k => k.status === 'used').length;
     const totalCredits = allKeys
@@ -33,7 +34,7 @@ export class ApiKeysView {
     return `
       <div class="space-y-6 view-fade-enter">
         <!-- Top Stats Banner -->
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div class="admin-card rounded-2xl p-4 flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center flex-shrink-0">
               <span class="material-symbols-outlined text-xl">dataset</span>
@@ -41,6 +42,16 @@ export class ApiKeysView {
             <div>
               <div class="text-xs text-slate-400">Total Kunci</div>
               <div class="text-xl font-bold text-white font-mono">${allKeys.length}</div>
+            </div>
+          </div>
+
+          <div class="admin-card rounded-2xl p-4 flex items-center gap-3 border ${pendingCount > 0 ? 'border-amber-500/40 bg-amber-500/5' : 'border-slate-800/80'}">
+            <div class="w-10 h-10 rounded-xl ${pendingCount > 0 ? 'bg-amber-500/20 text-amber-400 animate-pulse' : 'bg-amber-500/10 text-amber-400'} flex items-center justify-center flex-shrink-0">
+              <span class="material-symbols-outlined text-xl">hourglass_top</span>
+            </div>
+            <div>
+              <div class="text-xs text-slate-400">Perlu Verifikasi</div>
+              <div class="text-xl font-bold text-amber-400 font-mono">${pendingCount}</div>
             </div>
           </div>
 
@@ -101,6 +112,19 @@ export class ApiKeysView {
                 }"
               >
                 Semua (${allKeys.length})
+              </button>
+              <button
+                type="button"
+                data-filter="pending"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  this.currentFilter === 'pending'
+                    ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                    : pendingCount > 0
+                    ? 'text-amber-400 font-semibold hover:text-white'
+                    : 'text-slate-400 hover:text-white'
+                }"
+              >
+                Perlu Verifikasi (${pendingCount})
               </button>
               <button
                 type="button"
@@ -209,6 +233,8 @@ export class ApiKeysView {
                           let statusBadge = '';
                           if (k.status === 'valid') {
                             statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">Valid</span>';
+                          } else if (k.status === 'pending') {
+                            statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-amber-500/15 text-amber-300 border-amber-500/40 inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>Perlu Verifikasi</span>';
                           } else if (k.status === 'used') {
                             statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-blue-500/10 text-blue-400 border-blue-500/30">Digunakan</span>';
                           } else {
@@ -268,7 +294,30 @@ export class ApiKeysView {
                       <td class="text-right">
                         <div class="flex items-center justify-end gap-1.5">
                           ${
-                            k.status === 'valid'
+                            k.status === 'pending'
+                              ? `
+                            <button
+                              type="button"
+                              data-action="approve-key"
+                              data-id="${k.id}"
+                              title="Setujui API Key & Cairkan ke Saldo Aktif"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 transition-all shadow-sm"
+                            >
+                              <span class="material-symbols-outlined text-xs">check_circle</span>
+                              <span>Setujui</span>
+                            </button>
+                            <button
+                              type="button"
+                              data-action="reject-key"
+                              data-id="${k.id}"
+                              title="Tolak API Key & Batalkan Saldo Pasif"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1 transition-all"
+                            >
+                              <span class="material-symbols-outlined text-xs">cancel</span>
+                              <span>Tolak</span>
+                            </button>
+                          `
+                              : k.status === 'valid'
                               ? `
                             <button
                               type="button"
@@ -390,6 +439,37 @@ export class ApiKeysView {
           this.dataService.deleteApiKey(id);
           this.toast.warning(`API Key #${id} telah dihapus dari database.`, 'Dihapus');
           refreshCallback();
+        }
+      });
+    });
+
+    // Approve Key (Verifikasi & Cairkan ke Saldo Aktif)
+    container.querySelectorAll('[data-action="approve-key"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const res = this.dataService.approveApiKey(id);
+        if (res.success) {
+          this.toast.success(`API Key #${id} berhasil disetujui! Saldo Rp ${res.rewardAmount.toLocaleString('id-ID')} telah dicairkan ke Saldo Aktif.`, 'Key Terverifikasi');
+          refreshCallback();
+        } else {
+          this.toast.error(res.message || 'Gagal memverifikasi API Key', 'Gagal');
+        }
+      });
+    });
+
+    // Reject Key (Tolak & Batalkan Saldo Pasif)
+    container.querySelectorAll('[data-action="reject-key"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const reason = prompt('Masukkan alasan penolakan API Key:', 'Kunci tidak aktif / kuota tidak valid');
+        if (reason !== null) {
+          const res = this.dataService.rejectApiKey(id, reason.trim() || 'Ditolak oleh Admin');
+          if (res.success) {
+            this.toast.warning(`API Key #${id} ditolak dan Saldo Pasif telah dibatalkan.`, 'Key Ditolak');
+            refreshCallback();
+          } else {
+            this.toast.error(res.message || 'Gagal menolak API Key', 'Gagal');
+          }
         }
       });
     });

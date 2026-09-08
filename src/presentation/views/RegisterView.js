@@ -212,14 +212,14 @@ export class RegisterView extends IComponent {
       const confirmPassword = confirmInput.value;
 
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Mendaftarkan ke Supabase...</span>';
+      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Proses</span>';
 
       const res = await this._authService.register({ name, email, password, confirmPassword });
 
       if (res.success) {
         this._notification.showModal({
           title: 'Pendaftaran Berhasil!',
-          message: res.message || 'Akun Anda berhasil didaftarkan di Supabase.',
+          message: res.message || 'Pendaftaran Anda telah berhasil! Silahkan setor Key API dan hasilkan uang sebanyak banyak nya!',
           type: 'success',
           confirmText: res.requireEmailConfirmation ? 'Ke Halaman Login' : 'Buka Dashboard',
           onConfirm: () => {

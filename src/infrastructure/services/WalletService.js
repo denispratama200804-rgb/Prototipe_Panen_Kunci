@@ -24,11 +24,32 @@ export class WalletService {
     this._transactionRepository = transactionRepository;
 
     this._balance = 85000;
+    this._passiveBalance = 0;
     this._lifetimeEarnings = 450000;
     this._transactions = [];
     this._minWithdrawal = 50000;
 
     this._loadWallet();
+
+    // Cross-tab synchronization via storage event
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e) => {
+        if (
+          e.key &&
+          (e.key.includes('wallet_balance') ||
+           e.key.includes('wallet_passive_balance') ||
+           e.key.includes('transactions') ||
+           e.key.includes('api_keys'))
+        ) {
+          this._loadWallet();
+          this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+            balance: this._balance,
+            passiveBalance: this._passiveBalance,
+            lifetime: this._lifetimeEarnings
+          });
+        }
+      });
+    }
   }
 
   /**
@@ -67,6 +88,16 @@ export class WalletService {
     const savedBalance = this._storage.get('wallet_balance');
     if (savedBalance !== null && !isNaN(Number(savedBalance))) {
       this._balance = Number(savedBalance);
+    }
+
+    const savedPassive = this._storage.get('wallet_passive_balance');
+    if (savedPassive !== null && !isNaN(Number(savedPassive))) {
+      this._passiveBalance = Number(savedPassive);
+    } else {
+      const savedKeys = this._storage.get('api_keys') || [];
+      this._passiveBalance = savedKeys
+        .filter(k => k.status === 'pending')
+        .reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
     }
 
     const savedLifetime = this._storage.get('lifetime_earnings');
@@ -154,6 +185,7 @@ export class WalletService {
 
   _persist() {
     this._storage.set('wallet_balance', this._balance);
+    this._storage.set('wallet_passive_balance', this._passiveBalance);
     this._storage.set('lifetime_earnings', this._lifetimeEarnings);
     this._storage.set('transactions', this._transactions.map(t => t.toJSON()));
   }
@@ -164,6 +196,14 @@ export class WalletService {
    */
   getBalance() {
     return this._balance;
+  }
+
+  /**
+   * Saldo pasif yang menunggu verifikasi admin
+   * @returns {number}
+   */
+  getPassiveBalance() {
+    return this._passiveBalance;
   }
 
   /**
@@ -256,6 +296,74 @@ export class WalletService {
     }
 
     this._eventBus.emit(AppEvents.BALANCE_UPDATED, { balance: this._balance, lifetime: this._lifetimeEarnings });
+  }
+
+  /**
+   * Menambahkan saldo reward ke Saldo Pasif (menunggu verifikasi admin)
+   * @param {number} amount
+   * @param {import('../../domain/models/ApiKey.js').ApiKey} apiKey
+   */
+  addPassiveDeposit(amount, apiKey) {
+    this._passiveBalance += amount;
+
+    const tx = new Transaction({
+      id: 'tx_' + Math.random().toString(36).substring(2, 9),
+      userId: apiKey.userId || 'usr_current',
+      type: 'deposit',
+      amount,
+      title: 'Setoran API Key',
+      description: `Menunggu verifikasi admin: ${apiKey.getMaskedKey()}`,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    });
+
+    this._transactions.unshift(tx);
+    this._persist();
+
+    if (this._transactionRepository) {
+      this._transactionRepository.create(tx)
+        .then(saved => {
+          if (saved && saved.id) tx.id = saved.id;
+        })
+        .catch(err => console.warn('[WalletService] Supabase create tx fallback:', err.message));
+    }
+
+    this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+      balance: this._balance,
+      passiveBalance: this._passiveBalance,
+      lifetime: this._lifetimeEarnings
+    });
+  }
+
+  /**
+   * Mengonversi saldo pasif menjadi saldo aktif saat disetujui admin
+   * @param {number} amount
+   * @param {string} [keyString]
+   */
+  convertPassiveToActive(amount, keyString = '') {
+    this._passiveBalance = Math.max(0, this._passiveBalance - amount);
+    this._balance += amount;
+    this._lifetimeEarnings += amount;
+
+    const pendingTx = this._transactions.find(t =>
+      t.type === 'deposit' &&
+      t.status === 'pending' &&
+      (!keyString || (t.description && t.description.includes(keyString)))
+    );
+
+    if (pendingTx) {
+      pendingTx.status = 'success';
+      pendingTx.title = 'Setoran API Key (Terverifikasi)';
+      pendingTx.description = `Terverifikasi oleh admin: ${keyString || 'API Key'}`;
+    }
+
+    this._persist();
+
+    this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+      balance: this._balance,
+      passiveBalance: this._passiveBalance,
+      lifetime: this._lifetimeEarnings
+    });
   }
 
   /**

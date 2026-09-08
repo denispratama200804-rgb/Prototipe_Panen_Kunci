@@ -12,6 +12,7 @@ export class Sidebar {
   render(stats = {}) {
     const pendingCount = stats.pendingCount || 0;
     const totalKeys = stats.totalKeys || 0;
+    const pendingKeysCount = stats.pendingKeysCount || 0;
     const totalUsers = stats.totalUsers || 4;
 
     const navItems = [
@@ -19,8 +20,8 @@ export class Sidebar {
         id: 'apikeys',
         label: 'Gudang API Key',
         icon: 'vpn_key',
-        badge: totalKeys > 0 ? totalKeys : null,
-        badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+        badge: pendingKeysCount > 0 ? `${pendingKeysCount} Pending` : (totalKeys > 0 ? totalKeys : null),
+        badgeColor: pendingKeysCount > 0 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
       },
       {
         id: 'withdrawals',

@@ -240,7 +240,8 @@ export class SupabaseUserRepository extends IUserRepository {
       accountNumber: row.account_number || '',
       accountHolder: row.account_holder || '',
       isVerified: Boolean(row.is_verified),
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      avatar: row.avatar || row.avatar_url || '/avatar.png'
     });
   }
 }

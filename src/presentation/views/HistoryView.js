@@ -55,7 +55,9 @@ export class HistoryView extends IComponent {
                 </a>
               </div>
             ` : keys.map(k => {
+              const isPending = k.status === 'pending';
               const isValid = k.status === 'valid';
+              const stripeColor = isPending ? 'bg-amber-500' : (isValid ? 'bg-secondary' : 'bg-error-ruby');
               const dateStr = new Date(k.createdAt).toLocaleDateString('id-ID', {
                 day: 'numeric',
                 month: 'short',
@@ -66,26 +68,39 @@ export class HistoryView extends IComponent {
 
               return `
                 <div class="bg-surface-card border border-surface-container rounded-2xl p-4 shadow-sm flex items-center justify-between relative overflow-hidden group">
-                  <div class="absolute left-0 top-0 bottom-0 w-1.5 ${isValid ? 'bg-secondary' : 'bg-error-ruby'}"></div>
+                  <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}"></div>
                   
                   <div class="flex flex-col gap-1 pl-2">
                     <div class="flex items-center gap-2">
                       <span class="font-mono text-xs font-bold text-text-heading bg-surface-container-low px-2 py-0.5 rounded-md border border-surface-container">
                         ${k.getMaskedKey()}
                       </span>
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isValid ? 'bg-secondary-container text-on-secondary-container' : 'bg-error-container text-on-error-container'}">
-                        ${isValid ? 'Valid' : 'Invalid'}
-                      </span>
+                      ${isPending ? `
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30 inline-flex items-center gap-1">
+                          <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                          <span>Menunggu Verifikasi</span>
+                        </span>
+                      ` : isValid ? `
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary-container text-on-secondary-container">
+                          Valid
+                        </span>
+                      ` : `
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container">
+                          Invalid
+                        </span>
+                      `}
                     </div>
                     <span class="text-[11px] text-text-body">${dateStr}</span>
                     ${k.errorMessage ? `<span class="text-[11px] text-error-ruby">${k.errorMessage}</span>` : ''}
                   </div>
 
                   <div class="flex flex-col items-end shrink-0">
-                    <span class="font-headline-md text-sm font-extrabold ${isValid ? 'text-secondary' : 'text-outline'}">
-                      ${isValid ? `+Rp ${k.rewardAmount.toLocaleString('id-ID')}` : '+Rp 0'}
+                    <span class="font-headline-md text-sm font-extrabold ${isPending ? 'text-amber-500' : (isValid ? 'text-secondary' : 'text-outline')}">
+                      ${(isPending || isValid) ? `+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}` : '+Rp 0'}
                     </span>
-                    <span class="text-[10px] text-outline font-semibold">Kie.ai 80 Kredit</span>
+                    <span class="text-[10px] ${isPending ? 'text-amber-500 font-semibold' : 'text-outline font-semibold'}">
+                      ${isPending ? 'Saldo Pasif' : 'Kie.ai 80 Kredit'}
+                    </span>
                   </div>
                 </div>
               `;

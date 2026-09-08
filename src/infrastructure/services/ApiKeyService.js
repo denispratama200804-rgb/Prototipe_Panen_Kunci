@@ -200,7 +200,7 @@ export class ApiKeyService {
       id: 'key_' + Math.random().toString(36).substring(2, 9),
       keyString: trimmed,
       userId,
-      status: 'valid',
+      status: 'pending',
       rewardAmount,
       credits: 80,
       createdAt: new Date().toISOString()
@@ -218,8 +218,8 @@ export class ApiKeyService {
         .catch(err => console.warn('[ApiKeyService] Supabase create key fallback:', err.message));
     }
 
-    // 5. Kreditkan saldo ke dompet pengguna secara real-time
-    this._walletService.addDeposit(rewardAmount, newApiKey);
+    // 5. Kreditkan saldo ke dompet pengguna sebagai Saldo Pasif
+    this._walletService.addPassiveDeposit(rewardAmount, newApiKey);
 
     // 6. Emit event
     this._eventBus.emit(AppEvents.API_KEY_SUBMITTED, { apiKey: newApiKey, reward: rewardAmount });
@@ -228,7 +228,7 @@ export class ApiKeyService {
       success: true,
       apiKey: newApiKey,
       reward: rewardAmount,
-      message: `API Key valid dan saldo Anda telah bertambah Rp ${rewardAmount.toLocaleString('id-ID')}!`
+      message: `API Key valid dan telah disetorkan ke Saldo Pasif! Menunggu verifikasi dari Admin untuk dicairkan ke Saldo Aktif.`
     };
   }
 }

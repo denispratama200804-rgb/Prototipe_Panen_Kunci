@@ -220,7 +220,7 @@ export class AuthService {
 
         return {
           success: true,
-          message: 'Pendaftaran berhasil! Akun Anda telah disimpan langsung di Supabase.'
+          message: 'Pendaftaran Anda telah berhasil! Silahkan setor Key API dan hasilkan uang sebanyak banyak nya!'
         };
       } catch (err) {
         console.error('[AuthService] Gagal menyimpan ke tabel users Supabase:', err);
@@ -261,7 +261,7 @@ export class AuthService {
 
     return {
       success: true,
-      message: 'Pendaftaran berhasil!'
+      message: 'Pendaftaran Anda telah berhasil! Silahkan setor Key API dan hasilkan uang sebanyak banyak nya!'
     };
   }
 

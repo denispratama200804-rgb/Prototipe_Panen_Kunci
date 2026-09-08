@@ -15,6 +15,7 @@ export class User {
    * @param {string} [params.accountHolder]
    * @param {boolean} [params.isVerified]
    * @param {string} [params.createdAt]
+   * @param {string} [params.avatar]
    */
   constructor({
     id,
@@ -25,7 +26,8 @@ export class User {
     accountNumber = '5410987654',
     accountHolder = 'BUDI SANTOSO',
     isVerified = true,
-    createdAt = new Date().toISOString()
+    createdAt = new Date().toISOString(),
+    avatar = '/avatar.png'
   }) {
     this.id = id;
     this.name = name;
@@ -36,6 +38,7 @@ export class User {
     this.accountHolder = accountHolder;
     this.isVerified = isVerified;
     this.createdAt = createdAt;
+    this.avatar = avatar || '/avatar.png';
   }
 
   /**
@@ -62,7 +65,8 @@ export class User {
       accountNumber: this.accountNumber,
       accountHolder: this.accountHolder,
       isVerified: this.isVerified,
-      createdAt: this.createdAt
+      createdAt: this.createdAt,
+      avatar: this.avatar
     };
   }
 }

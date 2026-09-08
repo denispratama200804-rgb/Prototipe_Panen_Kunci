@@ -77,6 +77,8 @@ export class HeaderComponent {
       return;
     }
 
+    const isAuthPage = ['/login', '/register'].includes(path);
+
     this._element.innerHTML = `
       <div class="h-16 max-w-md mx-auto px-4 flex items-center justify-between">
         <div class="flex items-center gap-2">
@@ -88,14 +90,14 @@ export class HeaderComponent {
         </div>
 
         <div class="flex items-center gap-3">
-          ${isAuth ? `
+          ${isAuthPage ? '' : (isAuth ? `
             <a href="#/profil" class="relative group" title="Buka Profil">
-              <img src="/avatar.png" alt="${user?.name || 'User'}" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all" onerror="this.src='https://lh3.googleusercontent.com/aida-public/AB6AXuCJ06NwJvkMq5wnCKysow5prhzpnH7g6zRgYA4RYuyUgHK6g6xTot1wP7xXFVyjpvOcWMlIE07keEdOWlft-yWU3CY4OVQMVo94yYOErwizdVXrl3EnYkqJACecBLnDr-S_NAdc1h3mhBXs7Yf_5t7uzJSd4NfiLJMj78zcHOSK_2Kq3hpEg-uS5V6DqYBCxlY-gzwH25PqPD9gGdd_JtpdkqIo28boAKfZVg2uxTR-oSCUsDPPZ9GT'"/>
-              <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-secondary rounded-full border-2 border-white"></div>
+              <img src="${user?.avatar || '/avatar.png'}" alt="${user?.name || 'User'}" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all" onerror="this.onerror=null; this.src='/avatar.png';"/>
+              <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${user?.isVerified ? 'bg-secondary' : 'bg-outline'} rounded-full border-2 border-white"></div>
             </a>
           ` : `
             <a href="#/login" class="text-xs font-semibold text-primary hover:underline">Masuk</a>
-          `}
+          `)}
         </div>
       </div>
     `;

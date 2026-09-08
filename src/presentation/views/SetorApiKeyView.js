@@ -156,7 +156,9 @@ export class SetorApiKeyView extends IComponent {
                   <p class="text-xs">Belum ada API key yang disetorkan.</p>
                 </div>
               ` : keys.map(k => {
+                const isPending = k.status === 'pending';
                 const isValid = k.status === 'valid';
+                const borderClass = isPending ? 'bg-amber-500' : (isValid ? 'bg-secondary' : 'bg-error-ruby');
                 const dateStr = new Date(k.createdAt).toLocaleDateString('id-ID', {
                   day: 'numeric',
                   month: 'short',
@@ -166,14 +168,20 @@ export class SetorApiKeyView extends IComponent {
 
                 return `
                   <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm relative overflow-hidden">
-                    <div class="absolute left-0 top-0 bottom-0 w-1 ${isValid ? 'bg-secondary' : 'bg-error-ruby'}"></div>
+                    <div class="absolute left-0 top-0 bottom-0 w-1 ${borderClass}"></div>
                     <div class="flex flex-col gap-0.5 pl-2">
                       <div class="font-mono text-xs font-semibold text-text-heading">${k.getMaskedKey()}</div>
                       <div class="text-[11px] text-text-body">${dateStr}</div>
                     </div>
                     <div class="flex items-center gap-2">
-                      ${isValid ? `
-                        <span class="text-xs font-extrabold text-secondary">+Rp ${k.rewardAmount.toLocaleString('id-ID')}</span>
+                      ${isPending ? `
+                        <span class="text-xs font-extrabold text-amber-500">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
+                        <div class="bg-amber-500/15 text-amber-600 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-amber-500/30">
+                          <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                          <span>Menunggu Verifikasi</span>
+                        </div>
+                      ` : isValid ? `
+                        <span class="text-xs font-extrabold text-secondary">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
                         <div class="bg-secondary-container text-on-secondary-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
                           <span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
                           <span>Valid</span>
@@ -276,14 +284,13 @@ export class SetorApiKeyView extends IComponent {
       if (res.success) {
         input.value = '';
 
-        // Tampilkan Popup Setor Berhasil (sesuai setor_api_key_success_pop_up)
+        // Tampilkan Popup Setor Berhasil Masuk ke Saldo Pasif
         this._notification.showModal({
-          title: 'Setoran Berhasil!',
-          message: `API Key valid dan saldo Anda telah bertambah <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong>. Kuota 80 kredit berhasil diverifikasi secara instan!`,
+          title: 'Setoran Masuk ke Saldo Pasif!',
+          message: `API Key valid dan reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.<br><br>Reward akan otomatis cair ke <strong>Saldo Aktif</strong> setelah diverifikasi oleh Admin.`,
           type: 'success',
-          confirmText: 'Selesai',
+          confirmText: 'Kembali ke Dashboard',
           onConfirm: () => {
-            // Re-render view untuk memperbarui riwayat
             window.location.hash = '/dashboard';
           }
         });

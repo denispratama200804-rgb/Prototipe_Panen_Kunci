@@ -9,7 +9,7 @@ export class ApiKey {
    * @param {string} params.id
    * @param {string} params.keyString
    * @param {string} params.userId
-   * @param {'valid'|'invalid'} params.status
+   * @param {'pending'|'valid'|'invalid'|'used'} [params.status]
    * @param {number} params.rewardAmount
    * @param {number} [params.credits]
    * @param {string} [params.createdAt]
@@ -19,7 +19,7 @@ export class ApiKey {
     id,
     keyString,
     userId,
-    status = 'valid',
+    status = 'pending',
     rewardAmount = 3000,
     credits = 80,
     createdAt = new Date().toISOString(),

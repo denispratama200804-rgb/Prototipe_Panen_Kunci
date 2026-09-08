@@ -23,7 +23,7 @@ export class DashboardView extends IComponent {
     const user = this._authService.getCurrentUser();
     const isVerified = Boolean(user?.isVerified);
     const balance = this._walletService.getBalance();
-    const todayEarnings = this._walletService.getTodayEarnings();
+    const passiveBalance = this._walletService.getPassiveBalance();
     const todayKeysCount = this._apiKeyService.getTodayValidCount();
     const recentTx = this._walletService.getTransactions().slice(0, 4);
 
@@ -40,7 +40,7 @@ export class DashboardView extends IComponent {
             <div class="relative z-10 flex justify-between items-start">
               <div class="flex flex-col">
                 <span class="text-xs font-semibold text-primary-fixed-dim uppercase tracking-wider">Total Saldo Aktif</span>
-                <span class="text-3xl sm:text-4xl font-extrabold tracking-tight mt-1 text-white">
+                <span id="dashboard-balance" class="text-3xl sm:text-4xl font-extrabold tracking-tight mt-1 text-white">
                   Rp ${balance.toLocaleString('id-ID')}
                 </span>
               </div>
@@ -51,9 +51,9 @@ export class DashboardView extends IComponent {
 
             <div class="relative z-10 flex items-center justify-between mt-5 pt-4 border-t border-white/10 text-xs">
               <div class="flex flex-col">
-                <span class="text-white/70">Penghasilan Hari Ini</span>
-                <span class="font-bold text-secondary-fixed text-sm mt-0.5">
-                  +Rp ${todayEarnings.toLocaleString('id-ID')}
+                <span class="text-white/70">Saldo Pasif</span>
+                <span id="dashboard-passive" class="font-bold text-secondary-fixed text-sm mt-0.5">
+                  Rp ${passiveBalance.toLocaleString('id-ID')}
                 </span>
               </div>
               <div class="flex flex-col items-end">
@@ -126,11 +126,14 @@ export class DashboardView extends IComponent {
                         </span>
                       </div>
                       <div class="flex flex-col">
-                        <span class="font-label-md text-xs font-bold text-text-heading">${tx.title}</span>
+                        <div class="flex items-center gap-1.5">
+                          <span class="font-label-md text-xs font-bold text-text-heading">${tx.title}</span>
+                          ${tx.status === 'pending' ? '<span class="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded font-medium border border-amber-500/20">Pending</span>' : ''}
+                        </div>
                         <span class="text-[11px] text-text-body">${dateStr}</span>
                       </div>
                     </div>
-                    <span class="font-headline-md text-xs font-bold ${isDeposit ? 'text-secondary' : 'text-error-ruby'}">
+                    <span class="font-headline-md text-xs font-bold ${isDeposit ? (tx.status === 'pending' ? 'text-amber-500' : 'text-secondary') : 'text-error-ruby'}">
                       ${tx.getFormattedAmount()}
                     </span>
                   </div>
@@ -159,6 +162,21 @@ export class DashboardView extends IComponent {
         e.preventDefault();
         this._handleInstall(downloadBtn);
       });
+    }
+
+    // Auto-update saldo tampilan secara real-time saat diverifikasi admin di tab lain
+    this._unsubBalance = this._eventBus.on(AppEvents.BALANCE_UPDATED, () => {
+      const balanceEl = container.querySelector('#dashboard-balance');
+      const passiveEl = container.querySelector('#dashboard-passive');
+      if (balanceEl) balanceEl.textContent = `Rp ${this._walletService.getBalance().toLocaleString('id-ID')}`;
+      if (passiveEl) passiveEl.textContent = `Rp ${this._walletService.getPassiveBalance().toLocaleString('id-ID')}`;
+    });
+  }
+
+  destroy() {
+    if (this._unsubBalance) {
+      this._unsubBalance();
+      this._unsubBalance = null;
     }
   }
 

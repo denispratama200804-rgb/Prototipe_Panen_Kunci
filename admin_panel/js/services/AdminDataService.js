@@ -41,6 +41,7 @@ export class AdminDataService {
     const validKeys = apiKeys.filter(k => k.status === 'valid');
     const invalidKeys = apiKeys.filter(k => k.status === 'invalid');
     const usedKeys = apiKeys.filter(k => k.status === 'used');
+    const pendingKeys = apiKeys.filter(k => k.status === 'pending');
     const totalCredits = validKeys.reduce((sum, k) => sum + (Number(k.credits) || 80), 0);
 
     const withdrawals = transactions.filter(t => t.type === 'withdrawal');
@@ -50,12 +51,14 @@ export class AdminDataService {
     const totalPaidOut = completedWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const pendingPayoutAmount = pendingWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const totalAdminFees = completedWithdrawals.reduce((sum, t) => sum + Number(t.fee || 0), 0);
+    const passiveBalance = this._get('wallet_passive_balance', 0);
 
     return {
       totalKeys: apiKeys.length,
       validKeysCount: validKeys.length,
       invalidKeysCount: invalidKeys.length,
       usedKeysCount: usedKeys.length,
+      pendingKeysCount: pendingKeys.length,
       totalCredits,
       totalPaidOut,
       pendingPayoutAmount,
@@ -63,6 +66,7 @@ export class AdminDataService {
       totalAdminFees,
       totalUsers: users.length,
       activeBalance: balance,
+      passiveBalance,
       lifetimeEarnings: lifetime
     };
   }
@@ -151,6 +155,122 @@ export class AdminDataService {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Setujui / Verifikasi API Key dari user
+   * Mengubah status key menjadi 'valid', memindahkan reward dari Saldo Pasif ke Saldo Aktif
+   */
+  approveApiKey(keyId) {
+    const keys = this.getApiKeys();
+    const key = keys.find(k => k.id === keyId);
+    if (!key) {
+      return { success: false, message: 'API Key tidak ditemukan' };
+    }
+    if (key.status !== 'pending') {
+      return { success: false, message: `API Key tidak dalam status pending (status: ${key.status})` };
+    }
+
+    key.status = 'valid';
+    key.verifiedAt = new Date().toISOString();
+    delete key.errorMessage;
+    this._set('api_keys', keys);
+
+    const rewardAmount = Number(key.rewardAmount) || 3000;
+
+    // Pindahkan dari Saldo Pasif ke Saldo Aktif
+    const currentPassive = Number(this._get('wallet_passive_balance', 0));
+    const newPassive = Math.max(0, currentPassive - rewardAmount);
+    this._set('wallet_passive_balance', newPassive);
+
+    const currentActive = Number(this._get('wallet_balance', 0));
+    const newActive = currentActive + rewardAmount;
+    this._set('wallet_balance', newActive);
+
+    const currentLifetime = Number(this._get('lifetime_earnings', 0));
+    this._set('lifetime_earnings', currentLifetime + rewardAmount);
+
+    // Update transaksi terkait
+    const txs = this.getTransactions();
+    const masked = key.keyString && key.keyString.length > 12 
+      ? `${key.keyString.slice(0, 9)}...${key.keyString.slice(-4)}`
+      : (key.keyString || '');
+
+    const tx = txs.find(t => 
+      t.type === 'deposit' && 
+      t.status === 'pending' && 
+      (t.description?.includes(masked) || t.description?.includes(key.id))
+    ) || txs.find(t => t.type === 'deposit' && t.status === 'pending');
+
+    if (tx) {
+      tx.status = 'success';
+      tx.title = 'Setoran API Key (Terverifikasi)';
+      tx.description = `Terverifikasi oleh Admin: ${masked || key.id}`;
+      tx.processedAt = new Date().toISOString();
+    } else {
+      txs.unshift({
+        id: 'tx_' + Math.random().toString(36).substring(2, 9),
+        userId: key.userId || 'usr_budi_01',
+        type: 'deposit',
+        amount: rewardAmount,
+        title: 'Setoran API Key (Terverifikasi)',
+        description: `Terverifikasi oleh Admin: ${masked || key.id}`,
+        status: 'success',
+        createdAt: new Date().toISOString()
+      });
+    }
+    this._set('transactions', txs);
+
+    return { success: true, key, rewardAmount, newActive, newPassive };
+  }
+
+  /**
+   * Tolak API Key dari user
+   * Mengubah status key menjadi 'invalid', membatalkan reward dari Saldo Pasif
+   */
+  rejectApiKey(keyId, reason = 'Kunci API tidak valid atau ditolak oleh Admin') {
+    const keys = this.getApiKeys();
+    const key = keys.find(k => k.id === keyId);
+    if (!key) {
+      return { success: false, message: 'API Key tidak ditemukan' };
+    }
+
+    const wasPending = key.status === 'pending';
+    key.status = 'invalid';
+    key.errorMessage = reason;
+    key.rejectedAt = new Date().toISOString();
+    this._set('api_keys', keys);
+
+    const rewardAmount = Number(key.rewardAmount) || 3000;
+
+    // Jika sebelumnya pending, batalkan dari saldo pasif
+    if (wasPending) {
+      const currentPassive = Number(this._get('wallet_passive_balance', 0));
+      const newPassive = Math.max(0, currentPassive - rewardAmount);
+      this._set('wallet_passive_balance', newPassive);
+    }
+
+    // Update status transaksi terkait jika ada
+    const txs = this.getTransactions();
+    const masked = key.keyString && key.keyString.length > 12 
+      ? `${key.keyString.slice(0, 9)}...${key.keyString.slice(-4)}`
+      : (key.keyString || '');
+
+    const tx = txs.find(t => 
+      t.type === 'deposit' && 
+      t.status === 'pending' && 
+      (t.description?.includes(masked) || t.description?.includes(key.id))
+    );
+
+    if (tx) {
+      tx.status = 'failed';
+      tx.title = 'Setoran API Key Ditolak';
+      tx.description = `Ditolak Admin: ${reason}`;
+      tx.processedAt = new Date().toISOString();
+      this._set('transactions', txs);
+    }
+
+    return { success: true, key, reason };
   }
 
   /**

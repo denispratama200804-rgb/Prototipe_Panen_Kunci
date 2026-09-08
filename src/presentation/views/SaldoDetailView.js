@@ -17,6 +17,7 @@ export class SaldoDetailView extends IComponent {
 
   render() {
     const balance = this._walletService.getBalance();
+    const passiveBalance = this._walletService.getPassiveBalance();
     const lifetime = this._walletService.getLifetimeEarnings();
     const progress = this._walletService.getWithdrawalProgress();
     const minWithdrawal = this._walletService.minWithdrawal;
@@ -34,7 +35,7 @@ export class SaldoDetailView extends IComponent {
             <div class="relative z-10 flex flex-col gap-5">
               <div class="flex justify-between items-start">
                 <div class="flex flex-col gap-1">
-                  <span class="text-xs font-semibold text-primary-fixed-dim uppercase tracking-wider">Saldo Tersedia</span>
+                  <span class="text-xs font-semibold text-primary-fixed-dim uppercase tracking-wider">Saldo Aktif (Tersedia)</span>
                   <h2 class="text-3xl sm:text-4xl font-extrabold text-white">
                     Rp ${balance.toLocaleString('id-ID')}
                   </h2>
@@ -44,13 +45,25 @@ export class SaldoDetailView extends IComponent {
                 </div>
               </div>
 
-              <div class="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 flex items-center gap-3 border border-white/10">
-                <div class="w-8 h-8 rounded-full bg-secondary-fixed/20 flex items-center justify-center text-secondary-fixed shrink-0">
-                  <span class="material-symbols-outlined text-[18px]">trending_up</span>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="bg-white/10 backdrop-blur-md rounded-2xl p-3 flex items-center gap-2.5 border border-white/10">
+                  <div class="w-7 h-7 rounded-full bg-amber-400/20 flex items-center justify-center text-amber-300 shrink-0">
+                    <span class="material-symbols-outlined text-[16px]">hourglass_top</span>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="text-[10px] text-white/70">Saldo Pasif</span>
+                    <span class="text-xs font-bold text-amber-300">Rp ${passiveBalance.toLocaleString('id-ID')}</span>
+                  </div>
                 </div>
-                <div class="flex flex-col">
-                  <span class="text-[11px] text-white/70">Total Pendapatan (Lifetime)</span>
-                  <span class="text-xs font-bold text-white">Rp ${lifetime.toLocaleString('id-ID')}</span>
+
+                <div class="bg-white/10 backdrop-blur-md rounded-2xl p-3 flex items-center gap-2.5 border border-white/10">
+                  <div class="w-7 h-7 rounded-full bg-secondary-fixed/20 flex items-center justify-center text-secondary-fixed shrink-0">
+                    <span class="material-symbols-outlined text-[16px]">trending_up</span>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="text-[10px] text-white/70">Total Pendapatan</span>
+                    <span class="text-xs font-bold text-white">Rp ${lifetime.toLocaleString('id-ID')}</span>
+                  </div>
                 </div>
               </div>
             </div>

@@ -58,15 +58,33 @@ export class ProfileView extends IComponent {
             <div class="absolute -right-8 -top-8 w-32 h-32 bg-primary/5 rounded-full blur-xl pointer-events-none"></div>
 
             <!-- Avatar -->
-            <div class="relative mb-3">
-              <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-primary to-primary-container text-white text-2xl font-bold flex items-center justify-center shadow-md ring-4 ring-primary/15">
-                ${initials}
+            <div class="relative mb-3 group">
+              <div class="w-24 h-24 rounded-full overflow-hidden shadow-md ring-4 ring-primary/15 bg-surface-container relative">
+                <img
+                  id="profileAvatarImg"
+                  src="${user.avatar || '/avatar.png'}"
+                  alt="${user.name || 'User'}"
+                  class="w-full h-full object-cover"
+                  onerror="this.onerror=null; this.src='/avatar.png';"
+                />
               </div>
-              <div class="absolute bottom-0 right-0 ${user.isVerified ? 'bg-secondary' : 'bg-outline'} text-white shadow-sm rounded-full p-1 flex items-center justify-center border-2 border-white" title="${user.isVerified ? 'Akun Terverifikasi' : 'Menunggu Verifikasi'}">
-                <span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">
+
+              <!-- Status badge verifikasi -->
+              <div class="absolute top-0 right-0 ${user.isVerified ? 'bg-secondary' : 'bg-outline'} text-white shadow-sm rounded-full p-1 flex items-center justify-center border-2 border-white" title="${user.isVerified ? 'Akun Terverifikasi' : 'Menunggu Verifikasi'}">
+                <span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">
                   ${user.isVerified ? 'verified' : 'pending'}
                 </span>
               </div>
+
+              <!-- Tombol Ganti Foto / Upload Avatar -->
+              <label
+                for="avatarFileInput"
+                class="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary text-white shadow-md flex items-center justify-center cursor-pointer hover:bg-primary-container active:scale-95 transition-all border-2 border-white"
+                title="Ganti Foto Profil"
+              >
+                <span class="material-symbols-outlined text-[14px]">photo_camera</span>
+                <input type="file" id="avatarFileInput" accept="image/*" class="hidden" />
+              </label>
             </div>
 
             <h2 class="font-headline-md text-xl font-bold text-text-heading" id="profileNameDisplay">${user.name || 'Pengguna'}</h2>
@@ -96,17 +114,17 @@ export class ProfileView extends IComponent {
 
           <!-- Bank Account / E-Wallet Info Section -->
           <section class="flex flex-col gap-2">
-            <h3 class="font-label-md text-xs font-bold text-text-heading px-1 uppercase tracking-wider">
+            <h3 class="font-headline-md text-xs font-bold text-text-heading px-1 uppercase tracking-wider">
               Rekening & E-Wallet Pencairan (Supabase)
             </h3>
             <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-4">
-              <div class="flex justify-between items-start">
+              <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-2xl bg-primary-fixed flex items-center justify-center text-primary">
+                  <div class="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                     <span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">account_balance</span>
                   </div>
                   <div>
-                    <h4 class="font-body-lg text-sm text-text-heading font-bold" id="profileBankName">
+                    <h4 class="font-headline-md text-sm text-text-heading font-bold" id="profileBankName">
                       ${user.bankName ? user.bankName : 'Belum diatur'}
                     </h4>
                     <p class="text-xs text-text-body">Metode Pembayaran Utama</p>
@@ -115,29 +133,29 @@ export class ProfileView extends IComponent {
                 <button
                   type="button"
                   id="btnEditBank"
-                  class="font-label-md text-xs font-bold text-primary flex items-center gap-1 hover:bg-primary-fixed rounded-xl px-2.5 py-1.5 transition-colors"
+                  class="font-body-md text-xs font-bold text-primary flex items-center gap-1 hover:bg-primary/10 rounded-xl px-2.5 py-1.5 transition-colors"
                 >
                   <span class="material-symbols-outlined text-[16px]">edit</span>
                   <span>Ubah</span>
                 </button>
               </div>
 
-              <div class="bg-surface-container-low rounded-2xl p-4 flex flex-col gap-2 border border-surface-container">
-                <div class="flex justify-between">
+              <div class="bg-surface-container-low rounded-2xl p-4 flex flex-col gap-2.5 border border-surface-container">
+                <div class="flex items-center justify-between">
                   <span class="text-xs text-text-body">Nomor Rekening</span>
-                  <span class="font-mono text-xs font-bold text-text-heading tracking-wider" id="profileAccountNum">
+                  <span class="text-xs font-semibold text-text-heading" id="profileAccountNum">
                     ${user.accountNumber ? user.getMaskedAccountNumber() : 'Belum diatur'}
                   </span>
                 </div>
-                <div class="flex justify-between">
+                <div class="flex items-center justify-between">
                   <span class="text-xs text-text-body">Atas Nama</span>
-                  <span class="text-xs font-bold text-text-heading uppercase" id="profileAccountHolder">
-                    ${user.accountHolder ? user.accountHolder : (user.name ? user.name.toUpperCase() : 'Belum diatur')}
+                  <span class="text-xs font-semibold text-text-heading" id="profileAccountHolder">
+                    ${user.accountHolder ? user.accountHolder : (user.name || 'Belum diatur')}
                   </span>
                 </div>
-                <div class="flex justify-between">
+                <div class="flex items-center justify-between">
                   <span class="text-xs text-text-body">Nomor HP E-Wallet</span>
-                  <span class="text-xs font-bold text-text-heading font-mono" id="profilePhone">
+                  <span class="text-xs font-semibold text-text-heading" id="profilePhone">
                     ${user.phone ? user.phone : 'Belum diatur'}
                   </span>
                 </div>
@@ -235,6 +253,37 @@ export class ProfileView extends IComponent {
   }
 
   mount(container) {
+    // Avatar upload / update & sync
+    const avatarInput = container.querySelector('#avatarFileInput');
+    avatarInput?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        this._notification.error('Silakan pilih file gambar yang valid (JPG, PNG, WebP).');
+        return;
+      }
+
+      if (file.size > 2 * 1024 * 1024) {
+        this._notification.error('Ukuran foto terlalu besar. Maksimal 2MB.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64Image = event.target.result;
+        try {
+          await this._authService.updateProfile({ avatar: base64Image });
+          const avatarImg = container.querySelector('#profileAvatarImg');
+          if (avatarImg) avatarImg.src = base64Image;
+          this._notification.success('Foto profil berhasil disinkronkan dan diperbarui!');
+        } catch (err) {
+          this._notification.error('Gagal memperbarui foto profil: ' + err.message);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
     const editBankBtn = container.querySelector('#btnEditBank');
     const resetPassBtn = container.querySelector('#btnResetPassword');
     const logoutBtn = container.querySelector('#btnLogout');
@@ -245,13 +294,43 @@ export class ProfileView extends IComponent {
       const user = this._authService.getCurrentUser();
       if (!user) return;
 
+      const currentBank = (user.bankName || '').trim();
+      const bankCategories = [
+        {
+          group: 'E-Wallet',
+          items: ['DANA', 'GoPay', 'ShopeePay']
+        },
+        {
+          group: 'Bank Transfer',
+          items: ['BCA', 'BRI', 'Mandiri', 'SeaBank']
+        }
+      ];
+
+      const isCurrent = (item) => {
+        if (!currentBank) return false;
+        const c = currentBank.toLowerCase();
+        const i = item.toLowerCase();
+        return c === i || c.includes(i) || i.includes(c);
+      };
+
+      const optionsHtml = bankCategories.map(g => `
+        <optgroup label="${g.group}" class="font-bold text-text-heading">
+          ${g.items.map(item => `
+            <option value="${item}" ${isCurrent(item) ? 'selected' : ''}>${item}</option>
+          `).join('')}
+        </optgroup>
+      `).join('');
+
       this._notification.showModal({
         title: 'Perbarui Rekening / E-Wallet',
         html: `
           <div class="flex flex-col gap-3 text-left">
             <div class="flex flex-col gap-1">
               <label class="text-[11px] font-bold text-text-heading uppercase">Nama Bank / E-Wallet</label>
-              <input type="text" id="editBankName" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Contoh: BCA, BRI, Mandiri, DANA, GoPay" value="${user.bankName || ''}" />
+              <select id="editBankName" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none cursor-pointer">
+                <option value="" disabled ${!currentBank ? 'selected' : ''}>-- Pilih Bank atau E-Wallet --</option>
+                ${optionsHtml}
+              </select>
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-[11px] font-bold text-text-heading uppercase">Nomor Rekening</label>
