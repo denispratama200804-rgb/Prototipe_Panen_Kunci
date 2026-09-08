@@ -24,14 +24,35 @@ export class SetorApiKeyView extends IComponent {
       <div class="flex flex-col w-full min-h-screen bg-background pb-28 pt-20">
         <div class="px-margin-mobile max-w-md mx-auto w-full flex flex-col gap-5">
           
-          <!-- Mini Tutorial Steps -->
-          <section class="flex flex-col gap-2.5">
-            <div class="flex items-center gap-1.5 px-1">
-              <span class="material-symbols-outlined text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">info</span>
-              <h2 class="font-headline-md text-sm font-bold text-text-heading">Panduan Mendapatkan API Key</h2>
-            </div>
+          <!-- Mini Tutorial Steps Dropdown -->
+          <section class="flex flex-col">
+            <!-- Dropdown Toggle Button -->
+            <button
+              type="button"
+              id="btnToggleTutorial"
+              class="w-full bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm hover:bg-surface-container-low transition-all active:scale-[0.99] text-left group"
+              aria-expanded="false"
+              aria-controls="tutorialDropdownContent"
+            >
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white transition-colors">
+                  <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">menu_book</span>
+                </div>
+                <div class="flex flex-col">
+                  <h2 class="font-headline-md text-xs font-bold text-text-heading group-hover:text-primary transition-colors">
+                    Panduan Membuat API Key
+                  </h2>
+                  <p class="text-[11px] text-text-body">Ketuk untuk melihat 3 langkah mudah</p>
+                </div>
+              </div>
+              <span id="tutorialChevron" class="material-symbols-outlined text-outline text-[22px] transition-transform duration-300 group-hover:text-primary">expand_more</span>
+            </button>
 
-            <div class="grid grid-cols-1 gap-2.5 relative">
+            <!-- Dropdown Body (3 Cards) -->
+            <div
+              id="tutorialDropdownContent"
+              class="hidden flex-col gap-2.5 pt-2.5"
+            >
               <!-- Step 1 -->
               <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex gap-3 items-center shadow-sm">
                 <div class="w-8 h-8 rounded-xl bg-primary text-white flex items-center justify-center font-bold text-xs shrink-0">
@@ -176,6 +197,28 @@ export class SetorApiKeyView extends IComponent {
   }
 
   mount(container) {
+    // Dropdown Tutorial Toggle
+    const toggleTutorialBtn = container.querySelector('#btnToggleTutorial');
+    const tutorialContent = container.querySelector('#tutorialDropdownContent');
+    const tutorialChevron = container.querySelector('#tutorialChevron');
+
+    if (toggleTutorialBtn && tutorialContent && tutorialChevron) {
+      toggleTutorialBtn.addEventListener('click', () => {
+        const isHidden = tutorialContent.classList.contains('hidden');
+        if (isHidden) {
+          tutorialContent.classList.remove('hidden');
+          tutorialContent.classList.add('flex');
+          tutorialChevron.classList.add('rotate-180');
+          toggleTutorialBtn.setAttribute('aria-expanded', 'true');
+        } else {
+          tutorialContent.classList.add('hidden');
+          tutorialContent.classList.remove('flex');
+          tutorialChevron.classList.remove('rotate-180');
+          toggleTutorialBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
     const input = container.querySelector('#inputApiKey');
     const pasteBtn = container.querySelector('#btnPasteKey');
     const submitBtn = container.querySelector('#btnSubmitKey');
