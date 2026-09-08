@@ -115,7 +115,7 @@ export class ProfileView extends IComponent {
           <!-- Bank Account / E-Wallet Info Section -->
           <section class="flex flex-col gap-2">
             <h3 class="font-headline-md text-xs font-bold text-text-heading px-1 uppercase tracking-wider">
-              Rekening & E-Wallet Pencairan (Supabase)
+              Rekening & E-Wallet Pencairan
             </h3>
             <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-4">
               <div class="flex justify-between items-center">
