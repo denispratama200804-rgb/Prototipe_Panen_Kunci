@@ -56,7 +56,6 @@ export class Sidebar {
           <div>
             <div class="flex items-center gap-2">
               <h1 class="text-base font-bold tracking-tight text-white font-['Plus_Jakarta_Sans']">Panen Kunci</h1>
-              <span class="text-[10px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">PRO</span>
             </div>
             <p class="text-xs text-slate-400">Admin Control Center</p>
           </div>

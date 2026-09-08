@@ -39,24 +39,7 @@ export class Navbar {
             <span class="material-symbols-outlined text-lg group-hover:rotate-180 transition-transform duration-500">sync</span>
           </button>
 
-          <!-- Divider -->
-          <div class="h-6 w-px bg-slate-800"></div>
 
-          <!-- Admin Avatar & Info -->
-          <div class="flex items-center gap-3 pl-1">
-            <div class="relative">
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                alt="Admin Avatar"
-                class="w-10 h-10 rounded-xl object-cover ring-2 ring-indigo-500/40"
-              />
-              <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#091124]"></span>
-            </div>
-            <div class="hidden sm:block text-left">
-              <div class="text-sm font-semibold text-white tracking-tight leading-none mb-1">Chief Admin</div>
-              <div class="text-[11px] text-slate-400 leading-none">Super Administrator</div>
-            </div>
-          </div>
         </div>
       </header>
     `;
