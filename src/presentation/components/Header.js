@@ -89,11 +89,19 @@ export class HeaderComponent {
           <h1 class="font-headline-md text-base sm:text-lg font-bold text-on-surface truncate">${title}</h1>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2.5">
           ${isAuthPage ? '' : (isAuth ? `
-            <a href="#/profil" class="relative group" title="Buka Profil">
-              <img src="${user?.avatar || '/avatar.png'}" alt="${user?.name || 'User'}" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all" onerror="this.onerror=null; this.src='/avatar.png';"/>
-              <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${user?.isVerified ? 'bg-secondary' : 'bg-outline'} rounded-full border-2 border-white"></div>
+            ${user?.role === 'admin' ? `
+              <a href="/admin_panel/index.html" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-600/15 text-purple-600 border border-purple-500/30 hover:bg-purple-600 hover:text-white transition-all" title="Buka Panel Admin">
+                <span class="material-symbols-outlined text-[14px]">shield_person</span>
+                <span>Admin</span>
+              </a>
+            ` : ''}
+            <a href="#/profil" class="relative group flex items-center gap-2" title="Buka Profil">
+              <div class="relative">
+                <img src="${user?.avatar || '/avatar.png'}" alt="${user?.name || 'User'}" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all" onerror="this.onerror=null; this.src='/avatar.png';"/>
+                <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${user?.isVerified ? 'bg-secondary' : 'bg-outline'} rounded-full border-2 border-white"></div>
+              </div>
             </a>
           ` : `
             <a href="#/login" class="text-xs font-semibold text-primary hover:underline">Masuk</a>

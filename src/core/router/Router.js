@@ -55,8 +55,15 @@ export class Router {
     const rawHash = window.location.hash.slice(1) || '/';
     const [path] = rawHash.split('?');
     
-    // Jika user membuka hash #/admin atau #/admin_panel di aplikasi utama, redirect langsung
+    // Jika user membuka hash #/admin atau #/admin_panel di aplikasi utama, periksa hak akses admin
     if (path === '/admin' || path === '/admin_panel') {
+      const authService = this._container.has('AuthService') ? this._container.resolve('AuthService') : null;
+      if (authService && !authService.isAdmin()) {
+        const notif = this._container.has('NotificationService') ? this._container.resolve('NotificationService') : null;
+        notif?.error('Akses ditolak: Panel ini hanya dapat diakses oleh Administrator.');
+        this.navigate(authService.isAuthenticated() ? '/dashboard' : '/login');
+        return;
+      }
       window.location.href = '/admin_panel/index.html';
       return;
     }

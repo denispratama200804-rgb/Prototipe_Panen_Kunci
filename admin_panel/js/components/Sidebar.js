@@ -153,6 +153,10 @@ export class Sidebar {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
         localStorage.removeItem('panenkunci:admin_logged_in');
+        localStorage.removeItem('panenkunci:auth_role');
+        localStorage.removeItem('panenkunci:session');
+        localStorage.removeItem('panenkunci:current_user');
+        sessionStorage.clear();
         window.location.href = '/#/login';
       });
     }

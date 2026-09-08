@@ -9,6 +9,7 @@ export class User {
    * @param {string} params.id
    * @param {string} params.name
    * @param {string} params.email
+   * @param {string} [params.role]
    * @param {string} [params.phone]
    * @param {string} [params.bankName]
    * @param {string} [params.accountNumber]
@@ -21,6 +22,7 @@ export class User {
     id,
     name,
     email,
+    role = 'user',
     phone = '081234567890',
     bankName = 'Bank Central Asia (BCA)',
     accountNumber = '5410987654',
@@ -32,6 +34,7 @@ export class User {
     this.id = id;
     this.name = name;
     this.email = email;
+    this.role = (role || 'user').toLowerCase();
     this.phone = phone;
     this.bankName = bankName;
     this.accountNumber = accountNumber;
@@ -39,6 +42,22 @@ export class User {
     this.isVerified = isVerified;
     this.createdAt = createdAt;
     this.avatar = avatar || '/avatar.png';
+  }
+
+  /**
+   * Cek apakah user adalah administrator
+   * @returns {boolean}
+   */
+  isAdmin() {
+    return this.role === 'admin';
+  }
+
+  /**
+   * Cek apakah user adalah pengguna biasa
+   * @returns {boolean}
+   */
+  isUser() {
+    return this.role !== 'admin';
   }
 
   /**
@@ -60,6 +79,7 @@ export class User {
       id: this.id,
       name: this.name,
       email: this.email,
+      role: this.role,
       phone: this.phone,
       bankName: this.bankName,
       accountNumber: this.accountNumber,

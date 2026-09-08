@@ -231,10 +231,15 @@ export class SupabaseUserRepository extends IUserRepository {
    * @private
    */
   _toDomain(row) {
+    const isExplicitAdmin = row.role === 'admin' ||
+      (row.email && row.email.toLowerCase() === 'admin@panenkunci.com') ||
+      (row.email && row.email.toLowerCase().startsWith('admin@'));
+
     return new User({
       id: row.id,
       name: row.name,
       email: row.email,
+      role: isExplicitAdmin ? 'admin' : (row.role || 'user'),
       phone: row.phone || '',
       bankName: row.bank_name || '',
       accountNumber: row.account_number || '',

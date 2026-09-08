@@ -137,25 +137,25 @@ export class LoginView extends IComponent {
       const email = emailInput.value.trim();
       const password = passInput.value;
 
-      // Akses Admin khusus panel admin
-      if (email.toLowerCase() === 'admin' && password === 'admin') {
-        localStorage.setItem('panenkunci:admin_logged_in', 'true');
-        window.location.href = '/admin_panel/index.html';
-        return;
-      }
-
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Menghubungkan ke Supabase...</span>';
+      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Memverifikasi akun...</span>';
 
       const res = await this._authService.login(email, password);
 
       if (res.success) {
-        this._notification.success('Login berhasil! Selamat datang kembali.');
-        window.location.hash = '/dashboard';
+        if (res.role === 'admin') {
+          this._notification.success(res.message || 'Login berhasil sebagai Administrator!');
+          setTimeout(() => {
+            window.location.href = res.redirectTo || '/admin_panel/index.html';
+          }, 300);
+        } else {
+          this._notification.success(res.message || 'Login berhasil! Selamat datang.');
+          window.location.hash = '/dashboard';
+        }
       } else {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<span>Masuk Sekarang</span><span class="material-symbols-outlined text-[20px]">arrow_forward</span>';
-        this._notification.error(res.message || 'Login gagal.');
+        this._notification.error(res.message || 'Login gagal. Periksa kembali email dan kata sandi Anda.');
       }
     });
 

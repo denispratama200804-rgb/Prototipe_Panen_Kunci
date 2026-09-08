@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   bank_name       TEXT          DEFAULT '',
   account_number  TEXT          DEFAULT '',
   account_holder  TEXT          DEFAULT '',
+  role            TEXT          NOT NULL DEFAULT 'user'
+                                  CHECK (role IN ('user', 'admin')),
   is_verified     BOOLEAN       NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()

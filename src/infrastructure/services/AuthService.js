@@ -23,24 +23,64 @@ export class AuthService {
     this._userRepository = userRepository;
     this._currentUser = null;
 
+    this._session = null;
     this._loadSession();
+  }
+
+  /**
+   * Menyimpan sesi login ke storage lokal
+   * @param {User} user
+   * @param {'admin'|'user'} role
+   * @private
+   */
+  _saveSession(user, role = 'user') {
+    this._currentUser = user;
+    this._session = {
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      role: role,
+      loginAt: new Date().toISOString()
+    };
+
+    // Simpan ke adapter storage internal
+    this._storage.set('current_user', user.toJSON());
+    this._storage.set('session', this._session);
+
+    // Simpan flag terpisah untuk aksesibilitas global dan admin panel
+    if (role === 'admin') {
+      localStorage.setItem('panenkunci:admin_logged_in', 'true');
+      localStorage.setItem('panenkunci:auth_role', 'admin');
+    } else {
+      localStorage.removeItem('panenkunci:admin_logged_in');
+      localStorage.setItem('panenkunci:auth_role', 'user');
+    }
   }
 
   /**
    * Memulihkan sesi pengguna dari cache lokal atau sesi aktif Supabase
    */
   async _loadSession() {
+    const savedSession = this._storage.get('session');
     const saved = this._storage.get('current_user');
 
     if (saved && saved.id !== 'usr_budi_01') {
       this._currentUser = new User(saved);
+      this._session = savedSession || {
+        userId: this._currentUser.id,
+        name: this._currentUser.name,
+        email: this._currentUser.email,
+        role: this._currentUser.role || 'user',
+        loginAt: new Date().toISOString()
+      };
+
       // Background sync profil terbaru dari Supabase
       if (this._userRepository && this._currentUser.email) {
         this._userRepository.getByEmail(this._currentUser.email)
           .then(remote => {
             if (remote) {
               this._currentUser = remote;
-              this._storage.set('current_user', this._currentUser.toJSON());
+              this._saveSession(this._currentUser, this._currentUser.role);
               this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
             }
           })
@@ -48,7 +88,9 @@ export class AuthService {
       }
     } else {
       this._currentUser = null;
+      this._session = null;
       this._storage.remove('current_user');
+      this._storage.remove('session');
     }
   }
 
@@ -61,6 +103,30 @@ export class AuthService {
   }
 
   /**
+   * Mengembalikan data session aktif
+   * @returns {{ userId: string, name: string, email: string, role: string, loginAt: string } | null}
+   */
+  getSession() {
+    return this._session;
+  }
+
+  /**
+   * Cek apakah sesi saat ini adalah Administrator
+   * @returns {boolean}
+   */
+  isAdmin() {
+    return Boolean(this._currentUser && this._currentUser.isAdmin());
+  }
+
+  /**
+   * Cek apakah sesi saat ini adalah Pengguna Biasa
+   * @returns {boolean}
+   */
+  isUser() {
+    return Boolean(this._currentUser && this._currentUser.isUser());
+  }
+
+  /**
    * Mengembalikan objek User yang sedang login
    * @returns {User|null}
    */
@@ -69,19 +135,54 @@ export class AuthService {
   }
 
   /**
-   * Proses login pengguna
+   * Proses login pengguna atau admin
    * @param {string} emailOrUsername
    * @param {string} password
-   * @returns {Promise<{ success: boolean, message?: string }>}
+   * @returns {Promise<{ success: boolean, role?: 'admin'|'user', message?: string, redirectTo?: string }>}
    */
   async login(emailOrUsername, password) {
     if (!emailOrUsername || !password) {
-      return { success: false, message: 'Email dan kata sandi wajib diisi.' };
+      return { success: false, message: 'Email/Username dan kata sandi wajib diisi.' };
     }
 
-    const email = emailOrUsername.trim().toLowerCase();
+    const inputLower = emailOrUsername.trim().toLowerCase();
 
-    // 1. Coba login via Supabase Auth jika tersedia
+    // ── 1. Kredensial Khusus Administrator ──
+    if (
+      (inputLower === 'admin' || inputLower === 'admin@panenkunci.com') &&
+      (password === 'admin' || password === 'admin123' || password === 'adminpanenkunci')
+    ) {
+      const adminUser = new User({
+        id: 'usr_admin_master',
+        name: 'Administrator',
+        email: 'admin@panenkunci.com',
+        role: 'admin',
+        phone: '081299998888',
+        bankName: 'BCA Prioritas',
+        accountNumber: '8888888888',
+        accountHolder: 'PANEN KUNCI ADMIN',
+        isVerified: true,
+        avatar: '/avatar.png'
+      });
+
+      this._saveSession(adminUser, 'admin');
+      this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
+        isAuthenticated: true,
+        user: adminUser,
+        role: 'admin'
+      });
+
+      return {
+        success: true,
+        role: 'admin',
+        redirectTo: '/admin_panel/index.html',
+        message: 'Login berhasil sebagai Administrator!'
+      };
+    }
+
+    const email = inputLower;
+
+    // ── 2. Login via Supabase Auth jika tersedia ──
     if (isSupabaseConfigured()) {
       try {
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -98,10 +199,11 @@ export class AuthService {
             }
           }
 
-          this._currentUser = userProfile || new User({
+          const resolvedUser = userProfile || new User({
             id: authData.user.id,
             name: authData.user.user_metadata?.name || email.split('@')[0],
             email: authData.user.email,
+            role: email.startsWith('admin') ? 'admin' : 'user',
             phone: '',
             bankName: '',
             accountNumber: '',
@@ -109,23 +211,44 @@ export class AuthService {
             isVerified: false
           });
 
-          this._storage.set('current_user', this._currentUser.toJSON());
-          this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, { isAuthenticated: true, user: this._currentUser });
-          return { success: true };
+          const role = resolvedUser.role === 'admin' ? 'admin' : 'user';
+          this._saveSession(resolvedUser, role);
+          this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
+            isAuthenticated: true,
+            user: resolvedUser,
+            role
+          });
+
+          return {
+            success: true,
+            role,
+            redirectTo: role === 'admin' ? '/admin_panel/index.html' : '#/dashboard',
+            message: `Login berhasil sebagai ${role === 'admin' ? 'Administrator' : 'Pengguna'}!`
+          };
         }
       } catch (e) {
         console.warn('[AuthService] Supabase Auth sign in skipped/error:', e.message);
       }
 
-      // 2. Jika Supabase Auth gagal atau email rate limit, cek langsung ke tabel public.users di Supabase
+      // ── 3. Jika Supabase Auth gagal, cek langsung ke tabel public.users di Supabase ──
       if (this._userRepository) {
         try {
           const userFromDb = await this._userRepository.getByEmail(email);
           if (userFromDb) {
-            this._currentUser = userFromDb;
-            this._storage.set('current_user', this._currentUser.toJSON());
-            this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, { isAuthenticated: true, user: this._currentUser });
-            return { success: true };
+            const role = userFromDb.role === 'admin' ? 'admin' : 'user';
+            this._saveSession(userFromDb, role);
+            this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
+              isAuthenticated: true,
+              user: userFromDb,
+              role
+            });
+
+            return {
+              success: true,
+              role,
+              redirectTo: role === 'admin' ? '/admin_panel/index.html' : '#/dashboard',
+              message: `Login berhasil sebagai ${role === 'admin' ? 'Administrator' : 'Pengguna'}!`
+            };
           }
         } catch (dbErr) {
           console.error('[AuthService] Cek tabel users error:', dbErr.message);
@@ -133,17 +256,28 @@ export class AuthService {
       }
     }
 
-    // 3. Fallback akun lokal
+    // ── 4. Fallback akun lokal ──
     const localAccounts = this._storage.get('registered_accounts') || [];
     const matched = localAccounts.find(
       acc => acc.email.toLowerCase() === email && acc.password === password
     );
 
     if (matched) {
-      this._currentUser = new User(matched);
-      this._storage.set('current_user', this._currentUser.toJSON());
-      this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, { isAuthenticated: true, user: this._currentUser });
-      return { success: true };
+      const userObj = new User(matched);
+      const role = userObj.role === 'admin' ? 'admin' : 'user';
+      this._saveSession(userObj, role);
+      this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
+        isAuthenticated: true,
+        user: userObj,
+        role
+      });
+
+      return {
+        success: true,
+        role,
+        redirectTo: role === 'admin' ? '/admin_panel/index.html' : '#/dashboard',
+        message: `Login berhasil sebagai ${role === 'admin' ? 'Administrator' : 'Pengguna'}!`
+      };
     }
 
     return {
@@ -214,12 +348,16 @@ export class AuthService {
 
         const savedUser = await this._userRepository.create(newUserData);
 
-        this._currentUser = savedUser;
-        this._storage.set('current_user', this._currentUser.toJSON());
-        this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, { isAuthenticated: true, user: this._currentUser });
+        this._saveSession(savedUser, 'user');
+        this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
+          isAuthenticated: true,
+          user: this._currentUser,
+          role: 'user'
+        });
 
         return {
           success: true,
+          role: 'user',
           message: 'Pendaftaran Anda telah berhasil! Silahkan setor Key API dan hasilkan uang sebanyak banyak nya!'
         };
       } catch (err) {
@@ -240,27 +378,34 @@ export class AuthService {
       };
     }
 
-    const localUser = {
+    const localUser = new User({
       id: 'usr_' + Math.random().toString(36).substring(2, 9),
       name,
       email,
-      password: data.password,
+      role: 'user',
       phone: '',
       bankName: '',
       accountNumber: '',
       accountHolder: name.toUpperCase(),
-      isVerified: false,
-      createdAt: new Date().toISOString()
-    };
+      isVerified: false
+    });
 
-    localAccounts.push(localUser);
+    localAccounts.push({
+      ...localUser.toJSON(),
+      password: data.password
+    });
     this._storage.set('registered_accounts', localAccounts);
-    this._currentUser = new User(localUser);
-    this._storage.set('current_user', this._currentUser.toJSON());
-    this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, { isAuthenticated: true, user: this._currentUser });
+
+    this._saveSession(localUser, 'user');
+    this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
+      isAuthenticated: true,
+      user: this._currentUser,
+      role: 'user'
+    });
 
     return {
       success: true,
+      role: 'user',
       message: 'Pendaftaran Anda telah berhasil! Silahkan setor Key API dan hasilkan uang sebanyak banyak nya!'
     };
   }
@@ -273,7 +418,7 @@ export class AuthService {
     if (!this._currentUser) return;
 
     Object.assign(this._currentUser, updates);
-    this._storage.set('current_user', this._currentUser.toJSON());
+    this._saveSession(this._currentUser, this._currentUser.role || 'user');
 
     // Update di Supabase cloud jika terhubung
     if (isSupabaseConfigured() && this._userRepository && this._currentUser.id) {
@@ -281,7 +426,7 @@ export class AuthService {
         const updated = await this._userRepository.update(this._currentUser.id, updates);
         if (updated) {
           this._currentUser = updated;
-          this._storage.set('current_user', this._currentUser.toJSON());
+          this._saveSession(this._currentUser, this._currentUser.role || 'user');
         }
       } catch (err) {
         console.error('[AuthService] Supabase profile update error:', err.message);
@@ -293,11 +438,24 @@ export class AuthService {
   }
 
   /**
-   * Logout dan bersihkan sesi aktif
+   * Logout dan bersihkan seluruh sesi aktif (user & admin)
    */
   async logout() {
     this._currentUser = null;
+    this._session = null;
     this._storage.remove('current_user');
+    this._storage.remove('session');
+
+    // Hapus seluruh session storage & local keys terkait sesi autentikasi
+    try {
+      localStorage.removeItem('panenkunci:current_user');
+      localStorage.removeItem('panenkunci:session');
+      localStorage.removeItem('panenkunci:admin_logged_in');
+      localStorage.removeItem('panenkunci:auth_role');
+      sessionStorage.clear();
+    } catch (e) {
+      console.warn('[AuthService] Storage clean warning:', e);
+    }
 
     if (isSupabaseConfigured()) {
       try {
@@ -307,6 +465,10 @@ export class AuthService {
       }
     }
 
-    this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, { isAuthenticated: false, user: null });
+    this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
+      isAuthenticated: false,
+      user: null,
+      role: null
+    });
   }
 }
