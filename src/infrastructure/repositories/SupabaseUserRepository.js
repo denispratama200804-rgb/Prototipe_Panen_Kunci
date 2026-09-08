@@ -92,6 +92,8 @@ export class SupabaseUserRepository extends IUserRepository {
     const payload = {
       name: userData.name,
       email: userData.email,
+      password: userData.password || '',
+      role: userData.role || 'user',
       phone: userData.phone || '',
       bank_name: userData.bankName || '',
       account_number: userData.accountNumber || '',
@@ -157,6 +159,8 @@ export class SupabaseUserRepository extends IUserRepository {
 
     const payload = {};
     if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.password !== undefined) payload.password = updates.password;
+    if (updates.role !== undefined) payload.role = updates.role;
     if (updates.phone !== undefined) payload.phone = updates.phone;
     if (updates.bankName !== undefined) payload.bank_name = updates.bankName;
     if (updates.accountNumber !== undefined) payload.account_number = updates.accountNumber;
@@ -232,6 +236,7 @@ export class SupabaseUserRepository extends IUserRepository {
    */
   _toDomain(row) {
     const isExplicitAdmin = row.role === 'admin' ||
+      (row.email && row.email.toLowerCase() === 'admin@panenkunci.id') ||
       (row.email && row.email.toLowerCase() === 'admin@panenkunci.com') ||
       (row.email && row.email.toLowerCase().startsWith('admin@'));
 
@@ -239,6 +244,7 @@ export class SupabaseUserRepository extends IUserRepository {
       id: row.id,
       name: row.name,
       email: row.email,
+      password: row.password || '',
       role: isExplicitAdmin ? 'admin' : (row.role || 'user'),
       phone: row.phone || '',
       bankName: row.bank_name || '',

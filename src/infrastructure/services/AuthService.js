@@ -147,17 +147,18 @@ export class AuthService {
 
     const inputLower = emailOrUsername.trim().toLowerCase();
 
-    // ── 1. Kredensial Khusus Administrator ──
+    // ── 1. Kredensial Khusus Administrator (Master Fallback) ──
     if (
-      (inputLower === 'admin' || inputLower === 'admin@panenkunci.com') &&
+      (inputLower === 'admin' || inputLower === 'admin@panenkunci.id' || inputLower === 'admin@panenkunci.com') &&
       (password === 'admin' || password === 'admin123' || password === 'adminpanenkunci')
     ) {
       const adminUser = new User({
         id: 'usr_admin_master',
-        name: 'Administrator',
-        email: 'admin@panenkunci.com',
+        name: 'Administrator Panen Kunci',
+        email: inputLower.includes('@') ? inputLower : 'admin@panenkunci.id',
+        password,
         role: 'admin',
-        phone: '081299998888',
+        phone: '',
         bankName: 'BCA Prioritas',
         accountNumber: '8888888888',
         accountHolder: 'PANEN KUNCI ADMIN',
@@ -182,8 +183,45 @@ export class AuthService {
 
     const email = inputLower;
 
-    // ── 2. Login via Supabase Auth jika tersedia ──
-    if (isSupabaseConfigured()) {
+    // ── 2. Login via Database Supabase (Cek email & password di tabel users) ──
+    if (isSupabaseConfigured() && this._userRepository) {
+      try {
+        const userFromDb = await this._userRepository.getByEmail(email);
+        if (userFromDb) {
+          // Jika kolom password tersedia di database, periksa kecocokan password
+          if (userFromDb.password && userFromDb.password !== password) {
+            return {
+              success: false,
+              message: 'Kata sandi yang Anda masukkan salah. Silakan periksa kembali.'
+            };
+          }
+
+          const isAdmin = userFromDb.role === 'admin' ||
+                          userFromDb.isAdmin() ||
+                          email === 'admin@panenkunci.id' ||
+                          email === 'admin@panenkunci.com' ||
+                          email.startsWith('admin@');
+          const role = isAdmin ? 'admin' : 'user';
+
+          this._saveSession(userFromDb, role);
+          this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
+            isAuthenticated: true,
+            user: userFromDb,
+            role
+          });
+
+          return {
+            success: true,
+            role,
+            redirectTo: role === 'admin' ? '/admin_panel/index.html' : '#/dashboard',
+            message: `Login berhasil sebagai ${role === 'admin' ? 'Administrator' : 'Pengguna'}!`
+          };
+        }
+      } catch (dbErr) {
+        console.warn('[AuthService] Cek tabel users Supabase warning:', dbErr.message);
+      }
+
+      // ── 3. Login via Supabase Auth jika akun terdaftar di auth.users ──
       try {
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
           email,
@@ -199,11 +237,16 @@ export class AuthService {
             }
           }
 
+          const isRoleAdmin = (userProfile && userProfile.role === 'admin') ||
+                              email.startsWith('admin') ||
+                              authData.user.user_metadata?.role === 'admin';
+
           const resolvedUser = userProfile || new User({
             id: authData.user.id,
             name: authData.user.user_metadata?.name || email.split('@')[0],
             email: authData.user.email,
-            role: email.startsWith('admin') ? 'admin' : 'user',
+            password,
+            role: isRoleAdmin ? 'admin' : 'user',
             phone: '',
             bankName: '',
             accountNumber: '',
@@ -211,7 +254,7 @@ export class AuthService {
             isVerified: false
           });
 
-          const role = resolvedUser.role === 'admin' ? 'admin' : 'user';
+          const role = isRoleAdmin ? 'admin' : 'user';
           this._saveSession(resolvedUser, role);
           this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
             isAuthenticated: true,
@@ -228,31 +271,6 @@ export class AuthService {
         }
       } catch (e) {
         console.warn('[AuthService] Supabase Auth sign in skipped/error:', e.message);
-      }
-
-      // ── 3. Jika Supabase Auth gagal, cek langsung ke tabel public.users di Supabase ──
-      if (this._userRepository) {
-        try {
-          const userFromDb = await this._userRepository.getByEmail(email);
-          if (userFromDb) {
-            const role = userFromDb.role === 'admin' ? 'admin' : 'user';
-            this._saveSession(userFromDb, role);
-            this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
-              isAuthenticated: true,
-              user: userFromDb,
-              role
-            });
-
-            return {
-              success: true,
-              role,
-              redirectTo: role === 'admin' ? '/admin_panel/index.html' : '#/dashboard',
-              message: `Login berhasil sebagai ${role === 'admin' ? 'Administrator' : 'Pengguna'}!`
-            };
-          }
-        } catch (dbErr) {
-          console.error('[AuthService] Cek tabel users error:', dbErr.message);
-        }
       }
     }
 
@@ -332,9 +350,14 @@ export class AuthService {
         }
 
         // C. Simpan data profil pengguna PASTI ke tabel `public.users` di Supabase
+        const isRoleAdmin = email.startsWith('admin') || email === 'admin@panenkunci.id';
+        const role = isRoleAdmin ? 'admin' : 'user';
+
         const newUserData = {
           name,
           email,
+          password: data.password,
+          role,
           phone: '',
           bankName: '',
           accountNumber: '',
@@ -348,11 +371,11 @@ export class AuthService {
 
         const savedUser = await this._userRepository.create(newUserData);
 
-        this._saveSession(savedUser, 'user');
+        this._saveSession(savedUser, role);
         this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
           isAuthenticated: true,
           user: this._currentUser,
-          role: 'user'
+          role
         });
 
         return {
@@ -378,11 +401,15 @@ export class AuthService {
       };
     }
 
+    const isLocalAdmin = email.startsWith('admin') || email === 'admin@panenkunci.id';
+    const localRole = isLocalAdmin ? 'admin' : 'user';
+
     const localUser = new User({
       id: 'usr_' + Math.random().toString(36).substring(2, 9),
       name,
       email,
-      role: 'user',
+      password: data.password,
+      role: localRole,
       phone: '',
       bankName: '',
       accountNumber: '',
@@ -396,16 +423,16 @@ export class AuthService {
     });
     this._storage.set('registered_accounts', localAccounts);
 
-    this._saveSession(localUser, 'user');
+    this._saveSession(localUser, localRole);
     this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
       isAuthenticated: true,
       user: this._currentUser,
-      role: 'user'
+      role: localRole
     });
 
     return {
       success: true,
-      role: 'user',
+      role: localRole,
       message: 'Pendaftaran Anda telah berhasil! Silahkan setor Key API dan hasilkan uang sebanyak banyak nya!'
     };
   }

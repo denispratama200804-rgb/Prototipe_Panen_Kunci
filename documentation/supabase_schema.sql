@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
   name            TEXT          NOT NULL,
   email           TEXT          NOT NULL UNIQUE,
+  password        TEXT          DEFAULT '',
   phone           TEXT          DEFAULT '',
   bank_name       TEXT          DEFAULT '',
   account_number  TEXT          DEFAULT '',
@@ -33,9 +34,14 @@ CREATE TABLE IF NOT EXISTS public.users (
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
+-- Query migrasi jika tabel users sudah ada sebelumnya:
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password TEXT DEFAULT '';
+
 COMMENT ON TABLE  public.users                  IS 'Profil pengguna aplikasi Panen Kunci';
 COMMENT ON COLUMN public.users.id               IS 'Primary key — UUID otomatis, harus sama dengan auth.users.id';
 COMMENT ON COLUMN public.users.email            IS 'Email unik pengguna';
+COMMENT ON COLUMN public.users.password         IS 'Kata sandi pengguna (plain / hash)';
+COMMENT ON COLUMN public.users.role             IS 'Peran pengguna: user (pengguna biasa) atau admin (administrator)';
 COMMENT ON COLUMN public.users.bank_name        IS 'Nama bank rekening tujuan penarikan';
 COMMENT ON COLUMN public.users.account_number   IS 'Nomor rekening bank';
 COMMENT ON COLUMN public.users.account_holder   IS 'Nama pemilik rekening sesuai buku tabungan';
@@ -221,24 +227,22 @@ CREATE POLICY "transactions: allow insert"
 
 
 -- ============================================================
--- SEED DATA (opsional — hapus sebelum deploy production!)
+-- AKUN ADMINISTRATOR UTAMA (Siap Pakai)
 -- ============================================================
-
-/*
--- Ganti UUID di bawah dengan ID dari Supabase Auth (auth.users.id)
-
-INSERT INTO public.users (id, name, email, phone, bank_name, account_number, account_holder, is_verified)
+-- Email    : admin@panenkunci.id
+-- Password : admin123
+-- Role     : admin
+-- ============================================================
+INSERT INTO public.users (name, email, password, role, is_verified)
 VALUES (
-  'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-  'Budi Santoso',
-  'budi.santoso@example.com',
-  '081234567890',
-  'Bank Central Asia (BCA)',
-  '5410987654',
-  'BUDI SANTOSO',
+  'Administrator Panen Kunci',
+  'admin@panenkunci.id',
+  'admin123',
+  'admin',
   TRUE
-) ON CONFLICT (id) DO NOTHING;
-*/
+)
+ON CONFLICT (email) DO UPDATE
+SET role = 'admin', password = EXCLUDED.password;
 
 
 -- ============================================================

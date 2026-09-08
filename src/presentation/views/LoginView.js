@@ -43,10 +43,10 @@ export class LoginView extends IComponent {
                 <span class="material-symbols-outlined absolute left-3.5 text-outline text-[20px]">mail</span>
                 <input
                   id="loginEmail"
-                  type="email"
-                  placeholder="nama@email.com"
+                  type="text"
+                  placeholder="nama@email.com atau username admin"
                   required
-                  autocomplete="email"
+                  autocomplete="username"
                   class="w-full bg-bg-subtle text-text-heading font-body-md text-sm rounded-xl py-3 pl-11 pr-4 border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all placeholder:text-outline/50"
                 />
               </div>

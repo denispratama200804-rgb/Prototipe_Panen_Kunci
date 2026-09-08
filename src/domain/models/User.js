@@ -22,6 +22,7 @@ export class User {
     id,
     name,
     email,
+    password = '',
     role = 'user',
     phone = '',
     bankName = '',
@@ -34,6 +35,7 @@ export class User {
     this.id = id;
     this.name = name;
     this.email = email;
+    this.password = password || '';
     this.role = (role || 'user').toLowerCase();
     this.phone = phone || '';
     this.bankName = bankName || '';
@@ -79,6 +81,7 @@ export class User {
       id: this.id,
       name: this.name,
       email: this.email,
+      password: this.password,
       role: this.role,
       phone: this.phone,
       bankName: this.bankName,
