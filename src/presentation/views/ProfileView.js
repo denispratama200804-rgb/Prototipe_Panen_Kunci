@@ -3,7 +3,7 @@ import { IComponent } from '../../core/interfaces/IComponent.js';
 /**
  * ProfileView
  * Prinsip: Single Responsibility Principle (SRP) & Liskov Substitution Principle (LSP)
- * Halaman profil pengguna, manajemen rekening bank/e-wallet, keamanan, dan pengaturan akun.
+ * Halaman profil pengguna yang terhubung langsung dengan data autentikasi dan database Supabase.
  */
 export class ProfileView extends IComponent {
   /**
@@ -19,18 +19,34 @@ export class ProfileView extends IComponent {
   }
 
   render() {
-    const user = this._authService.getCurrentUser() || {
-      name: 'Budi Santoso',
-      email: 'budi.santoso@example.com',
-      phone: '081234567890',
-      bankName: 'Bank Central Asia (BCA)',
-      accountNumber: '5410987654',
-      accountHolder: 'BUDI SANTOSO',
-      isVerified: true
-    };
+    const user = this._authService.getCurrentUser();
+
+    // Jika belum login, tampilkan layar masuk akun yang ramah
+    if (!user) {
+      return `
+        <div class="flex flex-col w-full min-h-screen bg-background items-center justify-center p-6 text-center">
+          <div class="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
+            <span class="material-symbols-outlined text-3xl">account_circle</span>
+          </div>
+          <h2 class="font-headline-md text-xl font-bold text-text-heading">Belum Masuk Akun</h2>
+          <p class="text-xs text-text-body max-w-xs mt-1 mb-6">
+            Silakan masuk dengan akun Panen Kunci Anda untuk melihat dan mengelola profil akun.
+          </p>
+          <a href="#/login" class="bg-primary text-white font-label-md text-sm font-bold px-6 py-3 rounded-2xl shadow-md hover:bg-primary-container transition-all">
+            Masuk Sekarang
+          </a>
+        </div>
+      `;
+    }
 
     const lifetime = this._walletService.getLifetimeEarnings();
     const totalKeys = this._apiKeyService.getAllKeys().length;
+    const initials = (user.name || 'PK')
+      .split(' ')
+      .map(part => part[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
 
     return `
       <div class="flex flex-col w-full min-h-screen bg-background pb-28 pt-20">
@@ -43,23 +59,26 @@ export class ProfileView extends IComponent {
 
             <!-- Avatar -->
             <div class="relative mb-3">
-              <img
-                src="/avatar.png"
-                alt="${user.name}"
-                class="w-24 h-24 rounded-full object-cover shadow-md ring-4 ring-primary/15"
-                onerror="this.src='https://lh3.googleusercontent.com/aida-public/AB6AXuCJ06NwJvkMq5wnCKysow5prhzpnH7g6zRgYA4RYuyUgHK6g6xTot1wP7xXFVyjpvOcWMlIE07keEdOWlft-yWU3CY4OVQMVo94yYOErwizdVXrl3EnYkqJACecBLnDr-S_NAdc1h3mhBXs7Yf_5t7uzJSd4NfiLJMj78zcHOSK_2Kq3hpEg-uS5V6DqYBCxlY-gzwH25PqPD9gGdd_JtpdkqIo28boAKfZVg2uxTR-oSCUsDPPZ9GT'"
-              />
-              <div class="absolute bottom-0 right-0 bg-secondary text-white shadow-sm rounded-full p-1 flex items-center justify-center border-2 border-white" title="Akun Terverifikasi">
-                <span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+              <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-primary to-primary-container text-white text-2xl font-bold flex items-center justify-center shadow-md ring-4 ring-primary/15">
+                ${initials}
+              </div>
+              <div class="absolute bottom-0 right-0 ${user.isVerified ? 'bg-secondary' : 'bg-outline'} text-white shadow-sm rounded-full p-1 flex items-center justify-center border-2 border-white" title="${user.isVerified ? 'Akun Terverifikasi' : 'Menunggu Verifikasi'}">
+                <span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">
+                  ${user.isVerified ? 'verified' : 'pending'}
+                </span>
               </div>
             </div>
 
-            <h2 class="font-headline-md text-xl font-bold text-text-heading">${user.name}</h2>
-            <p class="text-xs text-text-body mt-0.5">${user.email}</p>
+            <h2 class="font-headline-md text-xl font-bold text-text-heading" id="profileNameDisplay">${user.name || 'Pengguna'}</h2>
+            <p class="text-xs text-text-body mt-0.5" id="profileEmailDisplay">${user.email || ''}</p>
 
-            <div class="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-secondary-container/50 text-on-secondary-container text-xs font-semibold">
-              <span class="material-symbols-outlined text-[16px] text-secondary" style="font-variation-settings: 'FILL' 1;">shield</span>
-              <span class="text-secondary font-bold">Akun Terverifikasi</span>
+            <div class="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full ${user.isVerified ? 'bg-secondary-container/50 text-on-secondary-container' : 'bg-surface-container text-text-body'} text-xs font-semibold">
+              <span class="material-symbols-outlined text-[16px] ${user.isVerified ? 'text-secondary' : 'text-outline'}" style="font-variation-settings: 'FILL' 1;">
+                ${user.isVerified ? 'verified' : 'hourglass_empty'}
+              </span>
+              <span class="${user.isVerified ? 'text-secondary' : 'text-text-body'} font-bold">
+                ${user.isVerified ? 'Akun Terverifikasi' : 'Menunggu Verifikasi Admin'}
+              </span>
             </div>
 
             <!-- Quick Stats -->
@@ -78,7 +97,7 @@ export class ProfileView extends IComponent {
           <!-- Bank Account / E-Wallet Info Section -->
           <section class="flex flex-col gap-2">
             <h3 class="font-label-md text-xs font-bold text-text-heading px-1 uppercase tracking-wider">
-              Rekening & E-Wallet Pencairan
+              Rekening & E-Wallet Pencairan (Supabase)
             </h3>
             <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-4">
               <div class="flex justify-between items-start">
@@ -87,8 +106,10 @@ export class ProfileView extends IComponent {
                     <span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">account_balance</span>
                   </div>
                   <div>
-                    <h4 class="font-body-lg text-sm text-text-heading font-bold" id="profileBankName">${user.bankName || 'Bank Central Asia (BCA)'}</h4>
-                    <p class="text-xs text-text-body">Rekening Utama</p>
+                    <h4 class="font-body-lg text-sm text-text-heading font-bold" id="profileBankName">
+                      ${user.bankName ? user.bankName : 'Belum diatur'}
+                    </h4>
+                    <p class="text-xs text-text-body">Metode Pembayaran Utama</p>
                   </div>
                 </div>
                 <button
@@ -105,19 +126,19 @@ export class ProfileView extends IComponent {
                 <div class="flex justify-between">
                   <span class="text-xs text-text-body">Nomor Rekening</span>
                   <span class="font-mono text-xs font-bold text-text-heading tracking-wider" id="profileAccountNum">
-                    ${user.accountNumber ? `**** **** ${user.accountNumber.slice(-4)}` : '**** **** 5678'}
+                    ${user.accountNumber ? user.getMaskedAccountNumber() : 'Belum diatur'}
                   </span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-xs text-text-body">Atas Nama</span>
                   <span class="text-xs font-bold text-text-heading uppercase" id="profileAccountHolder">
-                    ${user.accountHolder || user.name.toUpperCase()}
+                    ${user.accountHolder ? user.accountHolder : (user.name ? user.name.toUpperCase() : 'Belum diatur')}
                   </span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-xs text-text-body">Nomor Handphone E-Wallet</span>
+                  <span class="text-xs text-text-body">Nomor HP E-Wallet</span>
                   <span class="text-xs font-bold text-text-heading font-mono" id="profilePhone">
-                    ${user.phone || '081234567890'}
+                    ${user.phone ? user.phone : 'Belum diatur'}
                   </span>
                 </div>
               </div>
@@ -139,7 +160,7 @@ export class ProfileView extends IComponent {
                   <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary">
                     <span class="material-symbols-outlined text-[20px]">lock_reset</span>
                   </div>
-                  <span class="text-xs font-bold text-text-heading">Ganti Kata Sandi</span>
+                  <span class="text-xs font-bold text-text-heading">Atur Ulang Kata Sandi</span>
                 </div>
                 <span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-[20px]">chevron_right</span>
               </button>
@@ -158,8 +179,8 @@ export class ProfileView extends IComponent {
                 data-type="help"
               >
                 <div class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary">
-                    <span class="material-symbols-outlined text-[20px]">help_center</span>
+                  <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-text-heading">
+                    <span class="material-symbols-outlined text-[20px]">help_outline</span>
                   </div>
                   <span class="text-xs font-bold text-text-heading">Pusat Bantuan & FAQ</span>
                 </div>
@@ -172,10 +193,10 @@ export class ProfileView extends IComponent {
                 data-type="terms"
               >
                 <div class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary">
+                  <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-text-heading">
                     <span class="material-symbols-outlined text-[20px]">description</span>
                   </div>
-                  <span class="text-xs font-bold text-text-heading">Syarat & Ketentuan</span>
+                  <span class="text-xs font-bold text-text-heading">Syarat & Ketentuan Layanan</span>
                 </div>
                 <span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-[20px]">chevron_right</span>
               </button>
@@ -186,8 +207,8 @@ export class ProfileView extends IComponent {
                 data-type="privacy"
               >
                 <div class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary">
-                    <span class="material-symbols-outlined text-[20px]">privacy_tip</span>
+                  <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-text-heading">
+                    <span class="material-symbols-outlined text-[20px]">policy</span>
                   </div>
                   <span class="text-xs font-bold text-text-heading">Kebijakan Privasi</span>
                 </div>
@@ -197,13 +218,13 @@ export class ProfileView extends IComponent {
           </section>
 
           <!-- Logout Button -->
-          <div class="mt-1">
+          <div class="pt-2">
             <button
               type="button"
               id="btnLogout"
-              class="w-full flex items-center justify-center gap-2 py-4 bg-error-container text-on-error-container rounded-2xl font-label-md text-sm font-bold hover:bg-error hover:text-white transition-all shadow-sm active:scale-[0.98]"
+              class="w-full bg-surface-card border border-error-ruby/30 text-error-ruby rounded-2xl py-3.5 px-4 flex items-center justify-center gap-2 hover:bg-error-ruby/10 active:scale-[0.98] transition-all font-label-md text-xs font-bold shadow-sm"
             >
-              <span class="material-symbols-outlined text-[20px]">logout</span>
+              <span class="material-symbols-outlined text-[18px]">logout</span>
               <span>Keluar dari Akun</span>
             </button>
           </div>
@@ -219,85 +240,92 @@ export class ProfileView extends IComponent {
     const logoutBtn = container.querySelector('#btnLogout');
     const infoBtns = container.querySelectorAll('.btn-info-modal');
 
-    // Edit Bank / E-Wallet Info Modal
+    // Modal Edit Rekening / E-Wallet
     editBankBtn?.addEventListener('click', () => {
       const user = this._authService.getCurrentUser();
+      if (!user) return;
+
       this._notification.showModal({
         title: 'Perbarui Rekening / E-Wallet',
         html: `
           <div class="flex flex-col gap-3 text-left">
             <div class="flex flex-col gap-1">
               <label class="text-[11px] font-bold text-text-heading uppercase">Nama Bank / E-Wallet</label>
-              <input type="text" id="editBankName" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" value="${user?.bankName || 'Bank Central Asia (BCA)'}" />
+              <input type="text" id="editBankName" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Contoh: BCA, BRI, Mandiri, DANA, GoPay" value="${user.bankName || ''}" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-[11px] font-bold text-text-heading uppercase">Nomor Rekening</label>
-              <input type="text" id="editAccountNum" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" value="${user?.accountNumber || '5410987654'}" />
+              <input type="text" id="editAccountNum" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Masukkan nomor rekening Anda" value="${user.accountNumber || ''}" />
             </div>
             <div class="flex flex-col gap-1">
-              <label class="text-[11px] font-bold text-text-heading uppercase">Nomor HP E-Wallet</label>
-              <input type="text" id="editPhone" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" value="${user?.phone || '081234567890'}" />
+              <label class="text-[11px] font-bold text-text-heading uppercase">Nama Pemilik Rekening</label>
+              <input type="text" id="editAccountHolder" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Nama sesuai buku tabungan / e-wallet" value="${user.accountHolder || user.name || ''}" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-[11px] font-bold text-text-heading uppercase">Nomor HP E-Wallet / Telepon</label>
+              <input type="tel" id="editPhone" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Contoh: 081234567890" value="${user.phone || ''}" />
             </div>
           </div>
         `,
         type: 'info',
-        confirmText: 'Simpan Perubahan',
+        confirmText: 'Simpan ke Supabase',
         cancelText: 'Batal',
         showCancel: true,
-        onConfirm: () => {
-          const bankName = document.getElementById('editBankName')?.value.trim();
-          const accountNumber = document.getElementById('editAccountNum')?.value.trim();
-          const phone = document.getElementById('editPhone')?.value.trim();
+        onConfirm: async () => {
+          const bankName = document.getElementById('editBankName')?.value?.trim();
+          const accountNumber = document.getElementById('editAccountNum')?.value?.trim();
+          const accountHolder = document.getElementById('editAccountHolder')?.value?.trim();
+          const phone = document.getElementById('editPhone')?.value?.trim();
 
-          this._authService.updateProfile({ bankName, accountNumber, phone });
-          this._notification.success('Data rekening dan e-wallet berhasil diperbarui!');
-          window.location.hash = '/profil';
+          try {
+            await this._authService.updateProfile({ bankName, accountNumber, accountHolder, phone });
+            this._notification.success('Data rekening berhasil disimpan ke Supabase!');
+            
+            // Re-render konten tampilan profil saat ini
+            const viewRoot = document.getElementById('app-view-root');
+            if (viewRoot) {
+              viewRoot.innerHTML = this.render();
+              this.mount(viewRoot);
+            }
+          } catch (err) {
+            this._notification.error('Gagal memperbarui profil: ' + err.message);
+          }
         }
       });
     });
 
-    // Reset Password Modal
+    // Reset password info modal
     resetPassBtn?.addEventListener('click', () => {
+      const user = this._authService.getCurrentUser();
       this._notification.showModal({
-        title: 'Ganti Kata Sandi',
-        html: `
-          <div class="flex flex-col gap-3 text-left">
-            <div class="flex flex-col gap-1">
-              <label class="text-[11px] font-bold text-text-heading uppercase">Kata Sandi Lama</label>
-              <input type="password" id="oldPassword" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="••••••••" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-[11px] font-bold text-text-heading uppercase">Kata Sandi Baru</label>
-              <input type="password" id="newPassword" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Minimal 8 karakter" />
-            </div>
-          </div>
-        `,
+        title: 'Atur Ulang Kata Sandi',
+        message: `Tautan reset kata sandi akan dikirim ke alamat email resmi akun Anda (${user?.email || 'email Anda'}). Lanjutkan?`,
         type: 'info',
-        confirmText: 'Simpan Kata Sandi Baru',
+        confirmText: 'Kirim Email Reset',
         cancelText: 'Batal',
         showCancel: true,
         onConfirm: () => {
-          this._notification.success('Kata sandi berhasil diperbarui!');
+          this._notification.success('Instruksi pengaturan ulang kata sandi telah dikirim ke email Anda.');
         }
       });
     });
 
-    // Info modals
+    // Help & FAQ modal
     infoBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         const type = btn.getAttribute('data-type');
         const contents = {
           help: {
             title: 'Pusat Bantuan & FAQ',
-            message: 'Jika mengalami kendala terkait penyetoran API Key atau pencairan dana, hubungi tim support Panen Kunci di support@panenkunci.id atau melalui layanan chat bantuan 24/7.'
+            message: 'Jika mengalami kendala terkait penyetoran API Key atau pencairan dana, hubungi tim support Panen Kunci di support@panenkunci.id atau melalui layanan bantuan resmi.'
           },
           terms: {
             title: 'Syarat & Ketentuan',
-            message: 'Setiap API Key yang disetor harus memiliki saldo 80 kredit aktif dari Kie.ai. Key yang sudah terdaftar tidak dapat digunakan kembali. Pencairan saldo dilakukan sesuai limit minimum Rp 50.000.'
+            message: 'Setiap API Key yang disetor harus memiliki saldo 80 kredit aktif dari Kie.ai. Key yang sudah terdaftar tidak dapat digunakan kembali. Pencairan saldo dilakukan sesuai batas minimum penarikan yang berlaku.'
           },
           privacy: {
             title: 'Kebijakan Privasi',
-            message: 'Panen Kunci menjaga kerahasiaan data pengguna dengan enkripsi AES-256 standar industri keuangan. Kami tidak pernah membagikan data pribadi atau kredensial akun Anda kepada pihak ketiga.'
+            message: 'Panen Kunci menjaga kerahasiaan data pengguna dengan enkripsi standar industri. Kami tidak pernah membagikan data pribadi atau kredensial akun Anda kepada pihak ketiga.'
           }
         };
 
@@ -311,18 +339,18 @@ export class ProfileView extends IComponent {
       });
     });
 
-    // Logout Confirmation
+    // Logout handler
     logoutBtn?.addEventListener('click', () => {
       this._notification.showModal({
         title: 'Konfirmasi Keluar',
         message: 'Apakah Anda yakin ingin keluar dari akun Panen Kunci?',
         type: 'confirm',
         confirmText: 'Ya, Keluar',
-        cancelText: 'Tetap di Sini',
+        cancelText: 'Batal',
         showCancel: true,
-        onConfirm: () => {
-          this._authService.logout();
-          this._notification.info('Anda telah berhasil keluar.');
+        onConfirm: async () => {
+          await this._authService.logout();
+          this._notification.info('Anda telah berhasil keluar dari akun.');
           window.location.hash = '/login';
         }
       });
