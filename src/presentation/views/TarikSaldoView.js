@@ -22,8 +22,8 @@ export class TarikSaldoView extends IComponent {
     const balance = this._walletService.getBalance();
     const minWithdrawal = this._walletService.minWithdrawal;
     const user = this._authService.getCurrentUser();
-    const defaultPhone = user?.phone || '081234567890';
-    const defaultBankAcc = user?.accountNumber || '5410987654';
+    const defaultPhone = user?.phone || '';
+    const defaultBankAcc = user?.accountNumber || '';
 
     // Nominal cepat (quick chips) dinamis proporsional mengikuti batas minimum admin
     const quickAmounts = [
@@ -303,10 +303,10 @@ export class TarikSaldoView extends IComponent {
       radio.addEventListener('change', (e) => {
         const user = this._authService.getCurrentUser();
         if (e.target.value === 'bank') {
-          accountInput.value = user?.accountNumber || '5410987654';
-          accountInput.placeholder = 'Nomor Rekening Bank BCA';
+          accountInput.value = user?.accountNumber || '';
+          accountInput.placeholder = 'Masukkan Nomor Rekening Bank';
         } else {
-          accountInput.value = user?.phone || '081234567890';
+          accountInput.value = user?.phone || '';
           accountInput.placeholder = 'Nomor Handphone E-Wallet (0812xxxx)';
         }
         updateBreakdown();

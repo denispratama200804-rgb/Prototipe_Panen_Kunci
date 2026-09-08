@@ -90,19 +90,19 @@ export class ProfileView extends IComponent {
             <h2 class="font-headline-md text-xl font-bold text-text-heading" id="profileNameDisplay">${user.name || 'Pengguna'}</h2>
             <p class="text-xs text-text-body mt-0.5" id="profileEmailDisplay">${user.email || ''}</p>
 
-            <!-- Role Badge: Mengetahui mana yang login sebagai User & mana yang Admin -->
-            <div class="mt-2.5 flex flex-wrap items-center justify-center gap-2">
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${user.isAdmin() ? 'bg-purple-500/15 text-purple-600 border border-purple-500/30' : 'bg-primary/10 text-primary border border-primary/20'}">
-                <span class="material-symbols-outlined text-[15px]">${user.isAdmin() ? 'shield_person' : 'person'}</span>
-                <span>${user.isAdmin() ? 'ADMINISTRATOR' : 'PENGGUNA (USER)'}</span>
-              </span>
-              ${user.isAdmin() ? `
+            <!-- Role Badge: Hanya ditampilkan jika login sebagai Administrator -->
+            ${user.isAdmin() ? `
+              <div class="mt-2.5 flex flex-wrap items-center justify-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-500/15 text-purple-600 border border-purple-500/30">
+                  <span class="material-symbols-outlined text-[15px]">shield_person</span>
+                  <span>ADMINISTRATOR</span>
+                </span>
                 <a href="/admin_panel/index.html" class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-all">
                   <span class="material-symbols-outlined text-[15px]">dashboard_customize</span>
                   <span>Panel Admin</span>
                 </a>
-              ` : ''}
-            </div>
+              </div>
+            ` : ''}
 
             <div class="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full ${user.isVerified ? 'bg-secondary-container/50 text-on-secondary-container' : 'bg-surface-container text-text-body'} text-xs font-semibold">
               <span class="material-symbols-outlined text-[16px] ${user.isVerified ? 'text-secondary' : 'text-outline'}" style="font-variation-settings: 'FILL' 1;">

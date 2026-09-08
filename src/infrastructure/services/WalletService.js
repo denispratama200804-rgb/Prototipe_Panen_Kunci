@@ -23,13 +23,24 @@ export class WalletService {
     this._eventBus = eventBus;
     this._transactionRepository = transactionRepository;
 
-    this._balance = 85000;
+    this._balance = 0;
     this._passiveBalance = 0;
-    this._lifetimeEarnings = 450000;
+    this._lifetimeEarnings = 0;
     this._transactions = [];
     this._minWithdrawal = 50000;
 
     this._loadWallet();
+
+    // Listen auth state changed: saat user login/register/logout, reset dan muat ulang dompet milik user tersebut
+    this._eventBus.on(AppEvents.AUTH_STATE_CHANGED, () => {
+      this._loadWallet();
+      this._syncFromRemote();
+      this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+        balance: this._balance,
+        passiveBalance: this._passiveBalance,
+        lifetime: this._lifetimeEarnings
+      });
+    });
 
     // Cross-tab synchronization via storage event
     if (typeof window !== 'undefined') {
@@ -50,6 +61,16 @@ export class WalletService {
         }
       });
     }
+  }
+
+  /**
+   * Mengambil ID pengguna yang sedang aktif
+   * @returns {string|null}
+   * @private
+   */
+  _getUserId() {
+    const user = this._storage.get('current_user');
+    return user?.id || null;
   }
 
   /**
@@ -85,78 +106,48 @@ export class WalletService {
   }
 
   _loadWallet() {
-    const savedBalance = this._storage.get('wallet_balance');
-    if (savedBalance !== null && !isNaN(Number(savedBalance))) {
-      this._balance = Number(savedBalance);
+    const userId = this._getUserId();
+
+    // Jika tidak ada user login, pastikan semua data 0 dan kosong
+    if (!userId) {
+      this._balance = 0;
+      this._passiveBalance = 0;
+      this._lifetimeEarnings = 0;
+      this._transactions = [];
+      return;
     }
 
-    const savedPassive = this._storage.get('wallet_passive_balance');
+    const balanceKey = `wallet_balance_${userId}`;
+    const passiveKey = `wallet_passive_balance_${userId}`;
+    const lifetimeKey = `lifetime_earnings_${userId}`;
+    const txKey = `transactions_${userId}`;
+
+    const savedBalance = this._storage.get(balanceKey);
+    this._balance = (savedBalance !== null && !isNaN(Number(savedBalance))) ? Number(savedBalance) : 0;
+
+    const savedPassive = this._storage.get(passiveKey);
     if (savedPassive !== null && !isNaN(Number(savedPassive))) {
       this._passiveBalance = Number(savedPassive);
     } else {
-      const savedKeys = this._storage.get('api_keys') || [];
+      const keysKey = `api_keys_${userId}`;
+      const savedKeys = this._storage.get(keysKey) || [];
       this._passiveBalance = savedKeys
         .filter(k => k.status === 'pending')
         .reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
     }
 
-    const savedLifetime = this._storage.get('lifetime_earnings');
-    if (savedLifetime !== null && !isNaN(Number(savedLifetime))) {
-      this._lifetimeEarnings = Number(savedLifetime);
-    }
+    const savedLifetime = this._storage.get(lifetimeKey);
+    this._lifetimeEarnings = (savedLifetime !== null && !isNaN(Number(savedLifetime))) ? Number(savedLifetime) : 0;
 
-    const savedTx = this._storage.get('transactions');
+    const savedTx = this._storage.get(txKey);
     if (savedTx && Array.isArray(savedTx)) {
-      this._transactions = savedTx.map(t => new Transaction(t));
+      // Pastikan hanya transaksi milik user aktif yang dimuat
+      this._transactions = savedTx
+        .filter(t => t.userId === userId || !t.userId)
+        .map(t => new Transaction(t));
     } else {
-      // Mock transaksi awal prototipe
-      this._transactions = [
-        new Transaction({
-          id: 'tx_01',
-          userId: 'usr_budi_01',
-          type: 'deposit',
-          amount: 3000,
-          title: 'Setoran API Key',
-          description: 'Validasi kredit Kie.ai penuh (80 kredit)',
-          status: 'success',
-          createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
-        }),
-        new Transaction({
-          id: 'tx_02',
-          userId: 'usr_budi_01',
-          type: 'deposit',
-          amount: 3000,
-          title: 'Setoran API Key',
-          description: 'Validasi kredit Kie.ai penuh (80 kredit)',
-          status: 'success',
-          createdAt: new Date(Date.now() - 3600000 * 5).toISOString()
-        }),
-        new Transaction({
-          id: 'tx_03',
-          userId: 'usr_budi_01',
-          type: 'withdrawal',
-          amount: 100000,
-          title: 'Transfer Bank BCA',
-          description: 'Penarikan dana ke rekening 5410987654',
-          method: 'bank',
-          recipient: '5410987654',
-          status: 'success',
-          createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
-        }),
-        new Transaction({
-          id: 'tx_04',
-          userId: 'usr_budi_01',
-          type: 'withdrawal',
-          amount: 150000,
-          title: 'GoPay',
-          description: 'Penarikan dana ke 081234567890',
-          method: 'gopay',
-          recipient: '081234567890',
-          status: 'success',
-          createdAt: new Date(Date.now() - 86400000 * 5).toISOString()
-        })
-      ];
-      this._persist();
+      // Akun baru default bersih (tanpa transaksi dummy)
+      this._transactions = [];
     }
 
     // Sync remote transactions dari Supabase
@@ -164,19 +155,46 @@ export class WalletService {
   }
 
   async _syncFromRemote() {
-    if (!this._transactionRepository) return;
+    const userId = this._getUserId();
+    if (!this._transactionRepository || !userId) return;
+
     try {
-      const remoteTxs = await this._transactionRepository.getAll();
-      if (remoteTxs && remoteTxs.length > 0) {
-        const txMap = new Map();
-        remoteTxs.forEach(t => txMap.set(t.id, t));
-        this._transactions.forEach(t => {
-          if (!txMap.has(t.id)) {
-            txMap.set(t.id, t);
+      // Filter transaksi HANYA untuk pengguna yang sedang aktif
+      const remoteTxs = await this._transactionRepository.getAll(userId);
+      if (remoteTxs) {
+        this._transactions = remoteTxs;
+
+        // Hitung ulang saldo riil dari riwayat transaksi Supabase
+        let calculatedLifetime = 0;
+        let calculatedBalance = 0;
+        let calculatedPassive = 0;
+
+        remoteTxs.forEach(tx => {
+          const amt = Number(tx.amount) || 0;
+          if (tx.type === 'deposit') {
+            if (tx.status === 'success') {
+              calculatedBalance += amt;
+              calculatedLifetime += amt;
+            } else if (tx.status === 'pending') {
+              calculatedPassive += amt;
+            }
+          } else if (tx.type === 'withdrawal') {
+            if (tx.status === 'success' || tx.status === 'pending') {
+              calculatedBalance -= amt;
+            }
           }
         });
-        this._transactions = Array.from(txMap.values());
+
+        this._balance = Math.max(0, calculatedBalance);
+        this._passiveBalance = calculatedPassive;
+        this._lifetimeEarnings = calculatedLifetime;
         this._persist();
+
+        this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+          balance: this._balance,
+          passiveBalance: this._passiveBalance,
+          lifetime: this._lifetimeEarnings
+        });
       }
     } catch (err) {
       console.warn('[WalletService] Remote tx sync fallback to local cache:', err.message);
@@ -184,6 +202,13 @@ export class WalletService {
   }
 
   _persist() {
+    const userId = this._getUserId();
+    if (userId) {
+      this._storage.set(`wallet_balance_${userId}`, this._balance);
+      this._storage.set(`wallet_passive_balance_${userId}`, this._passiveBalance);
+      this._storage.set(`lifetime_earnings_${userId}`, this._lifetimeEarnings);
+      this._storage.set(`transactions_${userId}`, this._transactions.map(t => t.toJSON()));
+    }
     this._storage.set('wallet_balance', this._balance);
     this._storage.set('wallet_passive_balance', this._passiveBalance);
     this._storage.set('lifetime_earnings', this._lifetimeEarnings);

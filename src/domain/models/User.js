@@ -23,11 +23,11 @@ export class User {
     name,
     email,
     role = 'user',
-    phone = '081234567890',
-    bankName = 'Bank Central Asia (BCA)',
-    accountNumber = '5410987654',
-    accountHolder = 'BUDI SANTOSO',
-    isVerified = true,
+    phone = '',
+    bankName = '',
+    accountNumber = '',
+    accountHolder = '',
+    isVerified = false,
     createdAt = new Date().toISOString(),
     avatar = '/avatar.png'
   }) {
@@ -35,11 +35,11 @@ export class User {
     this.name = name;
     this.email = email;
     this.role = (role || 'user').toLowerCase();
-    this.phone = phone;
-    this.bankName = bankName;
-    this.accountNumber = accountNumber;
-    this.accountHolder = accountHolder;
-    this.isVerified = isVerified;
+    this.phone = phone || '';
+    this.bankName = bankName || '';
+    this.accountNumber = accountNumber || '';
+    this.accountHolder = accountHolder || '';
+    this.isVerified = Boolean(isVerified);
     this.createdAt = createdAt;
     this.avatar = avatar || '/avatar.png';
   }

@@ -24,45 +24,42 @@ export class ApiKeyService {
     this._keys = [];
 
     this._loadKeys();
+
+    // Listen auth state changed: saat user login/register/logout, reset dan muat ulang key milik user tersebut
+    this._eventBus.on(AppEvents.AUTH_STATE_CHANGED, () => {
+      this._loadKeys();
+      this._syncFromRemote();
+    });
+  }
+
+  /**
+   * Mengambil ID pengguna yang sedang aktif
+   * @returns {string|null}
+   * @private
+   */
+  _getUserId() {
+    const user = this._storage.get('current_user');
+    return user?.id || null;
   }
 
   _loadKeys() {
-    const saved = this._storage.get('api_keys');
+    const userId = this._getUserId();
+
+    if (!userId) {
+      this._keys = [];
+      return;
+    }
+
+    const keysKey = `api_keys_${userId}`;
+    const saved = this._storage.get(keysKey);
+
     if (saved && Array.isArray(saved)) {
-      this._keys = saved.map(k => new ApiKey(k));
+      this._keys = saved
+        .filter(k => k.userId === userId || !k.userId)
+        .map(k => new ApiKey(k));
     } else {
-      // Mock data awal yang menarik dan sesuai prototipe
-      this._keys = [
-        new ApiKey({
-          id: 'key_01',
-          keyString: 'sk-kie-8f92a1bc3d4e5f6g7h8i',
-          userId: 'usr_budi_01',
-          status: 'valid',
-          rewardAmount: 3000,
-          credits: 80,
-          createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
-        }),
-        new ApiKey({
-          id: 'key_02',
-          keyString: 'sk-kie-x7b9c2da1e4f5a6b7c8d',
-          userId: 'usr_budi_01',
-          status: 'invalid',
-          rewardAmount: 0,
-          credits: 0,
-          errorMessage: 'Kuota kredit Kie.ai sudah habis / 0 kredit.',
-          createdAt: new Date(Date.now() - 86400000).toISOString()
-        }),
-        new ApiKey({
-          id: 'key_03',
-          keyString: 'sk-kie-3m5n8pq7r9s1t2u3v4w5',
-          userId: 'usr_budi_01',
-          status: 'valid',
-          rewardAmount: 3000,
-          credits: 80,
-          createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
-        })
-      ];
-      this._persist();
+      // Akun baru default 0 key (bersih tanpa dummy)
+      this._keys = [];
     }
 
     // Sync dari remote Supabase jika repositori tersedia
@@ -70,19 +67,14 @@ export class ApiKeyService {
   }
 
   async _syncFromRemote() {
-    if (!this._apiKeyRepository) return;
+    const userId = this._getUserId();
+    if (!this._apiKeyRepository || !userId) return;
+
     try {
-      const remoteKeys = await this._apiKeyRepository.getAll();
-      if (remoteKeys && remoteKeys.length > 0) {
-        // Merge unik
-        const keyMap = new Map();
-        remoteKeys.forEach(k => keyMap.set(k.keyString.toLowerCase(), k));
-        this._keys.forEach(k => {
-          if (!keyMap.has(k.keyString.toLowerCase())) {
-            keyMap.set(k.keyString.toLowerCase(), k);
-          }
-        });
-        this._keys = Array.from(keyMap.values());
+      // Filter key HANYA untuk pengguna yang sedang aktif
+      const remoteKeys = await this._apiKeyRepository.getAll(userId);
+      if (remoteKeys) {
+        this._keys = remoteKeys;
         this._persist();
       }
     } catch (err) {
@@ -91,6 +83,10 @@ export class ApiKeyService {
   }
 
   _persist() {
+    const userId = this._getUserId();
+    if (userId) {
+      this._storage.set(`api_keys_${userId}`, this._keys.map(k => k.toJSON()));
+    }
     this._storage.set('api_keys', this._keys.map(k => k.toJSON()));
   }
 

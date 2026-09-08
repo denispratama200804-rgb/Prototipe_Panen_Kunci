@@ -14,7 +14,8 @@ export class HeaderComponent {
     this._eventBus = container.resolve('EventBus');
     this._authService = container.resolve('AuthService');
     this._element = null;
-    this._currentPath = '/';
+    const initialHash = (window.location.hash || '').replace(/^#\/?/, '/').split('?')[0];
+    this._currentPath = initialHash ? `/${initialHash.replace(/^\//, '')}` : '/';
   }
 
   mount(containerEl) {
@@ -36,17 +37,29 @@ export class HeaderComponent {
     this._eventBus.on(AppEvents.USER_UPDATED, () => {
       this.render();
     });
+
+    window.addEventListener('hashchange', () => {
+      const hash = (window.location.hash || '').replace(/^#\/?/, '/').split('?')[0];
+      this._currentPath = hash ? `/${hash.replace(/^\//, '')}` : '/';
+      this.render();
+    });
   }
 
   render() {
     if (!this._element) return;
 
-    const path = this._currentPath;
+    // Deteksi path secara akurat dari state maupun hash URL aktif
+    const currentHash = (window.location.hash || '').replace(/^#\/?/, '/').split('?')[0];
+    const path = (this._currentPath || currentHash || '/').trim();
+
+    const isLogin = path === '/login' || path === 'login' || currentHash === '/login' || currentHash === 'login';
+    const isRegister = path === '/register' || path === 'register' || currentHash === '/register' || currentHash === 'register';
+    const isAuthPage = isLogin || isRegister;
+    const isProfilePage = path === '/profil' || path === 'profil' || currentHash === '/profil' || currentHash === 'profil';
+
     const isAuth = this._authService.isAuthenticated();
     const user = this._authService.getCurrentUser();
 
-    // Sembunyikan header pada halaman landing & auth tertentu jika diinginkan, atau tampilkan header branding
-    const isSubPage = ['/saldo', '/setor', '/tarik'].includes(path);
     const pageTitles = {
       '/dashboard': 'Dashboard',
       '/saldo': 'Detail Saldo',
@@ -58,7 +71,7 @@ export class HeaderComponent {
       '/register': 'Daftar Akun'
     };
 
-    const title = pageTitles[path] || 'Panen Kunci';
+    const title = pageTitles[path] || (isLogin ? 'Masuk Akun' : (isRegister ? 'Daftar Akun' : 'Panen Kunci'));
 
     if (path === '/') {
       this._element.innerHTML = `
@@ -77,8 +90,6 @@ export class HeaderComponent {
       return;
     }
 
-    const isAuthPage = ['/login', '/register'].includes(path);
-
     this._element.innerHTML = `
       <div class="h-16 max-w-md mx-auto px-4 flex items-center justify-between">
         <div class="flex items-center gap-2">
@@ -90,19 +101,24 @@ export class HeaderComponent {
         </div>
 
         <div class="flex items-center gap-2.5">
-          ${isAuthPage ? '' : (isAuth ? `
+          ${isAuthPage ? `
+            <!-- Di halaman login dan register: TIDAK menampilkan profil sama sekali -->
+            <div class="w-8 h-8"></div>
+          ` : (isAuth ? `
             ${user?.role === 'admin' ? `
               <a href="/admin_panel/index.html" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-600/15 text-purple-600 border border-purple-500/30 hover:bg-purple-600 hover:text-white transition-all" title="Buka Panel Admin">
                 <span class="material-symbols-outlined text-[14px]">shield_person</span>
                 <span>Admin</span>
               </a>
             ` : ''}
-            <a href="#/profil" class="relative group flex items-center gap-2" title="Buka Profil">
-              <div class="relative">
-                <img src="${user?.avatar || '/avatar.png'}" alt="${user?.name || 'User'}" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all" onerror="this.onerror=null; this.src='/avatar.png';"/>
-                <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${user?.isVerified ? 'bg-secondary' : 'bg-outline'} rounded-full border-2 border-white"></div>
-              </div>
-            </a>
+            ${!isProfilePage ? `
+              <a href="#/profil" class="relative group flex items-center gap-2" title="Buka Profil">
+                <div class="relative">
+                  <img src="${user?.avatar || '/avatar.png'}" alt="${user?.name || 'User'}" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all" onerror="this.onerror=null; this.src='/avatar.png';"/>
+                  <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${user?.isVerified ? 'bg-secondary' : 'bg-outline'} rounded-full border-2 border-white"></div>
+                </div>
+              </a>
+            ` : '<div class="w-8 h-8"></div>'}
           ` : `
             <a href="#/login" class="text-xs font-semibold text-primary hover:underline">Masuk</a>
           `)}
