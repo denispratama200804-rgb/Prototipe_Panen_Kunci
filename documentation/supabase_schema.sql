@@ -34,8 +34,15 @@ CREATE TABLE IF NOT EXISTS public.users (
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
--- Query migrasi jika tabel users sudah ada sebelumnya:
+-- Query migrasi jika tabel users sudah ada sebelumnya (menjamin seluruh kolom tersedia):
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password TEXT DEFAULT '';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT '';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS bank_name TEXT DEFAULT '';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS account_number TEXT DEFAULT '';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS account_holder TEXT DEFAULT '';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT '/avatar.png';
 
 COMMENT ON TABLE  public.users                  IS 'Profil pengguna aplikasi Panen Kunci';
 COMMENT ON COLUMN public.users.id               IS 'Primary key — UUID otomatis, harus sama dengan auth.users.id';
