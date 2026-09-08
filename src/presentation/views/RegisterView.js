@@ -3,7 +3,7 @@ import { IComponent } from '../../core/interfaces/IComponent.js';
 /**
  * RegisterView
  * Prinsip: Single Responsibility Principle (SRP) & Liskov Substitution Principle (LSP)
- * Halaman pendaftaran akun baru dengan indikator kekuatan kata sandi dan modal sukses.
+ * Halaman pendaftaran akun baru langsung tersimpan ke Supabase (Auth + Tabel public.users).
  */
 export class RegisterView extends IComponent {
   /**
@@ -45,8 +45,9 @@ export class RegisterView extends IComponent {
                 <input
                   id="regName"
                   type="text"
-                  placeholder="Contoh: Budi Santoso"
+                  placeholder="Nama Lengkap Anda"
                   required
+                  autocomplete="name"
                   class="w-full bg-bg-subtle text-text-heading font-body-md text-sm rounded-xl py-3 pl-11 pr-4 border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
                 />
               </div>
@@ -64,6 +65,7 @@ export class RegisterView extends IComponent {
                   type="email"
                   placeholder="nama@email.com"
                   required
+                  autocomplete="email"
                   class="w-full bg-bg-subtle text-text-heading font-body-md text-sm rounded-xl py-3 pl-11 pr-4 border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
                 />
               </div>
@@ -81,9 +83,10 @@ export class RegisterView extends IComponent {
                   type="password"
                   placeholder="Minimal 8 karakter"
                   required
+                  autocomplete="new-password"
                   class="w-full bg-bg-subtle text-text-heading font-body-md text-sm rounded-xl py-3 pl-11 pr-11 border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
                 />
-                <button type="button" id="toggleRegPassword" class="absolute right-3 text-outline hover:text-text-heading p-1 transition-colors">
+                <button type="button" id="toggleRegPassword" class="absolute right-3 text-outline hover:text-text-heading p-1 transition-colors" aria-label="Lihat kata sandi">
                   <span class="material-symbols-outlined text-[20px]" id="iconRegPassword">visibility_off</span>
                 </button>
               </div>
@@ -107,8 +110,9 @@ export class RegisterView extends IComponent {
                 <input
                   id="regConfirmPassword"
                   type="password"
-                  placeholder="Ulangi kata sandi"
+                  placeholder="Ulangi kata sandi Anda"
                   required
+                  autocomplete="new-password"
                   class="w-full bg-bg-subtle text-text-heading font-body-md text-sm rounded-xl py-3 pl-11 pr-4 border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
                 />
               </div>
@@ -208,19 +212,18 @@ export class RegisterView extends IComponent {
       const confirmPassword = confirmInput.value;
 
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Mendaftarkan...</span>';
+      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Mendaftarkan ke Supabase...</span>';
 
       const res = await this._authService.register({ name, email, password, confirmPassword });
 
       if (res.success) {
-        // Modal pendaftaran sukses (sesuai daftar_berhasil_pop_up)
         this._notification.showModal({
           title: 'Pendaftaran Berhasil!',
-          message: 'Akun Panen Kunci Anda telah aktif. Selamat datang di platform penukaran API Key nomor 1 di Indonesia!',
+          message: res.message || 'Akun Anda berhasil didaftarkan di Supabase.',
           type: 'success',
-          confirmText: 'Buka Dashboard',
+          confirmText: res.requireEmailConfirmation ? 'Ke Halaman Login' : 'Buka Dashboard',
           onConfirm: () => {
-            window.location.hash = '/dashboard';
+            window.location.hash = res.requireEmailConfirmation ? '/login' : '/dashboard';
           }
         });
       } else {

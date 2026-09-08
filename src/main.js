@@ -12,6 +12,9 @@ import { WithdrawalValidator } from './domain/validators/WithdrawalValidator.js'
 // Infrastructure Adapters & Strategies
 import { LocalStorageAdapter } from './infrastructure/storage/LocalStorageAdapter.js';
 import { WithdrawalStrategyFactory } from './infrastructure/strategies/WithdrawalStrategyFactory.js';
+import { SupabaseUserRepository } from './infrastructure/repositories/SupabaseUserRepository.js';
+import { SupabaseApiKeyRepository } from './infrastructure/repositories/SupabaseApiKeyRepository.js';
+import { SupabaseTransactionRepository } from './infrastructure/repositories/SupabaseTransactionRepository.js';
 
 // Services
 import { NotificationService } from './infrastructure/services/NotificationService.js';
@@ -83,6 +86,16 @@ function bootstrap() {
   const storage = new LocalStorageAdapter('panenkunci:');
   container.registerSingleton('IStorage', storage);
 
+  // Repositories (DIP & ISP)
+  const userRepository = new SupabaseUserRepository();
+  container.registerSingleton('IUserRepository', userRepository);
+
+  const apiKeyRepository = new SupabaseApiKeyRepository();
+  container.registerSingleton('IApiKeyRepository', apiKeyRepository);
+
+  const transactionRepository = new SupabaseTransactionRepository();
+  container.registerSingleton('ITransactionRepository', transactionRepository);
+
   // 2. Register Validators (SRP & ISP)
   const authValidator = new AuthValidator();
   container.registerSingleton('AuthValidator', authValidator);
@@ -101,13 +114,13 @@ function bootstrap() {
   const notificationService = new NotificationService(eventBus);
   container.registerSingleton('NotificationService', notificationService);
 
-  const authService = new AuthService(storage, authValidator, eventBus);
+  const authService = new AuthService(storage, authValidator, eventBus, userRepository);
   container.registerSingleton('AuthService', authService);
 
-  const walletService = new WalletService(storage, withdrawalValidator, strategyFactory, eventBus);
+  const walletService = new WalletService(storage, withdrawalValidator, strategyFactory, eventBus, transactionRepository);
   container.registerSingleton('WalletService', walletService);
 
-  const apiKeyService = new ApiKeyService(storage, apiKeyValidator, walletService, eventBus);
+  const apiKeyService = new ApiKeyService(storage, apiKeyValidator, walletService, eventBus, apiKeyRepository);
   container.registerSingleton('ApiKeyService', apiKeyService);
 
   // 5. Mount Global UI Shell & Components

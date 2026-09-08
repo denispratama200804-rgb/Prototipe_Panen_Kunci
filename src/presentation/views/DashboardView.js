@@ -20,6 +20,8 @@ export class DashboardView extends IComponent {
   }
 
   render() {
+    const user = this._authService.getCurrentUser();
+    const isVerified = Boolean(user?.isVerified);
     const balance = this._walletService.getBalance();
     const todayEarnings = this._walletService.getTodayEarnings();
     const todayKeysCount = this._apiKeyService.getTodayValidCount();
@@ -56,9 +58,9 @@ export class DashboardView extends IComponent {
               </div>
               <div class="flex flex-col items-end">
                 <span class="text-white/70">Status Akun</span>
-                <span class="font-bold text-white flex items-center gap-1 mt-0.5">
-                  <span class="w-2 h-2 rounded-full bg-secondary-fixed"></span>
-                  Terverifikasi
+                <span class="font-bold text-white flex items-center gap-1.5 mt-0.5">
+                  <span class="w-2 h-2 rounded-full ${isVerified ? 'bg-secondary-fixed' : 'bg-warning-amber'}"></span>
+                  ${isVerified ? 'Terverifikasi' : 'Belum Diverifikasi'}
                 </span>
               </div>
             </div>

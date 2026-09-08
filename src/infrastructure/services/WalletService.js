@@ -4,8 +4,9 @@ import { AppEvents } from '../../core/events/EventBus.js';
 /**
  * WalletService
  * Prinsip: Single Responsibility Principle (SRP) & Dependency Inversion Principle (DIP)
- * Mengelola saldo aktif, pendapatan lifetime, progress limit penarikan,
- * dan memproses penarikan dana menggunakan Strategy Pattern.
+ *
+ * Mengelola saldo aktif, pendapatan kumulatif, batas penarikan,
+ * dan memproses mutasi saldo dengan Strategy Pattern serta sinkronisasi ITransactionRepository.
  */
 export class WalletService {
   /**
@@ -13,17 +14,19 @@ export class WalletService {
    * @param {import('../../domain/validators/WithdrawalValidator.js').WithdrawalValidator} validator
    * @param {import('../strategies/WithdrawalStrategyFactory.js').WithdrawalStrategyFactory} strategyFactory
    * @param {import('../../core/events/EventBus.js').EventBus} eventBus
+   * @param {import('../../core/interfaces/ITransactionRepository.js').ITransactionRepository} [transactionRepository]
    */
-  constructor(storage, validator, strategyFactory, eventBus) {
+  constructor(storage, validator, strategyFactory, eventBus, transactionRepository = null) {
     this._storage = storage;
     this._validator = validator;
     this._strategyFactory = strategyFactory;
     this._eventBus = eventBus;
+    this._transactionRepository = transactionRepository;
 
     this._balance = 85000;
     this._lifetimeEarnings = 450000;
     this._transactions = [];
-    this._minWithdrawal = 50000; // Minimum penarikan default Rp 50.000
+    this._minWithdrawal = 50000;
 
     this._loadWallet();
   }
@@ -75,7 +78,7 @@ export class WalletService {
     if (savedTx && Array.isArray(savedTx)) {
       this._transactions = savedTx.map(t => new Transaction(t));
     } else {
-      // Mock transaksi awal yang realistis sesuai prototipe
+      // Mock transaksi awal prototipe
       this._transactions = [
         new Transaction({
           id: 'tx_01',
@@ -123,6 +126,29 @@ export class WalletService {
         })
       ];
       this._persist();
+    }
+
+    // Sync remote transactions dari Supabase
+    this._syncFromRemote();
+  }
+
+  async _syncFromRemote() {
+    if (!this._transactionRepository) return;
+    try {
+      const remoteTxs = await this._transactionRepository.getAll();
+      if (remoteTxs && remoteTxs.length > 0) {
+        const txMap = new Map();
+        remoteTxs.forEach(t => txMap.set(t.id, t));
+        this._transactions.forEach(t => {
+          if (!txMap.has(t.id)) {
+            txMap.set(t.id, t);
+          }
+        });
+        this._transactions = Array.from(txMap.values());
+        this._persist();
+      }
+    } catch (err) {
+      console.warn('[WalletService] Remote tx sync fallback to local cache:', err.message);
     }
   }
 
@@ -220,18 +246,18 @@ export class WalletService {
     this._transactions.unshift(tx);
     this._persist();
 
+    // Simpan ke Supabase jika repositori aktif
+    if (this._transactionRepository) {
+      this._transactionRepository.create(tx)
+        .then(saved => {
+          if (saved && saved.id) tx.id = saved.id;
+        })
+        .catch(err => console.warn('[WalletService] Supabase create tx fallback:', err.message));
+    }
+
     this._eventBus.emit(AppEvents.BALANCE_UPDATED, { balance: this._balance, lifetime: this._lifetimeEarnings });
   }
 
-  /**
-   * Proses penarikan saldo menggunakan strategi penarikan (OCP & LSP)
-   * @param {Object} params
-   * @param {number} params.amount
-   * @param {string} params.method
-   * @param {string} params.accountIdentifier
-   * @param {string} [params.userId]
-   * @returns {Promise<{ success: boolean, message: string, transaction?: Transaction }>}
-   */
   /**
    * Mengambil biaya admin terkini untuk metode penarikan
    * @param {string} method
@@ -254,17 +280,17 @@ export class WalletService {
    * @param {string} params.method
    * @param {string} params.accountIdentifier
    * @param {string} [params.userId]
-   * @returns {Promise<{ success: boolean, message: string, transaction?: Transaction, fee?: number, totalDeduction?: number }>}
+   * @returns {Promise<{ success: boolean, message: string, transaction?: Transaction, fee?: number, totalReceive?: number }>}
    */
   async withdraw({ amount, method, accountIdentifier, userId = 'usr_current' }) {
     const numAmount = Number(amount);
 
-    // 1. Dapatkan strategi dan hitung biaya admin sesuai pengaturan admin panel
+    // 1. Dapatkan strategi dan hitung biaya admin sesuai pengaturan
     const strategy = this._strategyFactory.get(method);
     const fee = strategy ? strategy.calculateFee(numAmount) : 0;
     const totalReceive = Math.max(0, numAmount - fee);
 
-    // 2. Validasi penarikan (selalu sinkronkan minWithdrawal terkini dari admin)
+    // 2. Validasi penarikan
     this._validator.minWithdrawal = this.minWithdrawal;
     const validation = this._validator.validate({
       amount: numAmount,
@@ -286,14 +312,13 @@ export class WalletService {
     // 4. Kurangi saldo pengguna
     this._balance -= numAmount;
 
-    // 5. Catat transaksi dengan status 'pending' (Wajib diproses manual oleh Admin)
+    // 5. Catat transaksi dengan status 'pending' (perlu konfirmasi admin)
     const tx = new Transaction({
       id: result.transactionId || 'tx_' + Math.random().toString(36).substring(2, 9),
       userId,
       type: 'withdrawal',
       amount: numAmount,
       fee,
-      netPayout: totalReceive,
       title: `${strategy.getLabel()}`,
       description: `Penarikan ke ${accountIdentifier}${fee > 0 ? ` (Biaya Admin: Rp ${fee.toLocaleString('id-ID')})` : ''}`,
       status: 'pending',
@@ -304,6 +329,15 @@ export class WalletService {
 
     this._transactions.unshift(tx);
     this._persist();
+
+    // Simpan ke Supabase jika repositori aktif
+    if (this._transactionRepository) {
+      this._transactionRepository.create(tx)
+        .then(saved => {
+          if (saved && saved.id) tx.id = saved.id;
+        })
+        .catch(err => console.warn('[WalletService] Supabase create withdrawal tx fallback:', err.message));
+    }
 
     // 6. Emit balance & withdrawal event
     this._eventBus.emit(AppEvents.BALANCE_UPDATED, { balance: this._balance, lifetime: this._lifetimeEarnings });
