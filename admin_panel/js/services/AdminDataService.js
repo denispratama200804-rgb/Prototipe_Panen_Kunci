@@ -347,18 +347,93 @@ export class AdminDataService {
   }
 
   /**
-   * Setujui permintaan penarikan dana
+   * Setujui permintaan penarikan dana lengkap dengan bukti transfer dan kirim notifikasi ke user
+   * @param {string} transactionId
+   * @param {Object} [options]
+   * @param {string} [options.proofImage] Base64 data URL atau URL gambar bukti transfer
+   * @param {string} [options.notes] Catatan transfer dari admin
    */
-  approveWithdrawal(transactionId) {
+  approveWithdrawal(transactionId, { proofImage = '', notes = '' } = {}) {
     const txs = this.getTransactions();
     const idx = txs.findIndex(t => t.id === transactionId);
     if (idx !== -1) {
-      txs[idx].status = 'success';
-      txs[idx].processedAt = new Date().toISOString();
+      const tx = txs[idx];
+      tx.status = 'success';
+      tx.processedAt = new Date().toISOString();
+      if (proofImage) tx.proofImage = proofImage;
+      if (notes) tx.proofNotes = notes;
       this._set('transactions', txs);
-      return { success: true, transaction: txs[idx] };
+
+      // Sinkronkan ke transaksi spesifik pengguna (transactions_{userId})
+      const targetUserId = tx.userId || 'usr_budi_01';
+      const userTxKey = `transactions_${targetUserId}`;
+      const userTxs = this._get(userTxKey, []);
+      if (Array.isArray(userTxs)) {
+        const uIdx = userTxs.findIndex(t => t.id === transactionId);
+        if (uIdx !== -1) {
+          userTxs[uIdx].status = 'success';
+          userTxs[uIdx].processedAt = tx.processedAt;
+          if (proofImage) userTxs[uIdx].proofImage = proofImage;
+          if (notes) userTxs[uIdx].proofNotes = notes;
+          this._set(userTxKey, userTxs);
+        }
+      }
+
+      // Buat entri notifikasi baru untuk pengguna (headbar notifikasi)
+      const notifsKey = `notifications_${targetUserId}`;
+      const notifs = this._get(notifsKey, []);
+      const newNotif = {
+        id: 'notif_' + Math.random().toString(36).substring(2, 9),
+        userId: targetUserId,
+        type: 'withdrawal_success',
+        title: 'Penarikan Dana Berhasil Ditransfer!',
+        message: `Pencairan dana sebesar Rp ${Number(tx.amount || 0).toLocaleString('id-ID')} ke ${tx.recipient || tx.method || 'rekening tujuan'} telah berhasil dikirim oleh Admin.`,
+        amount: Number(tx.amount || 0),
+        fee: Number(tx.fee || 0),
+        method: tx.method || '',
+        recipient: tx.recipient || '',
+        transactionId: tx.id,
+        proofImage: proofImage || '',
+        proofNotes: notes || '',
+        createdAt: new Date().toISOString(),
+        isRead: false
+      };
+      notifs.unshift(newNotif);
+      this._set(notifsKey, notifs);
+
+      // Cadangkan ke notifikasi global
+      const globalNotifs = this._get('notifications', []);
+      globalNotifs.unshift(newNotif);
+      this._set('notifications', globalNotifs);
+
+      return { success: true, transaction: tx, notification: newNotif };
     }
     return { success: false, message: 'Transaksi tidak ditemukan' };
+  }
+
+  /**
+   * Mengambil data detail akun user berdasarkan transaksi
+   * @param {Object} tx
+   * @returns {Object|null}
+   */
+  getUserByTransaction(tx) {
+    if (!tx) return null;
+    const users = this.getUsers();
+    const user = users.find(u => u.id === tx.userId);
+    if (user) return user;
+
+    const curr = this._get('current_user');
+    if (curr && curr.id === tx.userId) return curr;
+
+    return {
+      id: tx.userId || 'usr_budi_01',
+      name: 'Budi Santoso',
+      phone: tx.recipient || '081234567890',
+      bankName: tx.method ? tx.method.toUpperCase() : 'DANA',
+      accountNumber: tx.recipient || '081234567890',
+      accountHolder: 'BUDI SANTOSO',
+      isVerified: true
+    };
   }
 
   /**

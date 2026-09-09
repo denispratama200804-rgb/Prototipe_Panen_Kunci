@@ -111,7 +111,7 @@ function bootstrap() {
   container.registerSingleton('WithdrawalStrategyFactory', strategyFactory);
 
   // 4. Register Services (SRP & DIP)
-  const notificationService = new NotificationService(eventBus);
+  const notificationService = new NotificationService(eventBus, storage);
   container.registerSingleton('NotificationService', notificationService);
 
   const authService = new AuthService(storage, authValidator, eventBus, userRepository);

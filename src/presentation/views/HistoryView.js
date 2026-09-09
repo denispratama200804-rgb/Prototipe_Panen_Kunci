@@ -152,6 +152,16 @@ export class HistoryView extends IComponent {
                       ${badgeHtml}
                     </div>
                     <span class="text-[11px] text-text-body">${w.description} • ${dateStr}</span>
+                    ${w.proofImage ? `
+                      <button
+                        type="button"
+                        data-proof-history="${w.id}"
+                        class="mt-1 text-[11px] font-bold text-primary hover:underline flex items-center gap-1 w-fit"
+                      >
+                        <span class="material-symbols-outlined text-[14px]">image</span>
+                        <span>Lihat Bukti Foto Transfer</span>
+                      </button>
+                    ` : ''}
                   </div>
 
                   <div class="flex flex-col items-end shrink-0">
@@ -192,6 +202,48 @@ export class HistoryView extends IComponent {
       tabBtnSetoran.className = 'flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 text-on-surface-variant hover:text-on-surface';
       contentPenarikan.classList.remove('hidden');
       contentSetoran.classList.add('hidden');
+    });
+
+    // Event listener untuk preview bukti foto di history
+    container.querySelectorAll('[data-proof-history]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-proof-history');
+        const w = this._walletService.getWithdrawals().find(item => item.id === id);
+        if (w && w.proofImage) {
+          const lightbox = document.createElement('div');
+          lightbox.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200';
+          lightbox.innerHTML = `
+            <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-8">
+              <button type="button" id="btn-close-hist-lightbox" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center">
+                <span class="material-symbols-outlined text-[20px]">close</span>
+              </button>
+              <div class="flex items-center gap-3 pr-8">
+                <div class="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-2xl">receipt_long</span>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Bukti Transfer Resmi</h3>
+                  <p class="text-[11px] text-slate-400">Penarikan #${w.id}</p>
+                </div>
+              </div>
+              <div class="rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 p-1">
+                <img src="${w.proofImage}" alt="Bukti Transfer" class="w-full max-h-[55vh] object-contain rounded-xl" />
+              </div>
+              <div class="flex items-center gap-2 pt-1">
+                <a href="${w.proofImage}" download="bukti-transfer-${w.id}.png" class="flex-1 py-2.5 px-4 rounded-xl bg-primary text-white text-xs font-bold text-center flex items-center justify-center gap-2 shadow-md">
+                  <span class="material-symbols-outlined text-[18px]">download</span>
+                  <span>Unduh Foto Bukti</span>
+                </a>
+                <button type="button" id="btn-cancel-hist-lightbox" class="py-2.5 px-4 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">Tutup</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(lightbox);
+          const close = () => lightbox.remove();
+          lightbox.querySelector('#btn-close-hist-lightbox').addEventListener('click', close);
+          lightbox.querySelector('#btn-cancel-hist-lightbox').addEventListener('click', close);
+        }
+      });
     });
   }
 }

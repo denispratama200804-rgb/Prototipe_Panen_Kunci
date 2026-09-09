@@ -17,6 +17,9 @@ export class Transaction {
    * @param {string} [params.recipient]
    * @param {number} [params.fee]
    * @param {string} [params.createdAt]
+   * @param {string} [params.processedAt]
+   * @param {string} [params.proofImage]
+   * @param {string} [params.proofNotes]
    */
   constructor({
     id,
@@ -29,7 +32,10 @@ export class Transaction {
     method = '',
     recipient = '',
     fee = 0,
-    createdAt = new Date().toISOString()
+    createdAt = new Date().toISOString(),
+    processedAt = '',
+    proofImage = '',
+    proofNotes = ''
   }) {
     this.id = id;
     this.userId = userId;
@@ -42,6 +48,9 @@ export class Transaction {
     this.recipient = recipient;
     this.fee = fee;
     this.createdAt = createdAt;
+    this.processedAt = processedAt;
+    this.proofImage = proofImage;
+    this.proofNotes = proofNotes;
   }
 
   /**
@@ -69,7 +78,10 @@ export class Transaction {
       method: this.method,
       recipient: this.recipient,
       fee: this.fee,
-      createdAt: this.createdAt
+      createdAt: this.createdAt,
+      processedAt: this.processedAt,
+      proofImage: this.proofImage,
+      proofNotes: this.proofNotes
     };
   }
 }

@@ -34,7 +34,7 @@ export class ApiKeysView {
     return `
       <div class="space-y-6 view-fade-enter">
         <!-- Top Stats Banner -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div class="admin-card rounded-2xl p-4 flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center flex-shrink-0">
               <span class="material-symbols-outlined text-xl">dataset</span>
@@ -50,7 +50,7 @@ export class ApiKeysView {
               <span class="material-symbols-outlined text-xl">hourglass_top</span>
             </div>
             <div>
-              <div class="text-xs text-slate-400">Perlu Verifikasi</div>
+              <div class="text-xs text-slate-400">Kunci Pasif</div>
               <div class="text-xl font-bold text-amber-400 font-mono">${pendingCount}</div>
             </div>
           </div>
@@ -60,28 +60,8 @@ export class ApiKeysView {
               <span class="material-symbols-outlined text-xl">verified</span>
             </div>
             <div>
-              <div class="text-xs text-slate-400">Siap Pakai (Valid)</div>
+              <div class="text-xs text-slate-400">Kunci Aktif</div>
               <div class="text-xl font-bold text-emerald-400 font-mono">${validCount}</div>
-            </div>
-          </div>
-
-          <div class="admin-card rounded-2xl p-4 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center flex-shrink-0">
-              <span class="material-symbols-outlined text-xl">bolt</span>
-            </div>
-            <div>
-              <div class="text-xs text-slate-400">Kredit Kie.ai Aktif</div>
-              <div class="text-xl font-bold text-cyan-400 font-mono">${totalCredits} cr</div>
-            </div>
-          </div>
-
-          <div class="admin-card rounded-2xl p-4 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center flex-shrink-0">
-              <span class="material-symbols-outlined text-xl">warning</span>
-            </div>
-            <div>
-              <div class="text-xs text-slate-400">Gagal / Habis</div>
-              <div class="text-xl font-bold text-rose-400 font-mono">${invalidCount}</div>
             </div>
           </div>
         </div>

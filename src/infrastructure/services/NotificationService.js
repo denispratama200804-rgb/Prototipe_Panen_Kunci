@@ -8,9 +8,115 @@ import { AppEvents } from '../../core/events/EventBus.js';
 export class NotificationService {
   /**
    * @param {import('../../core/events/EventBus.js').EventBus} eventBus
+   * @param {import('../../core/interfaces/IStorage.js').IStorage} [storage]
    */
-  constructor(eventBus) {
+  constructor(eventBus, storage = null) {
     this._eventBus = eventBus;
+    this._storage = storage;
+
+    // Cross-tab synchronization via storage event
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e) => {
+        if (e.key && (e.key.includes('notifications') || e.key.includes('transactions'))) {
+          this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
+        }
+      });
+    }
+  }
+
+  /**
+   * Mengambil ID user aktif
+   * @private
+   */
+  _getUserId() {
+    if (!this._storage) return 'usr_budi_01';
+    const user = this._storage.get('current_user');
+    return user?.id || 'usr_budi_01';
+  }
+
+  /**
+   * Mengambil daftar notifikasi tersimpan untuk pengguna aktif
+   * @returns {Array<Object>}
+   */
+  getNotifications() {
+    if (!this._storage) return [];
+    const userId = this._getUserId();
+    const userNotifs = this._storage.get(`notifications_${userId}`);
+    if (Array.isArray(userNotifs) && userNotifs.length > 0) {
+      return userNotifs;
+    }
+    const globalNotifs = this._storage.get('notifications');
+    if (Array.isArray(globalNotifs)) {
+      return globalNotifs.filter(n => !n.userId || n.userId === userId);
+    }
+    return [];
+  }
+
+  /**
+   * Mengambil jumlah notifikasi yang belum dibaca
+   * @returns {number}
+   */
+  getUnreadCount() {
+    const notifs = this.getNotifications();
+    return notifs.filter(n => !n.isRead).length;
+  }
+
+  /**
+   * Menandai satu notifikasi sebagai sudah dibaca
+   * @param {string} id
+   */
+  markAsRead(id) {
+    if (!this._storage) return;
+    const userId = this._getUserId();
+    const key = `notifications_${userId}`;
+    let notifs = this.getNotifications();
+    notifs = notifs.map(n => n.id === id ? { ...n, isRead: true } : n);
+    this._storage.set(key, notifs);
+    this._storage.set('notifications', notifs);
+    this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
+  }
+
+  /**
+   * Menandai semua notifikasi sebagai sudah dibaca
+   */
+  markAllAsRead() {
+    if (!this._storage) return;
+    const userId = this._getUserId();
+    const key = `notifications_${userId}`;
+    const notifs = this.getNotifications().map(n => ({ ...n, isRead: true }));
+    this._storage.set(key, notifs);
+    this._storage.set('notifications', notifs);
+    this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
+  }
+
+  /**
+   * Menambahkan notifikasi baru
+   * @param {Object} notif
+   */
+  addNotification(notif) {
+    if (!this._storage) return;
+    const userId = notif.userId || this._getUserId();
+    const key = `notifications_${userId}`;
+    const notifs = this.getNotifications();
+    const item = {
+      id: notif.id || 'notif_' + Math.random().toString(36).substring(2, 9),
+      userId,
+      title: notif.title || 'Notifikasi',
+      message: notif.message || '',
+      type: notif.type || 'info',
+      amount: notif.amount,
+      method: notif.method,
+      recipient: notif.recipient,
+      transactionId: notif.transactionId,
+      proofImage: notif.proofImage || '',
+      proofNotes: notif.proofNotes || '',
+      createdAt: notif.createdAt || new Date().toISOString(),
+      isRead: false
+    };
+    notifs.unshift(item);
+    this._storage.set(key, notifs);
+    this._storage.set('notifications', notifs);
+    this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED, item);
   }
 
   /**

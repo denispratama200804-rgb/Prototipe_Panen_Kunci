@@ -63,4 +63,5 @@ export const AppEvents = {
   SHOW_TOAST: 'notification:show_toast',
   SHOW_MODAL: 'notification:show_modal',
   CLOSE_MODAL: 'notification:close_modal',
+  NOTIFICATIONS_UPDATED: 'notification:updated',
 };
