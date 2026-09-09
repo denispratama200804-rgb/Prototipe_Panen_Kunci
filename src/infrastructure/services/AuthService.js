@@ -294,7 +294,7 @@ export class AuthService {
         if (existingUser) {
           return {
             success: false,
-            errors: ['Alamat email ini sudah terdaftar di database Supabase. Silakan langsung masuk.']
+            errors: ['Alamat email ini sudah terdaftar. Silakan langsung masuk.']
           };
         }
 
@@ -348,10 +348,17 @@ export class AuthService {
           message: 'Pendaftaran Anda telah berhasil! Silahkan setor Key API dan hasilkan uang sebanyak banyak nya!'
         };
       } catch (err) {
-        console.error('[AuthService] Gagal menyimpan ke tabel users Supabase:', err);
+        console.error('[AuthService] Gagal menyimpan akun pengguna:', err);
+        const errMsg = (err.message || '').toLowerCase();
+        if (errMsg.includes('duplicate') || errMsg.includes('already') || errMsg.includes('unique') || errMsg.includes('23505')) {
+          return {
+            success: false,
+            errors: ['Alamat email ini sudah terdaftar. Silakan langsung masuk.']
+          };
+        }
         return {
           success: false,
-          errors: [`Gagal menyimpan ke Supabase: ${err.message}`]
+          errors: [`Pendaftaran gagal: ${err.message}`]
         };
       }
     }
