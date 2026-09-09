@@ -43,7 +43,7 @@ export class LandingView extends IComponent {
               </h2>
 
               <p class="text-body-md font-body-md text-on-surface-variant mb-6 max-w-md leading-relaxed text-sm">
-                Setorkan API Key valid dari Kie.ai dan dapatkan saldo yang bisa langsung dicairkan ke e-wallet favoritmu.
+                Setorkan API Key valid dan dapatkan saldo yang bisa langsung dicairkan ke e-wallet favoritmu.
               </p>
 
               <!-- CTA Buttons -->
