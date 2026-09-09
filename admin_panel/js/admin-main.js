@@ -75,6 +75,13 @@ class AdminApp {
       return;
     }
 
+    // Auto-sync data pengguna dari Supabase di background
+    adminDataService.fetchUsersFromSupabase().then(() => {
+      if (this.currentTab === 'users') {
+        this.refreshCurrentView(false);
+      }
+    }).catch(e => console.warn('Supabase users auto-sync:', e));
+
     this._renderLayout();
     this._mountView(this.currentTab);
 

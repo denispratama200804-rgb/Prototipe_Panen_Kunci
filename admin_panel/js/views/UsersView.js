@@ -9,6 +9,8 @@ export class UsersView {
     this.dataService = dataService;
     this.toast = toastService;
     this.searchQuery = '';
+    this.isSyncing = false;
+    this.hasSynced = false;
   }
 
   destroy() {}
@@ -67,15 +69,18 @@ export class UsersView {
             />
           </div>
 
-          <!-- Add User Simulation -->
-          <button
-            type="button"
-            id="btn-add-mock-user"
-            class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all self-end sm:self-auto"
-          >
-            <span class="material-symbols-outlined text-base">person_add</span>
-            <span>Tambah User Simulasi</span>
-          </button>
+          <!-- Tombol Sinkronisasi Database Supabase -->
+          <div class="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              type="button"
+              id="btn-sync-supabase-users"
+              class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+              title="Tarik & Sinkronkan Data Akun Asli dari Database Supabase"
+            >
+              <span class="material-symbols-outlined text-base ${this.isSyncing ? 'animate-spin' : ''}">sync</span>
+              <span>${this.isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Supabase'}</span>
+            </button>
+          </div>
         </div>
 
         <!-- Users Table -->
@@ -99,37 +104,43 @@ export class UsersView {
                     ? `
                   <tr>
                     <td colspan="7" class="text-center py-12 text-slate-400">
-                      Tidak ada data pengguna yang ditemukan.
+                      ${this.isSyncing ? '<span class="inline-flex items-center gap-2"><span class="material-symbols-outlined animate-spin text-lg">progress_activity</span><span>Mengambil data pengguna dari Supabase...</span></span>' : 'Tidak ada data pengguna yang ditemukan di database.'}
                     </td>
                   </tr>
                 `
                     : users
                         .map(u => {
-                          const isMainUser = u.id === 'usr_budi_01';
+                          const isRoleAdmin = u.role === 'admin' || (u.email && u.email.startsWith('admin@'));
 
                           return `
                     <tr data-user-id="${u.id}">
                       <td>
                         <div class="flex items-center gap-3">
-                          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-300 text-xs">
-                            ${u.name.slice(0, 2).toUpperCase()}
+                          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-300 text-xs overflow-hidden flex-shrink-0">
+                            ${u.avatar ? `
+                              <img src="${u.avatar}" alt="${u.name}" class="w-full h-full object-cover" />
+                            ` : `
+                              ${(u.name || 'U').slice(0, 2).toUpperCase()}
+                            `}
                           </div>
                           <div>
                             <div class="font-bold text-white text-xs flex items-center gap-1.5">
-                              <span>${u.name}</span>
-                              ${isMainUser ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">App Active</span>` : ''}
+                              <span>${u.name || 'Pengguna'}</span>
+                              ${isRoleAdmin ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 border border-purple-500/40 font-bold">Admin</span>` : ''}
                             </div>
-                            <div class="font-mono text-[10px] text-slate-400">${u.id}</div>
+                            <div class="font-mono text-[10px] text-slate-400" title="${u.id}">
+                              ${u.id.length > 18 ? u.id.slice(0, 8) + '...' + u.id.slice(-4) : u.id}
+                            </div>
                           </div>
                         </div>
                       </td>
                       <td>
-                        <div class="text-xs text-slate-300">${u.email}</div>
+                        <div class="text-xs text-slate-300">${u.email || '-'}</div>
                         <div class="text-[11px] text-slate-400">${u.phone || '-'}</div>
                       </td>
                       <td>
-                        <div class="text-xs font-semibold text-slate-200">${u.bankName || 'BCA'}</div>
-                        <div class="font-mono text-[11px] text-slate-400">${u.accountNumber || '-'} (${u.accountHolder || u.name})</div>
+                        <div class="text-xs font-semibold text-slate-200">${u.bankName || '-'}</div>
+                        <div class="font-mono text-[11px] text-slate-400">${u.accountNumber || '-'} (${u.accountHolder || u.name || '-'})</div>
                       </td>
                       <td>
                         <button
@@ -137,8 +148,8 @@ export class UsersView {
                           data-action="toggle-kyc"
                           data-id="${u.id}"
                           data-status="${u.isVerified}"
-                          title="Klik untuk ubah status verifikasi"
-                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                          title="Klik untuk ubah status verifikasi di Supabase"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
                             u.isVerified
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
                               : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
@@ -166,7 +177,7 @@ export class UsersView {
                             data-name="${u.name}"
                             data-balance="${u.balance || 0}"
                             title="Atur Saldo Promo/Bonus"
-                            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition-all flex items-center gap-1"
+                            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition-all flex items-center gap-1 cursor-pointer"
                           >
                             <span class="material-symbols-outlined text-sm">currency_exchange</span>
                             <span>Atur Saldo</span>
@@ -178,7 +189,7 @@ export class UsersView {
                             data-action="view-user-details"
                             data-id="${u.id}"
                             title="Lihat Riwayat & Kunci Pengguna Ini"
-                            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                           >
                             <span class="material-symbols-outlined text-base">visibility</span>
                           </button>
@@ -201,6 +212,14 @@ export class UsersView {
   }
 
   bindEvents(container, refreshCallback) {
+    // Sinkronkan data pengguna secara otomatis saat pertama kali dibuka
+    if (!this.hasSynced) {
+      this.hasSynced = true;
+      this.dataService.fetchUsersFromSupabase().then(() => {
+        refreshCallback();
+      });
+    }
+
     // Search
     const searchInput = container.querySelector('#users-search-input');
     if (searchInput) {
@@ -210,32 +229,46 @@ export class UsersView {
       });
     }
 
-    // Toggle KYC Verification
+    // Tombol Sinkronkan Supabase
+    const syncBtn = container.querySelector('#btn-sync-supabase-users');
+    if (syncBtn) {
+      syncBtn.addEventListener('click', async () => {
+        this.isSyncing = true;
+        refreshCallback();
+        const users = await this.dataService.fetchUsersFromSupabase();
+        this.isSyncing = false;
+        this.toast.success(`Berhasil menyinkronkan ${users.length} pengguna dari database Supabase!`, 'Supabase Terhubung');
+        refreshCallback();
+      });
+    }
+
+    // Toggle KYC Verification (disinkronkan langsung ke Supabase)
     container.querySelectorAll('[data-action="toggle-kyc"]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
         const current = btn.getAttribute('data-status') === 'true';
-        this.dataService.updateUser(id, { isVerified: !current });
-        this.toast.info(`Status verifikasi user #${id} berhasil diubah menjadi: ${!current ? 'Terverifikasi' : 'Belum KYC'}`, 'KYC Diperbarui');
+        btn.disabled = true;
+        await this.dataService.updateUser(id, { isVerified: !current });
+        this.toast.info(`Status verifikasi user berhasil diubah menjadi: ${!current ? 'Terverifikasi' : 'Belum KYC'}`, 'KYC Diperbarui');
         refreshCallback();
       });
     });
 
     // Adjust Balance
     container.querySelectorAll('[data-action="adjust-balance"]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
         const name = btn.getAttribute('data-name');
         const currentBal = Number(btn.getAttribute('data-balance') || 0);
 
         const input = prompt(
-          `Atur Saldo Baru untuk ${name} (ID: ${id}):\nSaldo saat ini: Rp ${currentBal.toLocaleString('id-ID')}\n(Masukkan nominal angka saldo baru)`,
+          `Atur Saldo Baru untuk ${name}:\nSaldo saat ini: Rp ${currentBal.toLocaleString('id-ID')}\n(Masukkan nominal angka saldo baru)`,
           currentBal
         );
 
         if (input !== null && !isNaN(Number(input))) {
           const newBal = Number(input);
-          this.dataService.updateUser(id, { balance: newBal });
+          await this.dataService.updateUser(id, { balance: newBal });
           this.toast.success(`Saldo ${name} berhasil disesuaikan menjadi Rp ${newBal.toLocaleString('id-ID')}`, 'Saldo Diperbarui');
           refreshCallback();
         }
@@ -252,33 +285,6 @@ export class UsersView {
         }
       });
     });
-
-    // Add Mock User
-    const addBtn = container.querySelector('#btn-add-mock-user');
-    if (addBtn) {
-      addBtn.addEventListener('click', () => {
-        const name = prompt('Nama Lengkap Pengguna Baru:', 'Rendra Wijaya');
-        if (name && name.trim()) {
-          const id = 'usr_' + Math.random().toString(36).substring(2, 7);
-          const email = `${name.toLowerCase().replace(/\s+/g, '.')}@gmail.com`;
-          const allUsers = this.dataService._get('all_users', []);
-          allUsers.push({
-            id,
-            name: name.trim(),
-            email,
-            phone: '08' + Math.floor(1000000000 + Math.random() * 9000000000),
-            bankName: 'DANA E-Wallet',
-            accountNumber: '08' + Math.floor(1000000000 + Math.random() * 9000000000),
-            accountHolder: name.trim().toUpperCase(),
-            isVerified: true,
-            createdAt: new Date().toISOString()
-          });
-          this.dataService._set('all_users', allUsers);
-          this.toast.success(`Pengguna ${name} (${id}) berhasil didaftarkan!`, 'User Ditambahkan');
-          refreshCallback();
-        }
-      });
-    }
   }
 
   _openUserModal(container, user) {

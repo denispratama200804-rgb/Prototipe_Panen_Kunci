@@ -40,6 +40,32 @@ export default defineConfig(({ mode }) => {
           server.middlewares.use('/api/supabase-proxy', async (req, res) => {
             res.setHeader('Content-Type', 'application/json');
 
+            if (req.method === 'GET') {
+              try {
+                if (adminSupabase) {
+                  const { data: users, error } = await adminSupabase
+                    .from('users')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                  if (error) {
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ success: false, error: error.message }));
+                  } else {
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true, data: users }));
+                  }
+                } else {
+                  res.statusCode = 500;
+                  res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                }
+              } catch (e) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({ success: false, error: e.message }));
+              }
+              return;
+            }
+
             if (req.method === 'POST') {
               let bodyStr = '';
               req.on('data', chunk => { bodyStr += chunk; });
@@ -47,6 +73,27 @@ export default defineConfig(({ mode }) => {
                 try {
                   const parsed = JSON.parse(bodyStr || '{}');
                   const { action, table, data, id } = parsed;
+
+                  if (action === 'get_users' || (action === 'select' && table === 'users')) {
+                    if (adminSupabase) {
+                      const { data: users, error } = await adminSupabase
+                        .from('users')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+
+                      if (error) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: error.message }));
+                      } else {
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({ success: true, data: users }));
+                      }
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                    }
+                    return;
+                  }
 
                   if (action === 'insert' && table === 'users') {
                     const { data: inserted, error } = await adminSupabase
@@ -79,6 +126,22 @@ export default defineConfig(({ mode }) => {
                     } else {
                       res.statusCode = 200;
                       res.end(JSON.stringify({ success: true, data: updated }));
+                    }
+                    return;
+                  }
+
+                  if (action === 'delete' && table === 'users' && id) {
+                    const { error } = await adminSupabase
+                      .from('users')
+                      .delete()
+                      .eq('id', id);
+
+                    if (error) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: error.message }));
+                    } else {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true }));
                     }
                     return;
                   }

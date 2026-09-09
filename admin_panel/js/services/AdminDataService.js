@@ -7,6 +7,36 @@
 export class AdminDataService {
   constructor(prefix = 'panenkunci:') {
     this.prefix = prefix;
+    this._cleanDummyUsers();
+    // Auto-sync awal dari Supabase di background
+    this.fetchUsersFromSupabase().catch(() => {});
+  }
+
+  /**
+   * Membersihkan data dummy lama (Budi, Siti, Ahmad, Dewi) dari localStorage
+   */
+  _cleanDummyUsers() {
+    try {
+      const raw = localStorage.getItem(`${this.prefix}all_users`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter(u =>
+            u &&
+            u.id !== 'usr_siti_02' &&
+            u.id !== 'usr_ahmad_03' &&
+            u.id !== 'usr_dewi_04' &&
+            u.id !== 'usr_budi_01' &&
+            u.id !== 'usr_admin_master'
+          );
+          if (filtered.length !== parsed.length) {
+            localStorage.setItem(`${this.prefix}all_users`, JSON.stringify(filtered));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[AdminDataService] _cleanDummyUsers warning:', e);
+    }
   }
 
   // Helper localStorage aman
@@ -482,76 +512,102 @@ export class AdminDataService {
   }
 
   /**
-   * Mengambil daftar seluruh pengguna
+   * Mengambil dan menyinkronkan data pengguna asli langsung dari database Supabase
+   * @returns {Promise<Array>}
    */
-  getUsers({ search = '' } = {}) {
-    let users = this._get('all_users', []);
+  async fetchUsersFromSupabase() {
+    try {
+      let remoteUsers = null;
 
-    if (!Array.isArray(users) || users.length === 0) {
-      // Ambil current_user utama dari aplikasi
-      const currentUser = this._get('current_user', {
-        id: 'usr_budi_01',
-        name: 'Budi Santoso',
-        email: 'budi.santoso@example.com',
-        phone: '081234567890',
-        bankName: 'Bank Central Asia (BCA)',
-        accountNumber: '5410987654',
-        accountHolder: 'BUDI SANTOSO',
-        isVerified: true,
-        createdAt: new Date(Date.now() - 86400000 * 30).toISOString()
-      });
-
-      users = [
-        currentUser,
-        {
-          id: 'usr_siti_02',
-          name: 'Siti Rahmawati',
-          email: 'siti.rahma@gmail.com',
-          phone: '085712345678',
-          bankName: 'DANA E-Wallet',
-          accountNumber: '085712345678',
-          accountHolder: 'SITI RAHMAWATI',
-          isVerified: true,
-          createdAt: new Date(Date.now() - 86400000 * 14).toISOString()
-        },
-        {
-          id: 'usr_ahmad_03',
-          name: 'Ahmad Fauzi',
-          email: 'fauzi.ahmad@yahoo.com',
-          phone: '087890123456',
-          bankName: 'GoPay',
-          accountNumber: '087890123456',
-          accountHolder: 'AHMAD FAUZI',
-          isVerified: false,
-          createdAt: new Date(Date.now() - 86400000 * 5).toISOString()
-        },
-        {
-          id: 'usr_dewi_04',
-          name: 'Dewi Lestari',
-          email: 'dewi.kunci@gmail.com',
-          phone: '081399887766',
-          bankName: 'Bank Mandiri',
-          accountNumber: '1370019283746',
-          accountHolder: 'DEWI LESTARI',
-          isVerified: true,
-          createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
+      // 1. Ambil dari server proxy (menggunakan service role key admin)
+      try {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get_users', table: 'users' })
+        });
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          remoteUsers = json.data;
         }
-      ];
-      this._set('all_users', users);
+      } catch (proxyErr) {
+        console.warn('[AdminDataService] POST proxy warning:', proxyErr.message);
+      }
+
+      // 2. Fallback jika POST gagal
+      if (!remoteUsers) {
+        try {
+          const res = await fetch('/api/supabase-proxy');
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            remoteUsers = json.data;
+          }
+        } catch (getErr) {
+          console.warn('[AdminDataService] GET proxy warning:', getErr.message);
+        }
+      }
+
+      if (remoteUsers && Array.isArray(remoteUsers)) {
+        // Pertahankan custom balance yang pernah diubah admin jika ada
+        const existingUsers = this._get('all_users', []);
+        const balanceMap = {};
+        existingUsers.forEach(u => {
+          if (u.id && u.customBalance !== undefined) {
+            balanceMap[u.id] = u.customBalance;
+          }
+        });
+
+        // Petakan kolom Supabase ke objek pengguna di admin panel
+        const mappedUsers = remoteUsers.map(row => ({
+          id: row.id,
+          name: row.name || 'Tanpa Nama',
+          email: row.email || '-',
+          phone: row.phone || '-',
+          bankName: row.bank_name || '-',
+          accountNumber: row.account_number || '-',
+          accountHolder: row.account_holder || row.name || '-',
+          role: row.role || 'user',
+          isVerified: Boolean(row.is_verified),
+          createdAt: row.created_at || new Date().toISOString(),
+          avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : '',
+          customBalance: balanceMap[row.id] !== undefined ? balanceMap[row.id] : 0
+        }));
+
+        this._set('all_users', mappedUsers);
+        return mappedUsers;
+      }
+    } catch (e) {
+      console.error('[AdminDataService] Gagal fetch users dari Supabase:', e);
     }
 
-    // Attach computed stats
+    return this.getUsers();
+  }
+
+  /**
+   * Mengambil daftar seluruh pengguna dari cache data tersinkron
+   */
+  getUsers({ search = '' } = {}) {
+    const rawUsers = this._get('all_users', []);
+
+    // Filter keluar data dummy (Budi, Siti, Ahmad, Dewi)
+    const users = (Array.isArray(rawUsers) ? rawUsers : []).filter(u =>
+      u &&
+      u.id !== 'usr_siti_02' &&
+      u.id !== 'usr_ahmad_03' &&
+      u.id !== 'usr_dewi_04' &&
+      u.id !== 'usr_budi_01' &&
+      u.id !== 'usr_admin_master'
+    );
+
+    // Hubungkan dengan data setoran kunci & transaksi penarikan
     const apiKeys = this.getApiKeys();
     const transactions = this.getTransactions();
-    const activeBalance = this._get('wallet_balance', 85000);
 
     const enriched = users.map(u => {
-      const userKeys = apiKeys.filter(k => k.userId === u.id);
-      const userWithdrawals = transactions.filter(t => t.userId === u.id && t.type === 'withdrawal' && t.status === 'success');
+      const userKeys = apiKeys.filter(k => k.userId === u.id || (u.email && k.userEmail === u.email));
+      const userWithdrawals = transactions.filter(t => (t.userId === u.id || (u.email && t.userEmail === u.email)) && t.type === 'withdrawal' && t.status === 'success');
       const totalWithdrawn = userWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-      // Jika user utama (Budi), pakai saldo live dari app
-      const balance = u.id === 'usr_budi_01' ? activeBalance : (u.customBalance || 45000);
+      const balance = u.customBalance !== undefined ? u.customBalance : 0;
 
       return {
         ...u,
@@ -565,37 +621,78 @@ export class AdminDataService {
     if (!search) return enriched;
     const q = search.toLowerCase();
     return enriched.filter(u =>
-      u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      u.phone.toLowerCase().includes(q) ||
-      u.id.toLowerCase().includes(q)
+      (u.name && u.name.toLowerCase().includes(q)) ||
+      (u.email && u.email.toLowerCase().includes(q)) ||
+      (u.phone && u.phone.toLowerCase().includes(q)) ||
+      (u.id && u.id.toLowerCase().includes(q))
     );
   }
 
   /**
-   * Perbarui profil / status pengguna
+   * Perbarui profil / status KYC / saldo pengguna (tersinkron ke localStorage dan Supabase)
    */
-  updateUser(userId, updateData) {
+  async updateUser(userId, updateData) {
     const users = this._get('all_users', []);
     const idx = users.findIndex(u => u.id === userId);
     if (idx !== -1) {
       users[idx] = { ...users[idx], ...updateData };
+      if (updateData.balance !== undefined) {
+        users[idx].customBalance = updateData.balance;
+      }
       this._set('all_users', users);
 
-      // Jika yang di-update user utama, sinkronkan ke current_user
-      if (userId === 'usr_budi_01') {
-        const curr = this._get('current_user', {});
-        this._set('current_user', { ...curr, ...updateData });
+      // Sinkronkan ke tabel users Supabase di database
+      try {
+        const payload = {};
+        if (updateData.isVerified !== undefined) payload.is_verified = updateData.isVerified;
+        if (updateData.name !== undefined) payload.name = updateData.name;
+        if (updateData.phone !== undefined) payload.phone = updateData.phone;
+        if (updateData.bankName !== undefined) payload.bank_name = updateData.bankName;
+        if (updateData.accountNumber !== undefined) payload.account_number = updateData.accountNumber;
+        if (updateData.accountHolder !== undefined) payload.account_holder = updateData.accountHolder;
+        if (updateData.role !== undefined) payload.role = updateData.role;
+
+        if (Object.keys(payload).length > 0) {
+          await fetch('/api/supabase-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update', table: 'users', id: userId, data: payload })
+          });
+        }
+      } catch (err) {
+        console.warn('[AdminDataService] Sync update ke Supabase warning:', err.message);
       }
 
-      // Jika ada perubahan saldo user utama
-      if (userId === 'usr_budi_01' && updateData.balance !== undefined) {
-        this._set('wallet_balance', updateData.balance);
+      // Jika user yang diupdate adalah current_user aktif
+      const curr = this._get('current_user', {});
+      if (curr.id === userId) {
+        this._set('current_user', { ...curr, ...updateData });
       }
 
       return true;
     }
     return false;
+  }
+
+  /**
+   * Hapus pengguna dari daftar dan Supabase
+   */
+  async deleteUser(userId) {
+    let users = this._get('all_users', []);
+    users = users.filter(u => u.id !== userId);
+    this._set('all_users', users);
+
+    try {
+      await fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', table: 'users', id: userId })
+      });
+      return true;
+    } catch (err) {
+      console.warn('[AdminDataService] Delete user Supabase warning:', err.message);
+      return false;
+    }
   }
 
   /**
