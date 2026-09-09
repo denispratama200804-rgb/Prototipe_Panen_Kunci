@@ -18,6 +18,14 @@ export const googleClientId = (
   ''
 ).trim();
 
+// URL production aplikasi — digunakan agar redirect OAuth Google selalu ke Vercel, bukan IP lokal
+export const appBaseUrl = (
+  import.meta.env.VITE_APP_URL ||
+  import.meta.env.NEXT_PUBLIC_APP_URL ||
+  ''
+).trim().replace(/\/$/, ''); // hilangkan trailing slash
+
+
 /**
  * Memeriksa apakah Supabase telah dikonfigurasi dengan URL & Key yang valid
  * Supabase URL harus berupa URL web yang valid (diawali http:// atau https://)
