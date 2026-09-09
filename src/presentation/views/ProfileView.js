@@ -427,7 +427,7 @@ export class ProfileView extends IComponent {
           </div>
         `,
         type: 'info',
-        confirmText: 'Simpan ke Supabase',
+        confirmText: 'Simpan',
         cancelText: 'Batal',
         showCancel: true,
         onConfirm: async () => {
@@ -438,7 +438,7 @@ export class ProfileView extends IComponent {
 
           try {
             await this._authService.updateProfile({ bankName, accountNumber, accountHolder, phone });
-            this._notification.success('Data rekening berhasil disimpan ke Supabase!');
+            this._notification.success('Data rekening berhasil disimpan!');
             
             // Re-render konten tampilan profil saat ini
             const viewRoot = document.getElementById('app-view-root');

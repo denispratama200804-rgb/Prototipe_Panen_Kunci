@@ -1,12 +1,13 @@
 /**
  * Admin Panel Bootstrap & Router Engine
  * Panen Kunci Executive Control Center
+ * Arsitektur: Modern App Hub Dashboard + Responsive Desktop & Mobile Web
  */
 import { adminDataService } from './services/AdminDataService.js';
 import { toast } from './services/ToastService.js';
-import { Sidebar } from './components/Sidebar.js';
 import { Navbar } from './components/Navbar.js';
 
+import { HubDashboardView } from './views/HubDashboardView.js';
 import { ApiKeysView } from './views/ApiKeysView.js';
 import { WithdrawalsView } from './views/WithdrawalsView.js';
 import { UsersView } from './views/UsersView.js';
@@ -18,18 +19,20 @@ class AdminApp {
     this.currentTab = this._getInitialTab();
     this.currentViewInstance = null;
 
-    this.sidebar = new Sidebar(
-      this.currentTab,
-      tab => this.navigate(tab),
-      () => this._handleSeedDemo()
-    );
-
     this.navbar = new Navbar({
-      onRefresh: () => this.refreshCurrentView(true),
-      onSearch: q => console.log('Global search:', q)
+      onRefresh: () => this.refreshCurrentView(true, false),
+      onNavigate: tab => this.navigate(tab),
+      onSeed: () => this._handleSeedDemo(),
+      onLogout: () => this._handleLogout()
     });
 
     this.views = {
+      dashboard: new HubDashboardView(
+        adminDataService,
+        tab => this.navigate(tab),
+        () => this._handleSeedDemo(),
+        toast
+      ),
       apikeys: new ApiKeysView(adminDataService, toast),
       withdrawals: new WithdrawalsView(adminDataService, toast),
       users: new UsersView(adminDataService, toast),
@@ -39,8 +42,8 @@ class AdminApp {
 
   _getInitialTab() {
     const hash = window.location.hash.replace('#', '');
-    const validTabs = ['apikeys', 'withdrawals', 'users', 'settings'];
-    return validTabs.includes(hash) ? hash : 'apikeys';
+    const validTabs = ['dashboard', 'apikeys', 'withdrawals', 'users', 'settings'];
+    return validTabs.includes(hash) ? hash : 'dashboard';
   }
 
   init() {
@@ -75,6 +78,13 @@ class AdminApp {
       return;
     }
 
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(e => console.log('SW registration:', e));
+      });
+    }
+
     // Auto-sync data pengguna dari Supabase di background
     adminDataService.fetchUsersFromSupabase().then(() => {
       if (this.currentTab === 'users') {
@@ -93,54 +103,49 @@ class AdminApp {
       }
     });
 
-    // Listen to localStorage cross-tab updates (e.g. user deposited a key in another tab)
+    // Listen to localStorage cross-tab updates (debounced to avoid screen flash)
+    let storageSyncTimer = null;
     window.addEventListener('storage', e => {
       if (e.key && e.key.startsWith('panenkunci:')) {
-        toast.info('Data transaksi baru terdeteksi dari aplikasi pengguna.', 'Sinkronisasi Otomatis');
-        this.refreshCurrentView(false);
+        clearTimeout(storageSyncTimer);
+        storageSyncTimer = setTimeout(() => {
+          this.refreshCurrentView(false, false);
+        }, 250);
       }
     });
 
-    console.log('🚀 Panen Kunci Admin Panel initialized successfully!');
+    console.log('🚀 Panen Kunci Admin Panel Hub initialized successfully!');
   }
 
   _renderLayout() {
-    const stats = adminDataService.getStats();
-
     this.appRoot.innerHTML = `
       <!-- Ambient Background Glows -->
       <div class="admin-ambient-glow"></div>
 
-      <div class="relative z-10 flex min-h-screen w-full">
-        <!-- Sidebar Container -->
-        <div id="admin-sidebar-mount">
-          ${this.sidebar.render(stats)}
-        </div>
-
-        <!-- Main Content Area -->
-        <div class="flex-1 flex flex-col min-w-0 bg-[#060b18]/60">
-          <!-- Top Navbar Mount -->
-          <div id="admin-navbar-mount">
-            ${this.navbar.render(this._getViewTitle(this.currentTab))}
+      <div class="relative z-10 flex flex-col min-h-screen w-full max-w-full">
+        <!-- Unified Sticky Header: Solusi 100% Bebas Tembus Pandang & Bebas Celah -->
+        <div class="sticky top-0 z-30 bg-[#060b18] border-b border-slate-800 shadow-2xl safe-area-pt w-full max-w-full">
+          <!-- Top Navbar Mount (Header Referensi AI Dashboard) -->
+          <div id="admin-navbar-mount" class="w-full max-w-full">
+            ${this.navbar.render(this.currentTab, this._getViewTitle(this.currentTab))}
           </div>
-
-          <!-- Dynamic View Container -->
-          <main class="flex-1 p-6 sm:p-8 overflow-y-auto custom-scrollbar" id="admin-view-mount">
-            <!-- View content will be injected here -->
-          </main>
         </div>
+
+        <!-- Dynamic Main Content View Area: min-w-0 prevents flex horizontal expansion -->
+        <main class="flex-1 w-full max-w-7xl mx-auto min-w-0 p-3 sm:p-6 md:p-8" id="admin-view-mount">
+          <!-- View content will be injected here -->
+        </main>
       </div>
     `;
 
     this._bindLayoutEvents();
   }
 
-  _bindLayoutEvents() {
-    const sidebarMount = document.getElementById('admin-sidebar-mount');
-    if (sidebarMount) {
-      this.sidebar.bindEvents(sidebarMount);
-    }
+  _renderSubNav() {
+    return ''; // Filter tabs di dekat headbar dihilangkan sesuai permintaan user
+  }
 
+  _bindLayoutEvents() {
     const navbarMount = document.getElementById('admin-navbar-mount');
     if (navbarMount) {
       this.navbar.bindEvents(navbarMount);
@@ -149,6 +154,8 @@ class AdminApp {
 
   _getViewTitle(tab) {
     switch (tab) {
+      case 'dashboard':
+        return 'Admin Dashboard';
       case 'apikeys':
         return 'Gudang API Key';
       case 'withdrawals':
@@ -158,7 +165,7 @@ class AdminApp {
       case 'settings':
         return 'Pengaturan Tarif & Sistem';
       default:
-        return 'Control Panel';
+        return 'Control Center';
     }
   }
 
@@ -168,56 +175,51 @@ class AdminApp {
     }
 
     this.currentTab = tab;
-    this.sidebar.activeTab = tab;
 
     if (updateHash) {
       window.location.hash = tab;
     }
 
-    // Update Title in Navbar
-    const titleEl = document.getElementById('navbar-view-title');
-    if (titleEl) {
-      titleEl.textContent = this._getViewTitle(tab);
+    // Re-render navbar
+    const navbarMount = document.getElementById('admin-navbar-mount');
+    if (navbarMount) {
+      navbarMount.innerHTML = this.navbar.render(tab, this._getViewTitle(tab));
+      this.navbar.bindEvents(navbarMount);
     }
 
-    // Update Sidebar Navigation state
-    const sidebarMount = document.getElementById('admin-sidebar-mount');
-    if (sidebarMount) {
-      const stats = adminDataService.getStats();
-      sidebarMount.innerHTML = this.sidebar.render(stats);
-      this.sidebar.bindEvents(sidebarMount);
-    }
-
+    this._bindLayoutEvents();
     this._mountView(tab);
+
+    // Scroll to top on view change
+    const viewMount = document.getElementById('admin-view-mount');
+    if (viewMount) viewMount.scrollTop = 0;
   }
 
-  _mountView(tab) {
+  _mountView(tab, withAnimation = true) {
     const viewMount = document.getElementById('admin-view-mount');
     if (!viewMount) return;
 
-    const viewInstance = this.views[tab];
+    const viewInstance = this.views[tab] || this.views.dashboard;
     this.currentViewInstance = viewInstance;
 
-    viewMount.innerHTML = viewInstance.render();
+    let html = viewInstance.render();
+    if (!withAnimation) {
+      html = html.replace(/\bview-fade-enter\b/g, '');
+    }
+    viewMount.innerHTML = html;
 
     if (typeof viewInstance.bindEvents === 'function') {
       viewInstance.bindEvents(viewMount, () => {
-        this.refreshCurrentView(false);
+        this.refreshCurrentView(false, false);
       });
     }
   }
 
-  refreshCurrentView(showToast = true) {
-    // Re-render sidebar stats
-    const sidebarMount = document.getElementById('admin-sidebar-mount');
-    if (sidebarMount) {
-      const stats = adminDataService.getStats();
-      sidebarMount.innerHTML = this.sidebar.render(stats);
-      this.sidebar.bindEvents(sidebarMount);
-    }
+  refreshCurrentView(showToast = true, withAnimation = false) {
+    this._bindLayoutEvents();
 
     // Re-render active view
-    this._mountView(this.currentTab);
+    this._mountView(this.currentTab, withAnimation);
 
     if (showToast) {
       toast.success('Data panel operasional telah diperbarui!', 'Tersinkronisasi');
@@ -228,6 +230,15 @@ class AdminApp {
     adminDataService.seedDemoData();
     toast.success('Data demo realistis berhasil disuntikkan ke sistem!', 'Data Seeded');
     this.refreshCurrentView(false);
+  }
+
+  _handleLogout() {
+    localStorage.removeItem('panenkunci:admin_logged_in');
+    localStorage.removeItem('panenkunci:auth_role');
+    toast.info('Sesi administrator telah berakhir.', 'Logout Berhasil');
+    setTimeout(() => {
+      window.location.href = '/#/login';
+    }, 400);
   }
 }
 

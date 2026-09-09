@@ -9,15 +9,16 @@ export class ToastService {
   }
 
   _ensureContainer() {
+    if (typeof document === 'undefined') return;
     if (!this._container) {
       this._container = document.getElementById('admin-toast-container');
       if (!this._container) {
         this._container = document.createElement('div');
         this._container.id = 'admin-toast-container';
-        this._container.className = 'fixed top-5 right-5 z-50 pointer-events-none max-w-sm w-full min-h-[70px]';
         document.body.appendChild(this._container);
       }
     }
+    this._container.className = 'fixed top-4 left-4 right-4 sm:left-auto sm:right-6 sm:top-6 sm:w-96 z-[99999] pointer-events-none min-h-[70px]';
   }
 
   show({ type = 'info', title = '', message = '', duration = 4000 }) {
@@ -41,7 +42,7 @@ export class ToastService {
 
     const toastId = 'adm_toast_' + Math.random().toString(36).substring(2, 9);
     const toast = document.createElement('div');
-    toast.className = 'pointer-events-auto flex items-start gap-3 p-4 rounded-2xl backdrop-blur-xl border shadow-2xl text-white select-none';
+    toast.className = 'pointer-events-auto flex items-start gap-3 p-3.5 sm:p-4 rounded-2xl backdrop-blur-xl border shadow-2xl text-white select-none box-border max-w-full';
 
     let icon = 'info';
     let borderColor = 'border-blue-500/30';
@@ -62,7 +63,8 @@ export class ToastService {
     }
 
     toast.classList.add(borderColor);
-    toast.style.background = 'rgba(15, 23, 42, 0.96)';
+    toast.style.background = 'rgba(11, 19, 41, 0.98)';
+    toast.style.boxSizing = 'border-box';
     toast.style.position = 'absolute';
     toast.style.top = '0';
     toast.style.right = '0';
@@ -75,12 +77,12 @@ export class ToastService {
 
     toast.innerHTML = `
       <span class="material-symbols-outlined ${iconColor} text-2xl flex-shrink-0 mt-0.5">${icon}</span>
-      <div class="flex-1 min-w-0">
-        ${title ? `<h4 class="text-sm font-semibold tracking-wide text-slate-100 mb-0.5">${title}</h4>` : ''}
-        <p class="text-xs text-slate-300 leading-relaxed">${message}</p>
+      <div class="flex-1 min-w-0 pr-1">
+        ${title ? `<h4 class="text-sm font-bold tracking-wide text-slate-100 mb-0.5 leading-tight">${title}</h4>` : ''}
+        <p class="text-xs text-slate-300 leading-relaxed break-words">${message}</p>
       </div>
       <span class="adm-stack-badge hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-700/60 text-slate-300 shrink-0"></span>
-      <button type="button" class="text-slate-400 hover:text-white transition-colors flex-shrink-0 -mr-1 -mt-1 p-1">
+      <button type="button" class="text-slate-400 hover:text-white transition-colors flex-shrink-0 -mr-1 -mt-1 p-1 cursor-pointer">
         <span class="material-symbols-outlined text-lg">close</span>
       </button>
     `;

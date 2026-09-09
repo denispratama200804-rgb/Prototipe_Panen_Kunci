@@ -273,7 +273,7 @@ export class SetorApiKeyView extends IComponent {
       }
 
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Memverifikasi server Kie.ai...</span>';
+      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Memverifikasi API Key...</span>';
 
       const user = this._authService.getCurrentUser();
       const res = await this._apiKeyService.submitKey(rawKey, user ? user.id : 'usr_guest');

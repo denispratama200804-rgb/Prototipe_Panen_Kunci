@@ -1,3 +1,5 @@
+import { setupTableScroll } from '../utils/TableScroller.js';
+
 /**
  * DashboardView
  * Menampilkan ringkasan eksekutif, KPI cards, visualisasi grafik Chart.js,
@@ -179,23 +181,44 @@ export class DashboardView {
 
         <!-- Recent Transactions Table -->
         <div class="admin-card rounded-2xl overflow-hidden">
-          <div class="p-6 border-b border-slate-800/80 flex items-center justify-between">
+          <div class="p-4 sm:p-6 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 class="text-base font-bold text-white font-['Plus_Jakarta_Sans']">Transaksi Terbaru</h3>
               <p class="text-xs text-slate-400">Log mutasi saldo, setoran, dan penarikan yang tercatat di sistem</p>
             </div>
-            <button
-              type="button"
-              id="dash-btn-view-all-tx"
-              class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
-            >
-              <span>Lihat Semua</span>
-              <span class="material-symbols-outlined text-sm">chevron_right</span>
-            </button>
+            <div class="flex items-center gap-2">
+              <!-- Quick Scroll Controls -->
+              <div class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  id="btn-dash-scroll-left"
+                  title="Geser tabel ke kiri"
+                  class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95"
+                >
+                  <span class="material-symbols-outlined text-base">chevron_left</span>
+                </button>
+                <button
+                  type="button"
+                  id="btn-dash-scroll-right"
+                  title="Geser tabel ke kanan"
+                  class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95"
+                >
+                  <span class="material-symbols-outlined text-base">chevron_right</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                id="dash-btn-view-all-tx"
+                class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors ml-1"
+              >
+                <span>Lihat Semua</span>
+                <span class="material-symbols-outlined text-sm">chevron_right</span>
+              </button>
+            </div>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left admin-table">
+          <div class="overflow-x-auto custom-scrollbar w-full max-w-full min-w-0 pb-2 cursor-grab" id="dash-tx-table-scroll">
+            <table class="w-full text-left admin-table select-none" style="min-width: 680px;">
               <thead>
                 <tr>
                   <th>ID / Waktu</th>
@@ -255,8 +278,8 @@ export class DashboardView {
                           ${tx.fee ? `Rp ${Number(tx.fee).toLocaleString('id-ID')}` : '-'}
                         </span>
                       </td>
-                      <td>
-                        <span class="text-xs px-2.5 py-1 rounded-full font-semibold border ${statusClass}">
+                      <td class="whitespace-nowrap">
+                        <span class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold border whitespace-nowrap ${statusClass}">
                           ${statusLabel}
                         </span>
                       </td>
@@ -287,6 +310,9 @@ export class DashboardView {
         this.onNavigate('withdrawals');
       });
     }
+
+    // Quick Table Horizontal Scroll & Drag Navigation
+    setupTableScroll(container, 'dash-tx-table-scroll', 'btn-dash-scroll-left', 'btn-dash-scroll-right');
 
     this._initCharts(container);
   }

@@ -210,11 +210,13 @@ export class HistoryView extends IComponent {
         const id = btn.getAttribute('data-proof-history');
         const w = this._walletService.getWithdrawals().find(item => item.id === id);
         if (w && w.proofImage) {
+          document.body.style.overflow = 'hidden';
           const lightbox = document.createElement('div');
-          lightbox.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200';
+          lightbox.id = 'hist-proof-lightbox-overlay';
+          lightbox.className = 'fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200';
           lightbox.innerHTML = `
-            <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-8">
-              <button type="button" id="btn-close-hist-lightbox" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center">
+            <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-auto" style="max-height: calc(100vh - 2rem);">
+              <button type="button" id="btn-close-hist-lightbox" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center" title="Tutup (Esc)">
                 <span class="material-symbols-outlined text-[20px]">close</span>
               </button>
               <div class="flex items-center gap-3 pr-8">
@@ -227,21 +229,35 @@ export class HistoryView extends IComponent {
                 </div>
               </div>
               <div class="rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 p-1">
-                <img src="${w.proofImage}" alt="Bukti Transfer" class="w-full max-h-[55vh] object-contain rounded-xl" />
+                <img src="${w.proofImage}" alt="Bukti Transfer" class="w-full max-h-[50vh] object-contain rounded-xl" />
               </div>
               <div class="flex items-center gap-2 pt-1">
                 <a href="${w.proofImage}" download="bukti-transfer-${w.id}.png" class="flex-1 py-2.5 px-4 rounded-xl bg-primary text-white text-xs font-bold text-center flex items-center justify-center gap-2 shadow-md">
                   <span class="material-symbols-outlined text-[18px]">download</span>
                   <span>Unduh Foto Bukti</span>
                 </a>
-                <button type="button" id="btn-cancel-hist-lightbox" class="py-2.5 px-4 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">Tutup</button>
+                <button type="button" id="btn-cancel-hist-lightbox" class="py-2.5 px-4 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer">Tutup</button>
               </div>
             </div>
           `;
           document.body.appendChild(lightbox);
-          const close = () => lightbox.remove();
+
+          const handleKeydown = (e) => {
+            if (e.key === 'Escape') close();
+          };
+          document.addEventListener('keydown', handleKeydown);
+
+          const close = () => {
+            document.removeEventListener('keydown', handleKeydown);
+            document.body.style.overflow = '';
+            lightbox.remove();
+          };
+
           lightbox.querySelector('#btn-close-hist-lightbox').addEventListener('click', close);
           lightbox.querySelector('#btn-cancel-hist-lightbox').addEventListener('click', close);
+          lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) close();
+          });
         }
       });
     });

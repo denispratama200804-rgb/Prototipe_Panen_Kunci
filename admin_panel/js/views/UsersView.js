@@ -11,6 +11,7 @@ export class UsersView {
     this.searchQuery = '';
     this.isSyncing = false;
     this.hasSynced = false;
+    this.expandedUserIds = new Set();
   }
 
   destroy() {}
@@ -83,125 +84,236 @@ export class UsersView {
           </div>
         </div>
 
-        <!-- Users Table -->
-        <div class="admin-card rounded-2xl overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left admin-table">
-              <thead>
-                <tr>
-                  <th>Pengguna / ID</th>
-                  <th>Kontak</th>
-                  <th>Rekening / E-Wallet</th>
-                  <th>Status KYC</th>
-                  <th>Setoran Kunci</th>
-                  <th>Saldo Dompet</th>
-                  <th class="text-right">Aksi Kelola</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${
-                  users.length === 0
-                    ? `
-                  <tr>
-                    <td colspan="7" class="text-center py-12 text-slate-400">
-                      ${this.isSyncing ? '<span class="inline-flex items-center gap-2"><span class="material-symbols-outlined animate-spin text-lg">progress_activity</span><span>Mengambil data pengguna dari Supabase...</span></span>' : 'Tidak ada data pengguna yang ditemukan di database.'}
-                    </td>
-                  </tr>
-                `
-                    : users
-                        .map(u => {
-                          const isRoleAdmin = u.role === 'admin' || (u.email && u.email.startsWith('admin@'));
+        <!-- Daftar Pengguna & KYC (List Accordion Card sesuai Foto 2 - Bebas Scrollbar) -->
+        <div class="admin-card rounded-2xl overflow-hidden w-full max-w-full min-w-0 border border-slate-800/80 shadow-xl">
+          <div class="px-4 py-3 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base text-indigo-400">group</span>
+              <span class="font-bold text-white text-sm">Daftar Pengguna & KYC</span>
+            </div>
+            <span class="text-[11px] text-slate-400 font-mono bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-700/60">
+              ${users.length} pengguna
+            </span>
+          </div>
 
-                          return `
-                    <tr data-user-id="${u.id}">
-                      <td>
-                        <div class="flex items-center gap-3">
-                          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-300 text-xs overflow-hidden flex-shrink-0">
-                            ${u.avatar ? `
-                              <img src="${u.avatar}" alt="${u.name}" class="w-full h-full object-cover" />
-                            ` : `
-                              ${(u.name || 'U').slice(0, 2).toUpperCase()}
-                            `}
-                          </div>
-                          <div>
-                            <div class="font-bold text-white text-xs flex items-center gap-1.5">
-                              <span>${u.name || 'Pengguna'}</span>
-                              ${isRoleAdmin ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 border border-purple-500/40 font-bold">Admin</span>` : ''}
-                            </div>
-                            <div class="font-mono text-[10px] text-slate-400" title="${u.id}">
-                              ${u.id.length > 18 ? u.id.slice(0, 8) + '...' + u.id.slice(-4) : u.id}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="text-xs text-slate-300">${u.email || '-'}</div>
-                        <div class="text-[11px] text-slate-400">${u.phone || '-'}</div>
-                      </td>
-                      <td>
-                        <div class="text-xs font-semibold text-slate-200">${u.bankName || '-'}</div>
-                        <div class="font-mono text-[11px] text-slate-400">${u.accountNumber || '-'} (${u.accountHolder || u.name || '-'})</div>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          data-action="toggle-kyc"
-                          data-id="${u.id}"
-                          data-status="${u.isVerified}"
-                          title="Klik untuk ubah status verifikasi di Supabase"
-                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
-                            u.isVerified
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
-                          }"
-                        >
-                          <span class="material-symbols-outlined text-sm">${u.isVerified ? 'check_circle' : 'pending'}</span>
-                          <span>${u.isVerified ? 'Terverifikasi' : 'Belum KYC'}</span>
-                        </button>
-                      </td>
-                      <td>
-                        <div class="font-mono text-xs font-bold text-white">${u.totalKeys} Kunci</div>
-                        <div class="text-[10px] text-emerald-400">${u.validKeys} valid</div>
-                      </td>
-                      <td>
-                        <div class="font-mono text-xs font-extrabold text-indigo-300">Rp ${Number(u.balance || 0).toLocaleString('id-ID')}</div>
-                        <div class="text-[10px] text-slate-400">Total WD: Rp ${Number(u.totalWithdrawn || 0).toLocaleString('id-ID')}</div>
-                      </td>
-                      <td class="text-right">
-                        <div class="flex items-center justify-end gap-1.5">
-                          <!-- Adjust Balance Button -->
-                          <button
-                            type="button"
-                            data-action="adjust-balance"
-                            data-id="${u.id}"
-                            data-name="${u.name}"
-                            data-balance="${u.balance || 0}"
-                            title="Atur Saldo Promo/Bonus"
-                            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition-all flex items-center gap-1 cursor-pointer"
-                          >
-                            <span class="material-symbols-outlined text-sm">currency_exchange</span>
-                            <span>Atur Saldo</span>
-                          </button>
+          <div class="p-3 sm:p-4 space-y-2.5">
+            ${
+              users.length === 0
+                ? `
+              <div class="text-center py-12 text-slate-400">
+                <span class="material-symbols-outlined text-4xl mb-2 text-slate-600 block">inbox</span>
+                ${this.isSyncing ? '<span class="inline-flex items-center gap-2"><span class="material-symbols-outlined animate-spin text-lg">progress_activity</span><span>Mengambil data pengguna dari Supabase...</span></span>' : 'Tidak ada data pengguna yang ditemukan.'}
+              </div>
+            `
+                : users
+                    .map(u => {
+                      const isRoleAdmin = u.role === 'admin' || (u.email && u.email.startsWith('admin@'));
+                      const isExpanded = this.expandedUserIds.has(u.id);
+                      const initial = (u.name || 'User').slice(0, 2).toUpperCase();
+                      const balance = Number(u.balance || 0);
+                      const totalWD = Number(u.totalWithdrawn || 0);
 
-                          <!-- View Details Button -->
-                          <button
-                            type="button"
-                            data-action="view-user-details"
-                            data-id="${u.id}"
-                            title="Lihat Riwayat & Kunci Pengguna Ini"
-                            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                          >
-                            <span class="material-symbols-outlined text-base">visibility</span>
-                          </button>
+                      return `
+              <div class="rounded-2xl border transition-all duration-200 overflow-hidden ${
+                u.isVerified
+                  ? 'border-emerald-500/25 bg-slate-900/60 hover:border-emerald-500/40'
+                  : 'border-amber-500/30 bg-slate-900/80 hover:border-amber-500/50'
+              }">
+                <!-- Card Header (Sesuai Foto 2: Avatar + Nama & Kontak & Tag + Status + Chevron) -->
+                <div 
+                  class="flex items-center justify-between gap-2.5 sm:gap-4 p-3 sm:p-4 cursor-pointer select-none hover:bg-slate-800/40 transition-colors"
+                  data-action="toggle-user-details"
+                  data-id="${u.id}"
+                >
+                  <!-- Kiri: Avatar & Info Pengguna -->
+                  <div class="flex items-center gap-3 sm:gap-3.5 min-w-0">
+                    <!-- Avatar Lingkaran (Foto Profil atau Inisial 2 Huruf seperti Foto 2) -->
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-inner overflow-hidden border ${
+                      u.isVerified
+                        ? 'bg-emerald-900/60 text-emerald-300 border-emerald-500/40'
+                        : 'bg-indigo-900/60 text-indigo-300 border-indigo-500/40'
+                    }">
+                      ${
+                        u.avatar
+                          ? `<img src="${u.avatar}" alt="${u.name}" class="w-full h-full object-cover" />`
+                          : `<span>${initial}</span>`
+                      }
+                    </div>
+
+                    <!-- Teks: Nama, Email, dan Pill Saldo -->
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="font-bold text-white text-xs sm:text-sm tracking-wide truncate max-w-[150px] sm:max-w-none">${u.name || 'Pengguna'}</span>
+                        ${
+                          isRoleAdmin
+                            ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 border border-purple-500/40 font-bold">Admin</span>`
+                            : ''
+                        }
+                        <span class="font-mono text-[10px] text-slate-400 hidden sm:inline" title="${u.id}">
+                          (${u.id.length > 16 ? u.id.slice(0, 8) + '...' + u.id.slice(-4) : u.id})
+                        </span>
+                      </div>
+                      <div class="text-[11px] text-slate-400 truncate mt-0.5 max-w-[200px] sm:max-w-none">
+                        ${u.email || '-'}${u.phone ? ` • ${u.phone}` : ''}
+                      </div>
+                      <div class="mt-1">
+                        <!-- Pill Tag Saldo & Kunci mirip Foto 2 -->
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono border border-indigo-500/30 bg-indigo-500/10 text-indigo-300">
+                          <span class="material-symbols-outlined text-xs text-amber-400">payments</span>
+                          <span>Rp ${balance.toLocaleString('id-ID')}</span>
+                          <span class="text-slate-500">•</span>
+                          <span class="text-emerald-300">${u.totalKeys || 0} Kunci</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Kanan: Status KYC Badge & Tanda Panah Chevron -->
+                  <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                    <!-- Status KYC Pill Badge (Sesuai Foto 2: Pill dengan icon checklist) -->
+                    ${
+                      u.isVerified
+                        ? `<span class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-emerald-500/40 bg-emerald-950/60 text-emerald-400 tracking-wider">
+                            <span class="material-symbols-outlined text-xs sm:text-sm">verified</span>
+                            <span class="hidden sm:inline">TERVERIFIKASI</span>
+                            <span class="sm:hidden">KYC</span>
+                          </span>`
+                        : `<span class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-amber-500/40 bg-amber-950/60 text-amber-400 tracking-wider">
+                            <span class="material-symbols-outlined text-xs sm:text-sm">hourglass_empty</span>
+                            <span>BELUM KYC</span>
+                          </span>`
+                    }
+
+                    <!-- Tanda Panah Chevron untuk Lihat Detail -->
+                    <button
+                      type="button"
+                      class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                      title="Lihat rincian pengguna"
+                    >
+                      <span
+                        class="material-symbols-outlined text-xl sm:text-2xl transition-transform duration-200 ${isExpanded ? 'rotate-180 text-indigo-400' : ''}"
+                        data-user-chevron="${u.id}"
+                      >
+                        expand_more
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Bagian Detail yang Terbuka saat Tanda Panah / Baris Diklik -->
+                <div id="user-details-${u.id}" class="${isExpanded ? '' : 'hidden'} px-3 pb-3 sm:px-4 sm:pb-4 border-t border-slate-800/80 pt-3 space-y-3 view-fade-enter">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-950/70 border border-slate-800/90 text-xs">
+                    <!-- Data Kontak & ID -->
+                    <div>
+                      <span class="text-slate-400 block text-[10px] uppercase font-semibold">Identitas & Kontak:</span>
+                      <div class="mt-1 space-y-1">
+                        <div class="flex items-center gap-1.5 text-slate-300">
+                          <span class="material-symbols-outlined text-xs text-indigo-400">mail</span>
+                          <span class="truncate">${u.email || '-'}</span>
                         </div>
-                      </td>
-                    </tr>
-                  `;
-                        })
-                        .join('')
-                }
-              </tbody>
-            </table>
+                        <div class="flex items-center gap-1.5 text-slate-300">
+                          <span class="material-symbols-outlined text-xs text-emerald-400">call</span>
+                          <span>${u.phone || '-'}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-slate-400 font-mono text-[10px]">
+                          <span class="material-symbols-outlined text-xs text-slate-500">fingerprint</span>
+                          <span class="truncate">${u.id}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Rekening Pencairan -->
+                    <div>
+                      <span class="text-slate-400 block text-[10px] uppercase font-semibold">Rekening / E-Wallet Pencairan:</span>
+                      <div class="mt-1 space-y-1">
+                        <div class="font-bold text-white flex items-center gap-1.5">
+                          <span class="material-symbols-outlined text-sm text-cyan-400">account_balance</span>
+                          <span>${u.bankName || 'Belum diatur'}</span>
+                        </div>
+                        <div class="font-mono text-slate-300">${u.accountNumber || '-'}</div>
+                        <div class="text-[11px] text-slate-400">a.n. ${u.accountHolder || u.name || '-'}</div>
+                      </div>
+                    </div>
+
+                    <!-- Statistik Setoran & Finansial -->
+                    <div class="sm:col-span-2 pt-2 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                      <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                        <span class="text-[10px] text-slate-400 block">Total Kunci</span>
+                        <span class="font-mono text-xs font-bold text-white">${u.totalKeys || 0} Kunci</span>
+                      </div>
+                      <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                        <span class="text-[10px] text-slate-400 block">Kunci Valid</span>
+                        <span class="font-mono text-xs font-bold text-emerald-400">${u.validKeys || 0} Valid</span>
+                      </div>
+                      <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                        <span class="text-[10px] text-slate-400 block">Saldo Dompet</span>
+                        <span class="font-mono text-xs font-extrabold text-indigo-300">Rp ${balance.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                        <span class="text-[10px] text-slate-400 block">Total Ditarik (WD)</span>
+                        <span class="font-mono text-xs font-bold text-amber-400">Rp ${totalWD.toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Tindakan Admin -->
+                  <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <div class="text-[11px] text-slate-400">
+                      <span>Status Akun: </span>
+                      <strong class="text-white">${u.isVerified ? 'Terverifikasi (KYC Lengkap)' : 'Belum Memenuhi Verifikasi'}</strong>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                      <!-- Toggle KYC Button -->
+                      <button
+                        type="button"
+                        data-action="toggle-kyc"
+                        data-id="${u.id}"
+                        data-status="${u.isVerified}"
+                        title="Klik untuk ubah status verifikasi di Supabase"
+                        class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                          u.isVerified
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                        }"
+                      >
+                        <span class="material-symbols-outlined text-sm">${u.isVerified ? 'cancel' : 'check_circle'}</span>
+                        <span>${u.isVerified ? 'Batal Verifikasi' : 'Verifikasi KYC'}</span>
+                      </button>
+
+                      <!-- Adjust Balance Button -->
+                      <button
+                        type="button"
+                        data-action="adjust-balance"
+                        data-id="${u.id}"
+                        data-name="${u.name}"
+                        data-balance="${u.balance || 0}"
+                        title="Atur Saldo Promo/Bonus"
+                        class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span class="material-symbols-outlined text-sm">currency_exchange</span>
+                        <span>Atur Saldo</span>
+                      </button>
+
+                      <!-- View Details Button -->
+                      <button
+                        type="button"
+                        data-action="view-user-details"
+                        data-id="${u.id}"
+                        title="Lihat Riwayat & Kunci Pengguna Ini"
+                        class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <span class="material-symbols-outlined text-sm text-indigo-400">visibility</span>
+                        <span>Lihat Riwayat</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+                    })
+                    .join('')
+            }
           </div>
         </div>
 
@@ -212,6 +324,37 @@ export class UsersView {
   }
 
   bindEvents(container, refreshCallback) {
+    // Accordion Toggle: Klik baris / tanda panah untuk melihat detail user
+    container.querySelectorAll('[data-action="toggle-user-details"]').forEach(headerEl => {
+      headerEl.addEventListener('click', (e) => {
+        // Jangan toggle jika user mengklik tombol aksi di dalam detail (Ubah KYC, Atur Saldo, dsb)
+        if (
+          e.target.closest('[data-action="toggle-kyc"]') ||
+          e.target.closest('[data-action="adjust-balance"]') ||
+          e.target.closest('[data-action="view-user-details"]')
+        ) {
+          return;
+        }
+
+        const id = headerEl.getAttribute('data-id');
+        const detailsEl = container.querySelector(`#user-details-${id}`);
+        const chevronEl = container.querySelector(`[data-user-chevron="${id}"]`);
+
+        if (detailsEl) {
+          const isCurrentlyHidden = detailsEl.classList.contains('hidden');
+          if (isCurrentlyHidden) {
+            detailsEl.classList.remove('hidden');
+            if (chevronEl) chevronEl.classList.add('rotate-180', 'text-indigo-400');
+            this.expandedUserIds.add(id);
+          } else {
+            detailsEl.classList.add('hidden');
+            if (chevronEl) chevronEl.classList.remove('rotate-180', 'text-indigo-400');
+            this.expandedUserIds.delete(id);
+          }
+        }
+      });
+    });
+
     // Sinkronkan data pengguna secara otomatis saat pertama kali dibuka
     if (!this.hasSynced) {
       this.hasSynced = true;

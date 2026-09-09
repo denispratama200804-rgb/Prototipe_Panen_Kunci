@@ -17,6 +17,7 @@ export class AdminDataService {
    */
   _cleanDummyUsers() {
     try {
+      if (typeof localStorage === 'undefined') return;
       const raw = localStorage.getItem(`${this.prefix}all_users`);
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -159,6 +160,33 @@ export class AdminDataService {
     // Jika belum ada data di storage, inisialisasi default mock
     if (!Array.isArray(keys) || keys.length === 0) {
       keys = this._getInitialApiKeys();
+      this._set('api_keys', keys);
+    }
+
+    // Pastikan data Kunci Pasif (pending) tersedia untuk pengujian fitur filter
+    if (Array.isArray(keys) && keys.length > 0 && !keys.some(k => k.status === 'pending')) {
+      const now = Date.now();
+      const samplePending = [
+        {
+          id: 'key_p01',
+          keyString: 'sk-kie-p4ss1v3k3y778899aabbcc01',
+          userId: 'usr_ahmad_03',
+          status: 'pending',
+          rewardAmount: 3000,
+          credits: 80,
+          createdAt: new Date(now - 1800000).toISOString()
+        },
+        {
+          id: 'key_p02',
+          keyString: 'sk-kie-p4ss1v3d3w1001122334455',
+          userId: 'usr_dewi_04',
+          status: 'pending',
+          rewardAmount: 3000,
+          credits: 80,
+          createdAt: new Date(now - 900000).toISOString()
+        }
+      ];
+      keys = [...samplePending, ...keys];
       this._set('api_keys', keys);
     }
 
@@ -763,6 +791,24 @@ export class AdminDataService {
         rewardAmount: 3000,
         credits: 80,
         createdAt: new Date(now - 86400000 * 2).toISOString()
+      },
+      {
+        id: 'key_p01',
+        keyString: 'sk-kie-p4ss1v3k3y778899aabbcc01',
+        userId: 'usr_ahmad_03',
+        status: 'pending',
+        rewardAmount: 3000,
+        credits: 80,
+        createdAt: new Date(now - 1800000).toISOString()
+      },
+      {
+        id: 'key_p02',
+        keyString: 'sk-kie-p4ss1v3d3w1001122334455',
+        userId: 'usr_dewi_04',
+        status: 'pending',
+        rewardAmount: 3000,
+        credits: 80,
+        createdAt: new Date(now - 900000).toISOString()
       }
     ];
 

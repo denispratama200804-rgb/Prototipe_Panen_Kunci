@@ -161,9 +161,6 @@ export class HeaderComponent {
           `)}
         </div>
       </div>
-
-      <!-- Container Mount Point untuk Drawer Notifikasi & Lightbox -->
-      <div id="header-notif-drawer-container"></div>
     `;
 
     // Bind Back Button
@@ -190,21 +187,38 @@ export class HeaderComponent {
   }
 
   /**
+   * Portal mount point langsung di document.body agar terhindar dari
+   * jebakan backdrop-filter / transform pada elemen header.
+   */
+  _getDrawerPortal() {
+    let portal = document.getElementById('notif-drawer-portal');
+    if (!portal) {
+      portal = document.createElement('div');
+      portal.id = 'notif-drawer-portal';
+      document.body.appendChild(portal);
+    }
+    return portal;
+  }
+
+  /**
    * Menampilkan Drawer / Pop-up Panel Notifikasi Pengguna
    */
   _openNotificationDrawer() {
-    const mount = this._element.querySelector('#header-notif-drawer-container');
+    const mount = this._getDrawerPortal();
     if (!mount) return;
+
+    // Kunci scroll body saat drawer terbuka
+    document.body.style.overflow = 'hidden';
 
     const notifs = this._notificationService ? this._notificationService.getNotifications() : [];
     const unreadCount = notifs.filter(n => !n.isRead).length;
 
     mount.innerHTML = `
-      <div id="notif-drawer-backdrop" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex justify-center items-end sm:items-center p-0 sm:p-4 transition-all duration-200">
-        <div class="w-full max-w-md bg-surface-card rounded-t-3xl sm:rounded-3xl border border-surface-container shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in slide-in-from-bottom-5 duration-200">
+      <div id="notif-drawer-backdrop" class="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex justify-center items-end sm:items-center p-0 sm:p-4 transition-all duration-200">
+        <div class="w-full max-w-md bg-surface-card rounded-t-3xl sm:rounded-3xl border border-surface-container shadow-2xl overflow-hidden flex flex-col my-0 sm:my-auto" style="max-height: 85vh; max-height: 85dvh;">
           
-          <!-- Drawer Header -->
-          <div class="p-4 px-5 border-b border-surface-container flex items-center justify-between bg-surface-container-lowest">
+          <!-- Drawer Header (Sticky) -->
+          <div class="p-4 px-5 border-b border-surface-container flex items-center justify-between bg-surface-container-lowest shrink-0">
             <div class="flex items-center gap-2.5">
               <div class="w-9 h-9 rounded-2xl bg-secondary-container flex items-center justify-center text-on-secondary-container">
                 <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">notifications_active</span>
@@ -229,14 +243,15 @@ export class HeaderComponent {
                 type="button"
                 id="btn-close-notif-drawer"
                 class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-full transition-colors"
+                title="Tutup (Esc)"
               >
                 <span class="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
           </div>
 
-          <!-- Drawer Content -->
-          <div class="overflow-y-auto p-4 space-y-3 flex-1 custom-scrollbar">
+          <!-- Drawer Content (Scrollable) -->
+          <div class="overflow-y-auto p-4 space-y-3 flex-1 min-h-0 custom-scrollbar">
             ${notifs.length === 0 ? `
               <div class="py-14 text-center flex flex-col items-center justify-center">
                 <div class="w-14 h-14 rounded-full bg-surface-container-low flex items-center justify-center text-outline mb-2.5">
@@ -302,7 +317,7 @@ export class HeaderComponent {
                         <button
                           type="button"
                           data-view-proof="${n.id}"
-                          class="w-full py-2 px-3 rounded-xl bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary-container transition-all active:scale-[0.98] shadow-sm"
+                          class="w-full py-2 px-3 rounded-xl bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary-container transition-all active:scale-[0.98] shadow-sm cursor-pointer"
                         >
                           <span class="material-symbols-outlined text-[16px]">visibility</span>
                           <span>Lihat Bukti Foto Transaksi</span>
@@ -316,7 +331,7 @@ export class HeaderComponent {
                       <button
                         type="button"
                         data-mark-single-read="${n.id}"
-                        class="text-[11px] text-primary hover:underline font-semibold"
+                        class="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
                       >
                         Tandai sudah dibaca
                       </button>
@@ -327,22 +342,37 @@ export class HeaderComponent {
             }).join('')}
           </div>
 
-          <!-- Drawer Footer -->
-          <div class="p-3 bg-surface-container-lowest border-t border-surface-container text-center">
+          <!-- Drawer Footer (Sticky) -->
+          <div class="p-3 bg-surface-container-lowest border-t border-surface-container text-center shrink-0">
             <p class="text-[10px] text-outline">Panen Kunci • Notifikasi Realtime</p>
           </div>
         </div>
       </div>
     `;
 
+    if (this._drawerKeyHandler) {
+      document.removeEventListener('keydown', this._drawerKeyHandler);
+    }
+    this._drawerKeyHandler = (e) => {
+      if (e.key === 'Escape') closeDrawer();
+    };
+    document.addEventListener('keydown', this._drawerKeyHandler);
+
     const closeDrawer = () => {
+      if (this._drawerKeyHandler) {
+        document.removeEventListener('keydown', this._drawerKeyHandler);
+        this._drawerKeyHandler = null;
+      }
+      document.body.style.overflow = '';
       mount.innerHTML = '';
     };
 
     const backdrop = mount.querySelector('#notif-drawer-backdrop');
-    backdrop.addEventListener('click', (e) => {
-      if (e.target === backdrop) closeDrawer();
-    });
+    if (backdrop) {
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) closeDrawer();
+      });
+    }
 
     const closeBtn = mount.querySelector('#btn-close-notif-drawer');
     if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
@@ -376,7 +406,6 @@ export class HeaderComponent {
         const id = el.getAttribute('data-view-proof');
         const notif = notifs.find(n => n.id === id);
         if (notif && notif.proofImage) {
-          // Tandai juga sudah dibaca saat user membuka fotonya
           if (this._notificationService && !notif.isRead) {
             this._notificationService.markAsRead(id);
           }
@@ -394,14 +423,17 @@ export class HeaderComponent {
     lightboxMount.id = 'notif-proof-lightbox-modal';
     document.body.appendChild(lightboxMount);
 
+    document.body.style.overflow = 'hidden';
+
     lightboxMount.innerHTML = `
-      <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto custom-scrollbar animate-in fade-in duration-200">
-        <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-8">
+      <div id="proof-lightbox-overlay" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto custom-scrollbar animate-in fade-in duration-200">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-auto" style="max-height: calc(100vh - 2rem);">
           <!-- Close Button -->
           <button
             type="button"
             id="btn-close-proof-lightbox"
             class="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
+            title="Tutup (Esc)"
           >
             <span class="material-symbols-outlined text-[20px]">close</span>
           </button>
@@ -419,7 +451,7 @@ export class HeaderComponent {
 
           <!-- Image Container with Zoomable Look -->
           <div class="rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 flex items-center justify-center p-1 relative shadow-inner">
-            <img src="${notif.proofImage}" alt="Bukti Transfer Penuh" class="w-full max-h-[55vh] object-contain rounded-xl" />
+            <img src="${notif.proofImage}" alt="Bukti Transfer Penuh" class="w-full max-h-[50vh] object-contain rounded-xl" />
           </div>
 
           <!-- Transaction Summary Info -->
@@ -461,11 +493,24 @@ export class HeaderComponent {
       </div>
     `;
 
+    const handleKeydown = (e) => {
+      if (e.key === 'Escape') closeLightbox();
+    };
+    document.addEventListener('keydown', handleKeydown);
+
     const closeLightbox = () => {
+      document.removeEventListener('keydown', handleKeydown);
+      document.body.style.overflow = '';
       lightboxMount.remove();
     };
 
     lightboxMount.querySelector('#btn-close-proof-lightbox').addEventListener('click', closeLightbox);
     lightboxMount.querySelector('#btn-dismiss-lightbox').addEventListener('click', closeLightbox);
+    const overlay = lightboxMount.querySelector('#proof-lightbox-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeLightbox();
+      });
+    }
   }
 }
