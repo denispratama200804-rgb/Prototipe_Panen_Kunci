@@ -1,6 +1,6 @@
 import { User } from '../../domain/models/User.js';
 import { AppEvents } from '../../core/events/EventBus.js';
-import { supabase, isSupabaseConfigured } from '../supabase/supabaseClient.js';
+import { supabase, isSupabaseConfigured, googleClientId } from '../supabase/supabaseClient.js';
 
 /**
  * AuthService
@@ -22,9 +22,11 @@ export class AuthService {
     this._eventBus = eventBus;
     this._userRepository = userRepository;
     this._currentUser = null;
+    this._isSyncingOAuth = false;
 
     this._session = null;
     this._loadSession();
+    this._initSupabaseOAuthListener();
   }
 
   /**
@@ -474,5 +476,254 @@ export class AuthService {
       user: null,
       role: null
     });
+  }
+
+  /**
+   * Inisialisasi listener autentikasi Supabase untuk OAuth Google
+   * @private
+   */
+  _initSupabaseOAuthListener() {
+    if (!isSupabaseConfigured()) return;
+
+    // 1. Tangani jika callback URL membawa parameter error dari Google OAuth
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+    if (hash.includes('error=') || hash.includes('error_description=') || search.includes('error=')) {
+      const params = new URLSearchParams(hash.includes('error=') ? hash.replace(/^#/, '') : search.replace(/^\?/, ''));
+      const errorDesc = params.get('error_description') || params.get('error') || 'Autentikasi Google gagal atau dibatalkan.';
+
+      window.history.replaceState(null, '', window.location.pathname + '#/login');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+
+      setTimeout(() => {
+        this._eventBus.emit(AppEvents.SHOW_TOAST, {
+          type: 'error',
+          message: errorDesc.replace(/\+/g, ' ')
+        });
+      }, 300);
+      return;
+    }
+
+    // 2. Dengarkan perubahan sesi autentikasi Supabase (event callback SIGNED_IN atau USER_UPDATED)
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
+        const isGoogle = session.user.app_metadata?.provider === 'google' ||
+                         session.user.identities?.some(i => i.provider === 'google');
+        const hasOAuthParam = window.location.hash.includes('access_token') ||
+                              window.location.hash.includes('refresh_token') ||
+                              window.location.search.includes('code=');
+
+        if (isGoogle || hasOAuthParam) {
+          await this._syncOAuthUser(session.user, hasOAuthParam);
+        }
+      }
+    });
+
+    // 3. Tangani token OAuth jika user baru diarahkan kembali dari Google
+    if (window.location.hash.includes('access_token=') || window.location.search.includes('code=')) {
+      supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+        if (!error && session?.user) {
+          await this._syncOAuthUser(session.user, true);
+        }
+      }).catch(err => {
+        console.warn('[AuthService] getSession OAuth error:', err);
+      });
+    }
+  }
+
+  /**
+   * Masuk atau Daftar menggunakan Google OAuth
+   * @returns {Promise<{ success: boolean, message?: string }>}
+   */
+  async loginWithGoogle() {
+    if (!isSupabaseConfigured()) {
+      return {
+        success: false,
+        message: 'Layanan database Supabase belum dikonfigurasi.'
+      };
+    }
+
+    try {
+      const redirectUrl = window.location.origin + window.location.pathname;
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
+        }
+      });
+
+      if (error) {
+        console.error('[AuthService] Supabase signInWithOAuth error:', error);
+        return {
+          success: false,
+          message: error.message || 'Gagal memulai autentikasi Google.'
+        };
+      }
+
+      return {
+        success: true,
+        data
+      };
+    } catch (err) {
+      console.error('[AuthService] loginWithGoogle error:', err);
+      return {
+        success: false,
+        message: err.message || 'Terjadi kendala saat menghubungkan ke Google.'
+      };
+    }
+  }
+
+  /**
+   * Masuk menggunakan Google ID Token (Google One Tap / GIS)
+   * @param {string} idToken
+   * @returns {Promise<{ success: boolean, message?: string }>}
+   */
+  async loginWithGoogleIdToken(idToken) {
+    if (!isSupabaseConfigured()) {
+      return {
+        success: false,
+        message: 'Layanan database Supabase belum dikonfigurasi.'
+      };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: idToken
+      });
+
+      if (error) {
+        return { success: false, message: error.message };
+      }
+
+      if (data?.user) {
+        await this._syncOAuthUser(data.user, true);
+        return { success: true, user: data.user };
+      }
+
+      return { success: false, message: 'Gagal memproses kredensial Google.' };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
+
+  /**
+   * Sinkronisasi data akun dari Google ke database Supabase (tabel public.users)
+   * @param {import('@supabase/supabase-js').User} authUser
+   * @param {boolean} [isFreshLogin=false]
+   * @private
+   */
+  async _syncOAuthUser(authUser, isFreshLogin = false) {
+    if (!authUser || !authUser.email || this._isSyncingOAuth) return;
+    this._isSyncingOAuth = true;
+
+    try {
+      const email = authUser.email.toLowerCase().trim();
+      const meta = authUser.user_metadata || {};
+      const fullName = (meta.full_name || meta.name || email.split('@')[0]).trim();
+      const avatarUrl = meta.avatar_url || meta.picture || '';
+
+      const isRoleAdmin = email.startsWith('admin') ||
+                          email === 'admin@panenkunci.id' ||
+                          email === 'admin@panenkunci.com';
+      const defaultRole = isRoleAdmin ? 'admin' : 'user';
+
+      let userRecord = null;
+
+      if (this._userRepository) {
+        try {
+          // A. Periksa apakah user sudah terdaftar di database public.users
+          userRecord = await this._userRepository.getByEmail(email);
+
+          if (!userRecord) {
+            // B. Jika belum ada, buat record pengguna baru di tabel public.users
+            const newUserData = {
+              id: authUser.id,
+              name: fullName,
+              email: email,
+              password: '', // OAuth tidak memerlukan password manual
+              role: defaultRole,
+              phone: '',
+              bankName: '',
+              accountNumber: '',
+              accountHolder: fullName.toUpperCase(),
+              isVerified: true,
+              avatar: avatarUrl
+            };
+
+            userRecord = await this._userRepository.create(newUserData);
+            console.log('[AuthService] Pengguna baru dari Google berhasil disimpan ke database:', userRecord);
+          } else {
+            // C. Jika user sudah ada, perbarui foto profil jika sebelumnya kosong
+            if ((!userRecord.avatar || userRecord.avatar === '/avatar.png') && avatarUrl) {
+              try {
+                await this._userRepository.update(userRecord.id, { avatar: avatarUrl });
+                userRecord.avatar = avatarUrl;
+              } catch (updateErr) {
+                console.warn('[AuthService] Update avatar Google dilewati:', updateErr.message);
+              }
+            }
+          }
+        } catch (dbErr) {
+          console.error('[AuthService] Gagal sinkronisasi data user Google ke database:', dbErr);
+        }
+      }
+
+      // Fallback domain model jika repositori belum mengembalikan objek
+      if (!userRecord) {
+        userRecord = new User({
+          id: authUser.id,
+          name: fullName,
+          email: email,
+          password: '',
+          role: defaultRole,
+          phone: '',
+          bankName: '',
+          accountNumber: '',
+          accountHolder: fullName.toUpperCase(),
+          isVerified: true,
+          avatar: avatarUrl
+        });
+      }
+
+      const role = userRecord.role || defaultRole;
+      this._saveSession(userRecord, role);
+
+      this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
+        isAuthenticated: true,
+        user: userRecord,
+        role
+      });
+      this._eventBus.emit(AppEvents.USER_UPDATED, userRecord);
+
+      if (isFreshLogin) {
+        this._eventBus.emit(AppEvents.SHOW_TOAST, {
+          type: 'success',
+          message: `Selamat datang, ${userRecord.name}! Berhasil masuk menggunakan akun Google.`
+        });
+      }
+
+      // Bersihkan parameter token OAuth pada URL dan navigasikan ke halaman yang tepat
+      const curHash = window.location.hash || '';
+      const curSearch = window.location.search || '';
+      if (curHash.includes('access_token') || curHash.includes('refresh_token') || curSearch.includes('code=') || curHash === '#/login' || curHash === '#/register' || !curHash || curHash === '#/') {
+        window.history.replaceState(null, '', window.location.pathname + '#/dashboard');
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+
+        if (role === 'admin') {
+          setTimeout(() => {
+            window.location.href = '/admin_panel/index.html';
+          }, 300);
+        }
+      }
+    } catch (err) {
+      console.error('[AuthService] _syncOAuthUser fatal error:', err);
+    } finally {
+      this._isSyncingOAuth = false;
+    }
   }
 }

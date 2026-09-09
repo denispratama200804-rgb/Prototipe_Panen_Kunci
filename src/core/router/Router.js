@@ -53,6 +53,13 @@ export class Router {
    */
   async _onHashChange() {
     const rawHash = window.location.hash.slice(1) || '/';
+
+    // Jika URL memuat token callback OAuth dari Supabase (#access_token=... atau #error=...),
+    // biarkan Supabase SDK dan AuthService memproses autentikasi sebelum merender rute
+    if (rawHash.includes('access_token=') || rawHash.includes('refresh_token=') || rawHash.startsWith('error=')) {
+      return;
+    }
+
     const [path] = rawHash.split('?');
     
     // Jika user membuka hash #/admin atau #/admin_panel di aplikasi utama, periksa hak akses admin

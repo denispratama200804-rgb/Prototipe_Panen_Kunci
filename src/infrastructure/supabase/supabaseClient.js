@@ -12,6 +12,11 @@ const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_P
 
 export const supabaseUrl = rawUrl;
 export const supabaseAnonKey = rawKey;
+export const googleClientId = (
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  import.meta.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+  ''
+).trim();
 
 /**
  * Memeriksa apakah Supabase telah dikonfigurasi dengan URL & Key yang valid
