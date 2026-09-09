@@ -136,52 +136,16 @@ export class AuthService {
 
   /**
    * Proses login pengguna atau admin
-   * @param {string} emailOrUsername
+   * @param {string} emailInput
    * @param {string} password
    * @returns {Promise<{ success: boolean, role?: 'admin'|'user', message?: string, redirectTo?: string }>}
    */
-  async login(emailOrUsername, password) {
-    if (!emailOrUsername || !password) {
-      return { success: false, message: 'Email/Username dan kata sandi wajib diisi.' };
+  async login(emailInput, password) {
+    if (!emailInput || !password) {
+      return { success: false, message: 'Email dan kata sandi wajib diisi.' };
     }
 
-    const inputLower = emailOrUsername.trim().toLowerCase();
-
-    // ── 1. Kredensial Khusus Administrator (Master Fallback) ──
-    if (
-      (inputLower === 'admin' || inputLower === 'admin@panenkunci.id' || inputLower === 'admin@panenkunci.com') &&
-      (password === 'admin' || password === 'admin123' || password === 'adminpanenkunci')
-    ) {
-      const adminUser = new User({
-        id: 'usr_admin_master',
-        name: 'Administrator Panen Kunci',
-        email: inputLower.includes('@') ? inputLower : 'admin@panenkunci.id',
-        password,
-        role: 'admin',
-        phone: '',
-        bankName: 'BCA Prioritas',
-        accountNumber: '8888888888',
-        accountHolder: 'PANEN KUNCI ADMIN',
-        isVerified: true,
-        avatar: '/avatar.png'
-      });
-
-      this._saveSession(adminUser, 'admin');
-      this._eventBus.emit(AppEvents.AUTH_STATE_CHANGED, {
-        isAuthenticated: true,
-        user: adminUser,
-        role: 'admin'
-      });
-
-      return {
-        success: true,
-        role: 'admin',
-        redirectTo: '/admin_panel/index.html',
-        message: 'Login berhasil sebagai Administrator!'
-      };
-    }
-
-    const email = inputLower;
+    const email = emailInput.trim().toLowerCase();
 
     // ── 2. Login via Database Supabase (Cek email & password di tabel users) ──
     if (isSupabaseConfigured() && this._userRepository) {
