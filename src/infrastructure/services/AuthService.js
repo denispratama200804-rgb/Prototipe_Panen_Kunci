@@ -565,6 +565,10 @@ export class AuthService {
         };
       }
 
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+
       return {
         success: true,
         data

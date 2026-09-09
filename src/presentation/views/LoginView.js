@@ -97,26 +97,20 @@ export class LoginView extends IComponent {
             <div class="flex-grow border-t border-surface-container"></div>
           </div>
 
-          <!-- Google Login Container -->
-          <div class="w-full flex flex-col items-center mb-6">
-            <!-- Official Google Button (Menampilkan nama Panen Kunci) -->
-            <div id="gsiButtonTarget" class="w-full flex justify-center min-h-[44px]"></div>
-            
-            <!-- Fallback Button jika Google script belum termuat -->
-            <button
-              type="button"
-              id="btnGoogleLogin"
-              class="hidden w-full bg-surface-card hover:bg-bg-subtle active:scale-[0.98] text-text-heading font-label-md font-semibold text-sm rounded-2xl py-3.5 px-4 border border-outline-variant/40 shadow-sm transition-all flex items-center justify-center gap-3 cursor-pointer group"
-            >
-              <svg class="w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.36 7.33 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.58H1.24C.45 8.15 0 9.97 0 12s.45 3.85 1.24 5.42l4.04-3.15z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-              </svg>
-              <span id="txtGoogleLogin">Masuk dengan Google</span>
-            </button>
-          </div>
+          <!-- Google Login Button -->
+          <button
+            type="button"
+            id="btnGoogleLogin"
+            class="w-full bg-surface-card hover:bg-bg-subtle active:scale-[0.98] text-text-heading font-label-md font-semibold text-sm rounded-2xl py-3.5 px-4 border border-outline-variant/40 shadow-sm transition-all flex items-center justify-center gap-3 mb-6 cursor-pointer group"
+          >
+            <svg class="w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.36 7.33 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.58H1.24C.45 8.15 0 9.97 0 12s.45 3.85 1.24 5.42l4.04-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            <span id="txtGoogleLogin">Masuk dengan Google</span>
+          </button>
 
           <!-- Register Link -->
           <div class="text-center">
@@ -183,72 +177,7 @@ export class LoginView extends IComponent {
       }
     });
 
-    // Google Authentication (Official Google Button with 'Panen Kunci' branding + Fallback)
-    const gsiTarget = container.querySelector('#gsiButtonTarget');
-
-    const handleGoogleIdToken = async (credential) => {
-      const res = await this._authService.loginWithGoogleIdToken(credential);
-      if (res.success) {
-        this._notification.success('Login berhasil! Selamat datang.');
-        window.location.hash = '/dashboard';
-      } else {
-        this._notification.error(res.message || 'Gagal masuk dengan Google.');
-      }
-    };
-
-    const setupGoogleAuth = () => {
-      if (!window.google?.accounts?.id || !googleClientId) {
-        if (googleBtn) googleBtn.classList.remove('hidden');
-        return;
-      }
-
-      try {
-        window.google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: (response) => {
-            if (response?.credential) {
-              handleGoogleIdToken(response.credential);
-            }
-          }
-        });
-
-        if (gsiTarget) {
-          const btnWidth = Math.min(window.innerWidth - 64, 340);
-          window.google.accounts.id.renderButton(gsiTarget, {
-            theme: 'outline',
-            size: 'large',
-            type: 'standard',
-            shape: 'pill',
-            text: 'continue_with',
-            logo_alignment: 'left',
-            width: btnWidth
-          });
-        }
-
-        window.google.accounts.id.prompt();
-      } catch (err) {
-        console.warn('[Google Auth] Setup notice:', err);
-        if (googleBtn) googleBtn.classList.remove('hidden');
-      }
-    };
-
-    if (window.google?.accounts?.id) {
-      setupGoogleAuth();
-    } else {
-      let tries = 0;
-      const t = setInterval(() => {
-        tries++;
-        if (window.google?.accounts?.id) {
-          clearInterval(t);
-          setupGoogleAuth();
-        } else if (tries >= 10) {
-          clearInterval(t);
-          if (googleBtn) googleBtn.classList.remove('hidden');
-        }
-      }, 300);
-    }
-
-    // Fallback: tombol manual jika Google SDK tidak muncul
+    // Login via Google OAuth
     googleBtn?.addEventListener('click', async (e) => {
       e.preventDefault();
       googleBtn.disabled = true;
