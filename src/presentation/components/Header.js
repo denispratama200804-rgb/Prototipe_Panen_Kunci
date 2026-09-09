@@ -96,12 +96,20 @@ export class HeaderComponent {
       return;
     }
 
+    // Jika berjalan sebagai PWA standalone dan di halaman utama (login/dashboard),
+    // sembunyikan tombol back karena tidak ada halaman sebelumnya untuk kembali.
+    const isPwa = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    const isDashboard = path === '/dashboard' || path === 'dashboard' || currentHash === '/dashboard';
+    const hideBackBtn = isPwa && (isLogin || isDashboard);
+
     this._element.innerHTML = `
       <div class="h-16 max-w-md mx-auto px-4 flex items-center justify-between">
         <div class="flex items-center gap-2">
+          ${hideBackBtn ? '' : `
           <button type="button" id="header-back-btn" class="w-9 h-9 -ml-1 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-colors active:scale-95 cursor-pointer" aria-label="Kembali">
             <span class="material-symbols-outlined text-[22px]">arrow_back</span>
           </button>
+          `}
           <img src="/Logo_PK.jpg" alt="Logo" class="h-8 w-auto object-contain rounded-md" onerror="this.src='/logo.png'"/>
           <h1 class="font-headline-md text-base sm:text-lg font-bold text-on-surface truncate">${title}</h1>
         </div>
