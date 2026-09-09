@@ -2,7 +2,7 @@
   "name": "Panen Kunci",
   "short_name": "PanenKunci",
   "description": "Ubah API Key Kie.ai menjadi Rupiah Nyata. Setorkan API Key dan cairkan saldo ke e-wallet favoritmu.",
-  "start_url": "/",
+  "start_url": "/#/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
