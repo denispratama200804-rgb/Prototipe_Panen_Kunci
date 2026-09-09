@@ -30,7 +30,7 @@ export class User {
     accountHolder = '',
     isVerified = false,
     createdAt = new Date().toISOString(),
-    avatar = '/avatar.png'
+    avatar = ''
   }) {
     this.id = id;
     this.name = name;
@@ -43,7 +43,7 @@ export class User {
     this.accountHolder = accountHolder || '';
     this.isVerified = Boolean(isVerified);
     this.createdAt = createdAt;
-    this.avatar = avatar || '/avatar.png';
+    this.avatar = (avatar && avatar !== '/avatar.png') ? avatar : '';
   }
 
   /**

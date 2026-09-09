@@ -98,7 +98,8 @@ export class SupabaseUserRepository extends IUserRepository {
       bank_name: userData.bankName || '',
       account_number: userData.accountNumber || '',
       account_holder: userData.accountHolder || '',
-      is_verified: userData.isVerified ?? false
+      is_verified: userData.isVerified ?? false,
+      avatar: (userData.avatar && userData.avatar !== '/avatar.png') ? userData.avatar : ''
     };
 
     if (userData.id && userData.id.includes('-')) {
@@ -166,6 +167,7 @@ export class SupabaseUserRepository extends IUserRepository {
     if (updates.accountNumber !== undefined) payload.account_number = updates.accountNumber;
     if (updates.accountHolder !== undefined) payload.account_holder = updates.accountHolder;
     if (updates.isVerified !== undefined) payload.is_verified = updates.isVerified;
+    if (updates.avatar !== undefined) payload.avatar = (updates.avatar && updates.avatar !== '/avatar.png') ? updates.avatar : '';
 
     // 1. Coba update langsung via Supabase client
     const { data, error } = await supabase
@@ -252,7 +254,7 @@ export class SupabaseUserRepository extends IUserRepository {
       accountHolder: row.account_holder || '',
       isVerified: Boolean(row.is_verified),
       createdAt: row.created_at,
-      avatar: row.avatar || row.avatar_url || '/avatar.png'
+      avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : (row.avatar_url && row.avatar_url !== '/avatar.png' ? row.avatar_url : '')
     });
   }
 }

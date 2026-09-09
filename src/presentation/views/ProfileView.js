@@ -58,15 +58,30 @@ export class ProfileView extends IComponent {
             <div class="absolute -right-8 -top-8 w-32 h-32 bg-primary/5 rounded-full blur-xl pointer-events-none"></div>
 
             <!-- Avatar -->
-            <div class="relative mb-3 group">
-              <div class="w-24 h-24 rounded-full overflow-hidden shadow-md ring-4 ring-primary/15 bg-surface-container relative">
-                <img
-                  id="profileAvatarImg"
-                  src="${user.avatar || '/avatar.png'}"
-                  alt="${user.name || 'User'}"
-                  class="w-full h-full object-cover"
-                  onerror="this.onerror=null; this.src='/avatar.png';"
-                />
+            <div class="relative mb-2 group">
+              <div class="w-24 h-24 rounded-full overflow-hidden shadow-md ring-4 ring-primary/15 bg-surface-container relative flex items-center justify-center">
+                ${user.avatar ? `
+                  <img
+                    id="profileAvatarImg"
+                    src="${user.avatar}"
+                    alt="${user.name || 'User'}"
+                    class="w-full h-full object-cover"
+                    onerror="this.style.display='none'; document.getElementById('profileAvatarPlaceholder')?.classList.remove('hidden');"
+                  />
+                  <div id="profileAvatarPlaceholder" class="w-full h-full flex items-center justify-center bg-surface-container text-outline hidden">
+                    <span class="material-symbols-outlined text-4xl">person</span>
+                  </div>
+                ` : `
+                  <img
+                    id="profileAvatarImg"
+                    src=""
+                    alt="${user.name || 'User'}"
+                    class="w-full h-full object-cover hidden"
+                  />
+                  <div id="profileAvatarPlaceholder" class="w-full h-full flex items-center justify-center bg-surface-container text-outline">
+                    <span class="material-symbols-outlined text-4xl">person</span>
+                  </div>
+                `}
               </div>
 
               <!-- Status badge verifikasi -->
@@ -79,13 +94,24 @@ export class ProfileView extends IComponent {
               <!-- Tombol Ganti Foto / Upload Avatar -->
               <label
                 for="avatarFileInput"
-                class="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary text-white shadow-md flex items-center justify-center cursor-pointer hover:bg-primary-container active:scale-95 transition-all border-2 border-white"
-                title="Ganti Foto Profil"
+                class="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-white shadow-md flex items-center justify-center cursor-pointer hover:bg-primary-container active:scale-95 transition-all border-2 border-white z-10"
+                title="Unggah Foto Profil"
               >
-                <span class="material-symbols-outlined text-[14px]">photo_camera</span>
+                <span class="material-symbols-outlined text-[16px]">photo_camera</span>
                 <input type="file" id="avatarFileInput" accept="image/*" class="hidden" />
               </label>
             </div>
+
+            <!-- Tombol Hapus Foto (jika user memiliki avatar yang aktif) -->
+            <button
+              type="button"
+              id="btnRemoveAvatar"
+              class="text-[11px] font-semibold text-error-ruby/80 hover:text-error-ruby hover:underline mb-1 inline-flex items-center gap-1 transition-colors ${user.avatar ? '' : 'hidden'}"
+              title="Hapus foto profil"
+            >
+              <span class="material-symbols-outlined text-[13px]">delete</span>
+              <span>Hapus Foto</span>
+            </button>
 
             <h2 class="font-headline-md text-xl font-bold text-text-heading" id="profileNameDisplay">${user.name || 'Pengguna'}</h2>
             <p class="text-xs text-text-body mt-0.5" id="profileEmailDisplay">${user.email || ''}</p>
@@ -269,7 +295,9 @@ export class ProfileView extends IComponent {
   mount(container) {
     // Avatar upload / update & sync
     const avatarInput = container.querySelector('#avatarFileInput');
-    avatarInput?.addEventListener('change', (e) => {
+    const removeAvatarBtn = container.querySelector('#btnRemoveAvatar');
+
+    avatarInput?.addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
@@ -278,24 +306,62 @@ export class ProfileView extends IComponent {
         return;
       }
 
-      if (file.size > 2 * 1024 * 1024) {
-        this._notification.error('Ukuran foto terlalu besar. Maksimal 2MB.');
-        return;
+      const cameraLabel = container.querySelector('label[for="avatarFileInput"]');
+      const originalLabel = cameraLabel ? cameraLabel.innerHTML : '';
+      if (cameraLabel) {
+        cameraLabel.innerHTML = '<span class="material-symbols-outlined text-[15px] animate-spin">progress_activity</span>';
       }
 
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64Image = event.target.result;
-        try {
-          await this._authService.updateProfile({ avatar: base64Image });
-          const avatarImg = container.querySelector('#profileAvatarImg');
-          if (avatarImg) avatarImg.src = base64Image;
-          this._notification.success('Foto profil berhasil disinkronkan dan diperbarui!');
-        } catch (err) {
-          this._notification.error('Gagal memperbarui foto profil: ' + err.message);
+      try {
+        // Kompres otomatis gambar via Canvas ke resolusi optimal 400x400
+        const base64Image = await this._resizeImage(file, 400, 400, 0.85);
+
+        // Update preview langsung di halaman
+        const avatarImg = container.querySelector('#profileAvatarImg');
+        const placeholder = container.querySelector('#profileAvatarPlaceholder');
+        if (avatarImg) {
+          avatarImg.src = base64Image;
+          avatarImg.style.display = 'block';
+          avatarImg.classList.remove('hidden');
         }
-      };
-      reader.readAsDataURL(file);
+        if (placeholder) {
+          placeholder.classList.add('hidden');
+        }
+        if (removeAvatarBtn) {
+          removeAvatarBtn.classList.remove('hidden');
+        }
+
+        await this._authService.updateProfile({ avatar: base64Image });
+        this._notification.success('Foto profil berhasil diunggah dan diperbarui!');
+      } catch (err) {
+        console.error('Upload avatar error:', err);
+        this._notification.error('Gagal memperbarui foto profil: ' + (err.message || 'Terjadi kesalahan'));
+      } finally {
+        if (cameraLabel) {
+          cameraLabel.innerHTML = originalLabel;
+        }
+        avatarInput.value = '';
+      }
+    });
+
+    // Handler Hapus Foto Profil
+    removeAvatarBtn?.addEventListener('click', async () => {
+      try {
+        await this._authService.updateProfile({ avatar: '' });
+        const avatarImg = container.querySelector('#profileAvatarImg');
+        const placeholder = container.querySelector('#profileAvatarPlaceholder');
+        if (avatarImg) {
+          avatarImg.src = '';
+          avatarImg.classList.add('hidden');
+        }
+        if (placeholder) {
+          placeholder.classList.remove('hidden');
+        }
+        removeAvatarBtn.classList.add('hidden');
+        this._notification.success('Foto profil berhasil dihapus.');
+      } catch (err) {
+        this._notification.error('Gagal menghapus foto profil: ' + err.message);
+      }
     });
 
     const editBankBtn = container.querySelector('#btnEditBank');
@@ -447,6 +513,51 @@ export class ProfileView extends IComponent {
           window.location.hash = '/login';
         }
       });
+    });
+  }
+
+  /**
+   * Mengompres dan mengubah ukuran file gambar via HTML5 Canvas
+   * @param {File} file
+   * @param {number} maxWidth
+   * @param {number} maxHeight
+   * @param {number} quality
+   * @returns {Promise<string>}
+   */
+  _resizeImage(file, maxWidth = 400, maxHeight = 400, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (readerEvent) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => reject(new Error('Format file gambar tidak dapat diproses.'));
+        img.src = readerEvent.target.result;
+      };
+      reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
+      reader.readAsDataURL(file);
     });
   }
 }

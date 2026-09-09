@@ -65,6 +65,10 @@ export class AuthService {
     const saved = this._storage.get('current_user');
 
     if (saved && saved.id !== 'usr_budi_01') {
+      if (saved.avatar === '/avatar.png') {
+        saved.avatar = '';
+        this._storage.set('current_user', saved);
+      }
       this._currentUser = new User(saved);
       this._session = savedSession || {
         userId: this._currentUser.id,
@@ -427,8 +431,10 @@ export class AuthService {
           this._saveSession(this._currentUser, this._currentUser.role || 'user');
         }
       } catch (err) {
-        console.error('[AuthService] Supabase profile update error:', err.message);
-        throw err;
+        console.warn('[AuthService] Supabase profile update warning:', err.message);
+        if (err.message && !err.message.toLowerCase().includes('avatar')) {
+          throw err;
+        }
       }
     }
 

@@ -137,7 +137,21 @@ export class HeaderComponent {
             ${!isProfilePage ? `
               <a href="#/profil" class="relative group flex items-center gap-2" title="Buka Profil">
                 <div class="relative">
-                  <img src="${user?.avatar || '/avatar.png'}" alt="${user?.name || 'User'}" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all" onerror="this.onerror=null; this.src='/avatar.png';"/>
+                  ${user?.avatar ? `
+                    <img
+                      src="${user.avatar}"
+                      alt="${user?.name || 'User'}"
+                      class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all"
+                      onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.classList.remove('hidden');"
+                    />
+                    <div class="w-8 h-8 rounded-full bg-surface-container ring-2 ring-primary/20 group-hover:ring-primary flex items-center justify-center text-outline transition-all hidden">
+                      <span class="material-symbols-outlined text-[18px]">person</span>
+                    </div>
+                  ` : `
+                    <div class="w-8 h-8 rounded-full bg-surface-container ring-2 ring-primary/20 group-hover:ring-primary flex items-center justify-center text-outline transition-all">
+                      <span class="material-symbols-outlined text-[18px]">person</span>
+                    </div>
+                  `}
                   <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${user?.isVerified ? 'bg-secondary' : 'bg-outline'} rounded-full border-2 border-white"></div>
                 </div>
               </a>
