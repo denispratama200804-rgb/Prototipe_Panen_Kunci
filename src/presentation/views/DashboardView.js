@@ -27,6 +27,12 @@ export class DashboardView extends IComponent {
     const todayKeysCount = this._apiKeyService.getTodayValidCount();
     const recentTx = this._walletService.getTransactions().slice(0, 4);
 
+    const isDownloaded = localStorage.getItem('panenkunci:app_downloaded') === 'true'
+      || (typeof window !== 'undefined' && (
+        window.matchMedia?.('(display-mode: standalone)')?.matches
+        || window.navigator?.standalone === true
+      ));
+
     return `
       <div class="flex flex-col w-full min-h-screen bg-background pb-28 pt-20">
         <div class="px-margin-mobile max-w-md mx-auto w-full flex flex-col gap-5">
@@ -142,13 +148,15 @@ export class DashboardView extends IComponent {
             </div>
           </div>
 
-          <!-- Download App Button -->
-          <div class="pt-1">
-            <button type="button" id="btn-dashboard-download" class="w-full bg-primary text-on-primary rounded-2xl py-3.5 px-5 flex items-center justify-center gap-2.5 shadow-md shadow-primary/20 hover:bg-primary-container transition-all active:scale-95 font-label-md text-sm font-bold group">
-              <span class="material-symbols-outlined text-[20px] group-hover:translate-y-0.5 transition-transform">download</span>
-              <span>Download Aplikasi Panen Kunci</span>
-            </button>
-          </div>
+          <!-- Download App Button (Hanya tampil jika belum didownload) -->
+          ${!isDownloaded ? `
+            <div id="dashboard-download-container" class="pt-1 transition-all duration-300">
+              <button type="button" id="btn-dashboard-download" class="w-full bg-primary text-on-primary rounded-2xl py-3.5 px-5 flex items-center justify-center gap-2.5 shadow-md shadow-primary/20 hover:bg-primary-container transition-all active:scale-95 font-label-md text-sm font-bold group cursor-pointer">
+                <span class="material-symbols-outlined text-[20px] group-hover:translate-y-0.5 transition-transform">download</span>
+                <span>Download Aplikasi Panen Kunci</span>
+              </button>
+            </div>
+          ` : ''}
 
         </div>
       </div>
@@ -160,9 +168,18 @@ export class DashboardView extends IComponent {
     if (downloadBtn) {
       downloadBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        this._handleInstall(downloadBtn);
+        this._handleInstall(downloadBtn, container);
       });
     }
+
+    // Listener jika PWA berhasil diinstall saat berada di halaman ini
+    this._onAppInstalled = () => {
+      try {
+        localStorage.setItem('panenkunci:app_downloaded', 'true');
+      } catch (e) {}
+      this._hideDownloadButton(container);
+    };
+    window.addEventListener('appinstalled', this._onAppInstalled);
 
     // Auto-update saldo tampilan secara real-time saat diverifikasi admin di tab lain
     this._unsubBalance = this._eventBus.on(AppEvents.BALANCE_UPDATED, () => {
@@ -174,6 +191,10 @@ export class DashboardView extends IComponent {
   }
 
   destroy() {
+    if (this._onAppInstalled) {
+      window.removeEventListener('appinstalled', this._onAppInstalled);
+      this._onAppInstalled = null;
+    }
     if (this._unsubBalance) {
       this._unsubBalance();
       this._unsubBalance = null;
@@ -181,10 +202,30 @@ export class DashboardView extends IComponent {
   }
 
   /**
+   * Menghilangkan tombol download dengan animasi halus
+   */
+  _hideDownloadButton(container) {
+    const el = container ? container.querySelector('#dashboard-download-container') : document.getElementById('dashboard-download-container');
+    if (el) {
+      el.style.transition = 'all 0.4s ease';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(10px) scale(0.95)';
+      el.style.height = '0';
+      el.style.overflow = 'hidden';
+      el.style.marginTop = '0';
+      el.style.marginBottom = '0';
+      el.style.paddingTop = '0';
+      el.style.paddingBottom = '0';
+      setTimeout(() => el.remove(), 400);
+    }
+  }
+
+  /**
    * Langsung trigger PWA install prompt saat tombol diklik.
    * @param {HTMLButtonElement} btn
+   * @param {HTMLElement} container
    */
-  async _handleInstall(btn) {
+  async _handleInstall(btn, container) {
     const originalHTML = btn.innerHTML;
 
     // Loading state
@@ -198,8 +239,10 @@ export class DashboardView extends IComponent {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches
       || window.navigator.standalone === true;
     if (isStandalone) {
-      btn.disabled = false;
-      btn.innerHTML = originalHTML;
+      try {
+        localStorage.setItem('panenkunci:app_downloaded', 'true');
+      } catch (e) {}
+      this._hideDownloadButton(container);
       this._eventBus.emit(AppEvents.SHOW_TOAST, {
         message: '✅ Panen Kunci sudah terinstal di perangkat Anda!',
         type: 'success',
@@ -216,6 +259,9 @@ export class DashboardView extends IComponent {
         window.deferredInstallPrompt = null;
 
         if (outcome === 'accepted') {
+          try {
+            localStorage.setItem('panenkunci:app_downloaded', 'true');
+          } catch (e) {}
           btn.innerHTML = `
             <span class="material-symbols-outlined text-[20px]">check_circle</span>
             <span>Berhasil Dipasang!</span>
@@ -226,9 +272,8 @@ export class DashboardView extends IComponent {
             duration: 4000
           });
           setTimeout(() => {
-            btn.disabled = false;
-            btn.innerHTML = originalHTML;
-          }, 3000);
+            this._hideDownloadButton(container);
+          }, 1200);
         } else {
           btn.disabled = false;
           btn.innerHTML = originalHTML;
@@ -252,7 +297,7 @@ export class DashboardView extends IComponent {
 
     if (isIOS && isSafari) {
       this._eventBus.emit(AppEvents.SHOW_MODAL, {
-        title: '📲 Install di iPhone / iPad',
+        title: '📲 Pasang di iPhone / iPad',
         message: `
           <div class="flex flex-col gap-3 text-left mt-2">
             <div class="flex gap-3 items-start">
@@ -269,25 +314,42 @@ export class DashboardView extends IComponent {
             </div>
           </div>`,
         type: 'info',
-        confirmText: 'Siap!',
-        onConfirm: () => { }
+        confirmText: 'Sudah Pasang / Mengerti',
+        onConfirm: () => {
+          try {
+            localStorage.setItem('panenkunci:app_downloaded', 'true');
+          } catch (e) {}
+          this._hideDownloadButton(container);
+        }
       });
       return;
     }
 
-    if (isAndroid) {
-      this._eventBus.emit(AppEvents.SHOW_TOAST, {
-        message: '💡 Ketuk ⋮ Menu Chrome → "Tambahkan ke layar utama" untuk install.',
-        type: 'info',
-        duration: 5000
-      });
-      return;
-    }
-
-    this._eventBus.emit(AppEvents.SHOW_TOAST, {
-      message: '💡 Buka halaman ini di Chrome Android atau klik ikon install di address bar.',
+    // Modal panduan pasang untuk Android / Desktop Browser
+    this._eventBus.emit(AppEvents.SHOW_MODAL, {
+      title: '📲 Download & Pasang Aplikasi',
+      message: `
+        <div class="flex flex-col gap-3 text-left mt-2 text-xs text-text-body">
+          <p>Aplikasi Panen Kunci dapat dipasang langsung sebagai <strong>Aplikasi PWA</strong>:</p>
+          <div class="flex gap-2.5 items-start p-2.5 rounded-xl bg-bg-subtle border border-outline-variant/30">
+            <span class="material-symbols-outlined text-primary text-lg shrink-0">install_mobile</span>
+            <p>Pada browser Chrome: klik menu <strong>⋮ (titik tiga)</strong> di sudut atas lalu pilih <strong>"Instal Aplikasi"</strong> atau <strong>"Tambahkan ke Layar Utama"</strong>.</p>
+          </div>
+        </div>
+      `,
       type: 'info',
-      duration: 5000
+      confirmText: 'Tandai Sudah Download',
+      onConfirm: () => {
+        try {
+          localStorage.setItem('panenkunci:app_downloaded', 'true');
+        } catch (e) {}
+        this._hideDownloadButton(container);
+        this._eventBus.emit(AppEvents.SHOW_TOAST, {
+          message: '✅ Aplikasi telah ditandai terpasang. Tombol download disembunyikan.',
+          type: 'success',
+          duration: 3500
+        });
+      }
     });
   }
 }

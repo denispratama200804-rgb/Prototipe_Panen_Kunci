@@ -41,6 +41,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
 // Track when PWA is installed
 window.addEventListener('appinstalled', () => {
   window.deferredInstallPrompt = null;
+  try {
+    localStorage.setItem('panenkunci:app_downloaded', 'true');
+  } catch (e) {}
   console.log('[PWA] App installed successfully!');
 });
 
