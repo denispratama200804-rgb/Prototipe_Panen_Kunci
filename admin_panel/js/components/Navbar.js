@@ -40,7 +40,7 @@ export class Navbar {
             <a
               href="#dashboard"
               data-nav="dashboard"
-              class="w-8 h-8 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-all cursor-pointer shrink-0"
+              class="admin-nav-btn w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0"
               title="Kembali ke Dashboard Utama"
             >
               <span class="material-symbols-outlined text-base">arrow_back</span>
@@ -63,20 +63,20 @@ export class Navbar {
 
             <!-- Brand Text -->
             <div class="flex items-center gap-2">
-              <span class="font-bold text-base sm:text-lg text-white font-['Plus_Jakarta_Sans'] tracking-tight">
+              <span class="font-bold text-base sm:text-lg admin-brand-text font-['Plus_Jakarta_Sans'] tracking-tight">
                 Panen Kunci
               </span>
             </div>
           </a>
 
           ${!isDashboard && title ? `
-            <div class="hidden md:flex items-center gap-2 pl-3 border-l border-slate-800 text-xs text-slate-400">
+            <div class="hidden md:flex items-center gap-2 pl-3 border-l border-slate-700/60 text-xs text-slate-400">
               <a href="#dashboard" data-nav="dashboard" class="hover:text-white transition-colors flex items-center gap-1">
                 <span class="material-symbols-outlined text-sm">home</span>
                 <span>Dashboard</span>
               </a>
-              <span class="material-symbols-outlined text-[10px] text-slate-600">chevron_right</span>
-              <span class="text-indigo-300 font-medium">${title}</span>
+              <span class="material-symbols-outlined text-[10px] text-slate-500">chevron_right</span>
+              <span class="text-indigo-400 font-medium">${title}</span>
             </div>
           ` : ''}
         </div>
@@ -88,9 +88,9 @@ export class Navbar {
             type="button"
             id="navbar-refresh-btn"
             title="Sinkronkan data realtime"
-            class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-xs text-amber-300 hover:text-amber-200 transition-all flex items-center gap-1.5 cursor-pointer group"
+            class="admin-nav-btn px-2.5 sm:px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer group"
           >
-            <span class="material-symbols-outlined text-base group-hover:rotate-180 transition-transform duration-500">sync</span>
+            <span class="material-symbols-outlined text-base text-amber-500 group-hover:rotate-180 transition-transform duration-500">sync</span>
             <span class="hidden sm:inline font-medium">Sync</span>
           </button>
 
@@ -98,11 +98,11 @@ export class Navbar {
           <button
             type="button"
             id="navbar-theme-toggle-btn"
-            title="Ganti Tema (Malam / Siang)"
+            title="${isDark ? 'Ganti ke Tema Siang' : 'Ganti ke Tema Malam'}"
             aria-label="Ganti Tema Tampilan"
-            class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-xs ${isDark ? 'text-indigo-300 hover:text-indigo-200' : 'text-amber-500 hover:text-amber-600'} transition-all flex items-center gap-1.5 cursor-pointer group"
+            class="admin-nav-btn px-2.5 sm:px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer group"
           >
-            <span class="material-symbols-outlined text-base transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" id="navbar-theme-icon">
+            <span class="material-symbols-outlined text-base transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110 ${isDark ? 'text-indigo-400' : 'text-amber-500'}" id="navbar-theme-icon">
               ${isDark ? 'dark_mode' : 'light_mode'}
             </span>
             <span class="hidden sm:inline font-medium" id="navbar-theme-label">
@@ -115,19 +115,19 @@ export class Navbar {
             <button
               type="button"
               id="btn-admin-user-dropdown"
-              class="flex items-center gap-1.5 sm:gap-2 py-1 px-1.5 sm:px-2.5 rounded-xl hover:bg-slate-800/60 border border-transparent hover:border-slate-700/60 transition-all cursor-pointer"
+              class="admin-nav-btn flex items-center gap-1.5 sm:gap-2 py-1 px-1.5 sm:px-2.5 rounded-xl transition-all cursor-pointer"
             >
               <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-600 shadow-md shadow-purple-600/30 flex items-center justify-center text-white font-bold text-xs">
                 <span class="material-symbols-outlined text-base">person</span>
               </div>
-              <span class="hidden sm:inline text-xs font-semibold text-slate-200">Admin User</span>
-              <span class="material-symbols-outlined text-sm text-slate-400">expand_more</span>
+              <span class="hidden sm:inline text-xs font-semibold admin-user-label">Admin User</span>
+              <span class="material-symbols-outlined text-sm opacity-70">expand_more</span>
             </button>
 
             <!-- Dropdown Menu -->
             <div
               id="admin-user-dropdown-menu"
-              class="hidden absolute right-0 mt-2 w-60 bg-[#0c1427] border border-slate-700/80 rounded-2xl shadow-2xl shadow-black/80 py-2 z-50 backdrop-blur-2xl"
+              class="hidden absolute right-0 mt-2 w-60 admin-dropdown-menu rounded-2xl shadow-2xl py-2 z-50 backdrop-blur-md"
             >
               <div class="px-4 py-2.5 border-b border-slate-800">
                 <div class="text-xs font-bold text-white">Administrator</div>
@@ -305,27 +305,38 @@ export class Navbar {
       });
     }
 
-    // ── Theme Toggle Event Handlers ──
-    const handleToggleTheme = () => {
+    // ── Theme Toggle Event Handlers (Idempotent: prevents duplicate execution) ──
+    const handleToggleTheme = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       const newTheme = themeService.toggleTheme();
       this._updateThemeUI(container, newTheme);
     };
 
     const navbarThemeBtn = container.querySelector('#navbar-theme-toggle-btn');
     if (navbarThemeBtn) {
-      navbarThemeBtn.addEventListener('click', handleToggleTheme);
+      navbarThemeBtn.onclick = handleToggleTheme;
     }
 
     const dropdownThemeBtn = container.querySelector('#dropdown-btn-toggle-theme');
     if (dropdownThemeBtn) {
-      dropdownThemeBtn.addEventListener('click', () => {
+      dropdownThemeBtn.onclick = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         dropdownMenu?.classList.add('hidden');
         handleToggleTheme();
-      });
+      };
     }
 
-    // Sinkronisasi otomatis jika tema berganti dari view lain (misal Settings)
-    themeService.onThemeChange((theme) => {
+    // Pastikan hanya satu pendengar aktif (hindari memory leak / duplicate calls)
+    if (this._themeUnsubscribe) {
+      this._themeUnsubscribe();
+    }
+    this._themeUnsubscribe = themeService.onThemeChange((theme) => {
       this._updateThemeUI(container, theme);
     });
   }
@@ -339,6 +350,7 @@ export class Navbar {
 
     if (icon) {
       icon.textContent = isDark ? 'dark_mode' : 'light_mode';
+      icon.className = `material-symbols-outlined text-base transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110 ${isDark ? 'text-indigo-400' : 'text-amber-500'}`;
     }
     if (label) {
       label.textContent = isDark ? 'Malam' : 'Siang';
@@ -348,10 +360,10 @@ export class Navbar {
         <span class="material-symbols-outlined text-[12px]">${isDark ? 'dark_mode' : 'light_mode'}</span>
         <span>${isDark ? 'Malam' : 'Siang'}</span>
       `;
-      badge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold ${isDark ? 'bg-slate-700 text-indigo-300' : 'bg-amber-500/15 text-amber-600'} flex items-center gap-1`;
+      badge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold ${isDark ? 'bg-slate-700 text-indigo-300' : 'bg-amber-500/15 text-amber-700'} flex items-center gap-1`;
     }
     if (themeBtn) {
-      themeBtn.className = `px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-xs ${isDark ? 'text-indigo-300 hover:text-indigo-200' : 'text-amber-500 hover:text-amber-600'} transition-all flex items-center gap-1.5 cursor-pointer group`;
+      themeBtn.setAttribute('title', isDark ? 'Ganti ke Tema Siang' : 'Ganti ke Tema Malam');
     }
   }
 }

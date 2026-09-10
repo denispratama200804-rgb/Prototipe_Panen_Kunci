@@ -4,39 +4,55 @@
 [data-theme="dark"] {
   --admin-bg: #060b18;
   --admin-surface: #0e172e;
-  --admin-card: rgba(16, 26, 54, 0.75);
-  --admin-card-hover: rgba(22, 36, 74, 0.85);
-  --admin-border: rgba(148, 163, 184, 0.12);
-  --admin-border-focus: rgba(99, 102, 241, 0.4);
+  --admin-card: #0e172e;
+  --admin-card-hover: #152244;
+  --admin-border: rgba(148, 163, 184, 0.14);
+  --admin-border-focus: rgba(99, 102, 241, 0.5);
   --admin-header-bg: #060b18;
   --admin-dropdown-bg: #0c1427;
-  --admin-text: #f1f5f9;
+  --admin-text: #ffffff;
   --admin-text-muted: #94a3b8;
+  --admin-btn-bg: rgba(30, 41, 59, 0.7);
+  --admin-btn-border: rgba(51, 65, 85, 0.7);
+  --admin-btn-text: #cbd5e1;
+  --admin-btn-hover-bg: rgba(51, 65, 85, 0.95);
+  --admin-btn-hover-text: #ffffff;
   --accent-cyan: #06b6d4;
   --accent-indigo: #6366f1;
   --accent-emerald: #10b981;
   --accent-amber: #f59e0b;
   --accent-rose: #f43f5e;
+  color-scheme: dark;
 }
 
 [data-theme="light"] {
-  --admin-bg: #f8fafc;
+  --admin-bg: #f1f5f9;
   --admin-surface: #ffffff;
   --admin-card: #ffffff;
-  --admin-card-hover: #ffffff;
-  --admin-border: #e2e8f0;
+  --admin-card-hover: #f8fafc;
+  --admin-border: #cbd5e1;
   --admin-border-focus: rgba(99, 102, 241, 0.6);
-  --admin-header-bg: rgba(255, 255, 255, 0.96);
+  --admin-header-bg: #ffffff;
   --admin-dropdown-bg: #ffffff;
   --admin-text: #0f172a;
-  --admin-text-muted: #64748b;
+  --admin-text-muted: #475569;
+  --admin-btn-bg: #ffffff;
+  --admin-btn-border: #cbd5e1;
+  --admin-btn-text: #1e293b;
+  --admin-btn-hover-bg: #e2e8f0;
+  --admin-btn-hover-text: #0f172a;
+  --accent-cyan: #0891b2;
+  --accent-indigo: #4f46e5;
+  --accent-emerald: #059669;
+  --accent-amber: #d97706;
+  --accent-rose: #e11d48;
   color-scheme: light;
 }
 
 html {
   background-color: var(--admin-bg) !important;
   color-scheme: dark;
-  transition: background-color 0.25s ease;
+  transition: background-color 0.15s ease;
 }
 
 html[data-theme="light"],
@@ -50,14 +66,47 @@ body.admin-body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
   min-height: 100vh;
-  transition: background-color 0.25s ease, color 0.25s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 #admin-app {
   background-color: var(--admin-bg);
   overflow-x: hidden;
   width: 100%;
-  transition: background-color 0.25s ease;
+  transition: background-color 0.15s ease;
+}
+
+/* Helper Semantic Classes */
+.text-admin-heading {
+  color: var(--admin-text) !important;
+  transition: color 0.15s ease;
+}
+
+.text-admin-muted {
+  color: var(--admin-text-muted) !important;
+  transition: color 0.15s ease;
+}
+
+.admin-brand-text {
+  color: var(--admin-text) !important;
+  transition: color 0.15s ease;
+}
+
+.admin-user-label {
+  color: var(--admin-text) !important;
+  transition: color 0.15s ease;
+}
+
+.admin-nav-btn {
+  background-color: var(--admin-btn-bg);
+  border: 1px solid var(--admin-btn-border);
+  color: var(--admin-btn-text);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.admin-nav-btn:hover {
+  background-color: var(--admin-btn-hover-bg);
+  color: var(--admin-btn-hover-text);
 }
 
 /* Remove number input spinner arrows (stepper buttons) */
@@ -72,37 +121,38 @@ input[type="number"] {
   appearance: textfield !important;
 }
 
-/* Background Ambient Glows */
+/* Background Ambient Glows (Super lightweight) */
 .admin-ambient-glow {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
   background: 
-    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-    radial-gradient(circle at 90% 10%, rgba(6, 182, 212, 0.12) 0%, transparent 45%),
-    radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 50%);
+    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 90% 10%, rgba(6, 182, 212, 0.09) 0%, transparent 45%),
+    radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.06) 0%, transparent 50%);
+  transition: opacity 0.15s ease;
 }
 
-/* Glassmorphism Cards */
+[data-theme="light"] .admin-ambient-glow {
+  opacity: 0.15;
+}
+
+/* High-Performance Cards (No heavy backdrop-blur) */
 .admin-card {
-  background: var(--admin-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background-color: var(--admin-card);
   border: 1px solid var(--admin-border);
-  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4), 0 0 1px 1px rgba(255, 255, 255, 0.03) inset;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.15);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
 .admin-card:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.5), 0 0 20px rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.2);
 }
 
 .admin-glass-subtle {
-  background: rgba(14, 23, 46, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background-color: var(--admin-surface);
   border: 1px solid var(--admin-border);
 }
 
@@ -274,15 +324,13 @@ input[type="number"] {
   }
 }
 
-/* ─── Hub Cards & Squircle Icons (Reference Style) ─── */
+/* ─── Hub Cards & Squircle Icons (Reference Style - Super Lightweight) ─── */
 .hub-card {
-  background: rgba(13, 21, 39, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  background-color: var(--admin-card);
+  border: 1px solid var(--admin-border);
   border-radius: 1.5rem;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+  box-shadow: 0 6px 20px -4px rgba(0, 0, 0, 0.25);
   position: relative;
   overflow: hidden;
   cursor: pointer;
@@ -290,10 +338,19 @@ input[type="number"] {
 }
 
 .hub-card:hover {
-  transform: translateY(-6px);
-  border-color: rgba(99, 102, 241, 0.35);
-  background: rgba(18, 28, 54, 0.95);
-  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.7), 0 0 25px rgba(99, 102, 241, 0.18);
+  transform: translateY(-4px);
+  border-color: var(--accent-indigo);
+  background-color: var(--admin-card-hover);
+  box-shadow: 0 14px 28px -6px rgba(0, 0, 0, 0.3), 0 0 20px rgba(99, 102, 241, 0.15);
+}
+
+[data-theme="light"] .hub-card {
+  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+[data-theme="light"] .hub-card:hover {
+  box-shadow: 0 12px 24px -4px rgba(99, 102, 241, 0.14), 0 2px 6px rgba(15, 23, 42, 0.04);
+  border-color: rgba(99, 102, 241, 0.5);
 }
 
 .hub-card h3 {
@@ -433,59 +490,36 @@ input[type="number"] {
    MODERN LIGHT THEME (TEMA SIANG) & THEME ENGINE FOR ADMIN PANEL
    ═════════════════════════════════════════════════════════════════════ */
 
-/* Header & Navbar Theme Binding */
+/* Header & Navbar Theme Binding (0.15s snappy transition) */
 .admin-sticky-header {
   background-color: var(--admin-header-bg);
   border-bottom: 1px solid var(--admin-border);
-  transition: background-color 0.25s ease, border-color 0.25s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .admin-navbar {
   background-color: var(--admin-header-bg);
-  transition: background-color 0.25s ease;
+  transition: background-color 0.15s ease;
 }
 
 /* ── Light Mode Core Overrides ── */
 [data-theme="light"] .admin-ambient-glow {
-  background: 
-    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 90% 10%, rgba(6, 182, 212, 0.07) 0%, transparent 45%),
-    radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 50%);
-}
-
-[data-theme="light"] .admin-card {
-  background: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.04) !important;
-}
-
-[data-theme="light"] .admin-card:hover {
-  border-color: rgba(99, 102, 241, 0.35) !important;
-  box-shadow: 0 12px 30px -4px rgba(99, 102, 241, 0.12), 0 4px 10px rgba(0, 0, 0, 0.04) !important;
-}
-
-[data-theme="light"] .hub-card {
-  background: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.04) !important;
-}
-
-[data-theme="light"] .hub-card:hover {
-  background: #ffffff !important;
-  border-color: rgba(99, 102, 241, 0.45) !important;
-  box-shadow: 0 20px 38px -8px rgba(99, 102, 241, 0.16), 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  opacity: 0.12;
 }
 
 [data-theme="light"] .admin-glass-subtle {
-  background: rgba(241, 245, 249, 0.8) !important;
-  border-color: #e2e8f0 !important;
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
 }
 
 /* Headings & Text in Light Mode */
 [data-theme="light"] h1,
 [data-theme="light"] h2,
 [data-theme="light"] h3,
-[data-theme="light"] h4,
+[data-theme="light"] h4 {
+  color: #0f172a !important;
+}
+
 [data-theme="light"] .text-white:not([class*="bg-"]):not([class*="squircle-"]):not(.btn-colored) {
   color: #0f172a !important;
 }
@@ -506,6 +540,119 @@ input[type="number"] {
   color: #64748b !important;
 }
 
+/* ── Text & Border Helpers with Dynamic Theme Mapping ── */
+.text-admin-heading {
+  color: var(--admin-text);
+}
+.text-admin-body {
+  color: #cbd5e1;
+}
+.text-admin-muted {
+  color: var(--admin-text-muted);
+}
+.border-admin {
+  border-color: var(--admin-border);
+}
+
+[data-theme="light"] .text-admin-heading {
+  color: #0f172a !important;
+}
+[data-theme="light"] .text-admin-body {
+  color: #334155 !important;
+}
+[data-theme="light"] .text-admin-muted {
+  color: #64748b !important;
+}
+[data-theme="light"] .border-admin {
+  border-color: #e2e8f0 !important;
+}
+
+/* ── Themed List & Accordion Components (Harmonious Dark & Light) ── */
+.admin-card-header {
+  background-color: rgba(15, 23, 42, 0.85);
+  border-bottom: 1px solid var(--admin-border);
+}
+[data-theme="light"] .admin-card-header {
+  background-color: #f8fafc !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+.admin-item-card {
+  background-color: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  transition: all 0.18s ease;
+}
+.admin-item-card:hover {
+  background-color: rgba(30, 41, 59, 0.65);
+  border-color: rgba(148, 163, 184, 0.28);
+}
+[data-theme="light"] .admin-item-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+}
+[data-theme="light"] .admin-item-card:hover {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06);
+}
+
+.admin-sub-card {
+  background-color: rgba(2, 6, 23, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+[data-theme="light"] .admin-sub-card {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.admin-mini-card {
+  background-color: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+[data-theme="light"] .admin-mini-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+.admin-btn-secondary {
+  background-color: var(--admin-btn-bg);
+  border: 1px solid var(--admin-btn-border);
+  color: var(--admin-btn-text);
+}
+.admin-btn-secondary:hover {
+  background-color: var(--admin-btn-hover-bg);
+  color: var(--admin-btn-hover-text);
+}
+
+/* Badges & Pills for Light Mode */
+[data-theme="light"] .badge-verified {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  color: #047857 !important;
+}
+[data-theme="light"] .badge-unverified {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #b45309 !important;
+}
+[data-theme="light"] .avatar-verified {
+  background-color: #d1fae5 !important;
+  border-color: #6ee7b7 !important;
+  color: #065f46 !important;
+}
+[data-theme="light"] .avatar-unverified {
+  background-color: #e0e7ff !important;
+  border-color: #c7d2fe !important;
+  color: #3730a3 !important;
+}
+[data-theme="light"] .pill-saldo {
+  background-color: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #4338ca !important;
+}
+
 /* Surfaces & Borders in Light Mode */
 [data-theme="light"] .bg-\[\#060b18\],
 [data-theme="light"] .bg-\[\#080d1e\] {
@@ -513,31 +660,29 @@ input[type="number"] {
 }
 
 [data-theme="light"] .bg-slate-950,
+[data-theme="light"] [class*="bg-slate-950"],
 [data-theme="light"] .bg-slate-900,
-[data-theme="light"] .bg-slate-900\/90,
-[data-theme="light"] .bg-slate-900\/80 {
+[data-theme="light"] [class*="bg-slate-900"] {
   background-color: #f8fafc !important;
 }
 
 [data-theme="light"] .bg-slate-800,
-[data-theme="light"] .bg-slate-800\/90,
-[data-theme="light"] .bg-slate-800\/80,
-[data-theme="light"] .bg-slate-800\/60,
-[data-theme="light"] .bg-slate-800\/40 {
+[data-theme="light"] [class*="bg-slate-800"] {
   background-color: #f1f5f9 !important;
 }
 
 [data-theme="light"] .border-slate-800,
 [data-theme="light"] .border-slate-700,
-[data-theme="light"] .border-slate-700\/80,
-[data-theme="light"] .border-slate-700\/60,
-[data-theme="light"] .border-slate-800\/60 {
+[data-theme="light"] [class*="border-slate-800"],
+[data-theme="light"] [class*="border-slate-700"] {
   border-color: #e2e8f0 !important;
 }
 
 [data-theme="light"] .hover\:bg-slate-800\/60:hover,
 [data-theme="light"] .hover\:bg-slate-700:hover,
-[data-theme="light"] .hover\:bg-slate-700\/60:hover {
+[data-theme="light"] .hover\:bg-slate-700\/60:hover,
+[data-theme="light"] [class*="hover\:bg-slate-800"]:hover,
+[data-theme="light"] [class*="hover\:bg-slate-700"]:hover {
   background-color: #e2e8f0 !important;
 }
 
@@ -620,25 +765,39 @@ input[type="number"] {
   box-shadow: 0 20px 30px -8px rgba(0, 0, 0, 0.12), 0 8px 12px -4px rgba(0, 0, 0, 0.06) !important;
 }
 
-/* Ensure Text Inside Colored Solid Action Buttons Remains White */
-[data-theme="light"] .bg-blue-600,
-[data-theme="light"] .bg-indigo-600,
-[data-theme="light"] .bg-purple-600,
-[data-theme="light"] .bg-emerald-600,
-[data-theme="light"] .bg-rose-600,
-[data-theme="light"] .bg-red-600,
-[data-theme="light"] .bg-primary,
-[data-theme="light"] .bg-amber-600 {
+/* Ensure Text Inside Colored Solid Action Buttons Remains White (Excluding low-opacity buttons) */
+[data-theme="light"] button[class*="bg-blue-"]:not([class*="/"]),
+[data-theme="light"] button[class*="bg-indigo-"]:not([class*="/"]),
+[data-theme="light"] button[class*="bg-purple-"]:not([class*="/"]),
+[data-theme="light"] button[class*="bg-emerald-"]:not([class*="/"]),
+[data-theme="light"] button[class*="bg-rose-"]:not([class*="/"]),
+[data-theme="light"] button[class*="bg-red-"]:not([class*="/"]),
+[data-theme="light"] button[class*="bg-amber-"]:not([class*="/"]),
+[data-theme="light"] button[class*="bg-primary"],
+[data-theme="light"] a[class*="bg-blue-"]:not([class*="/"]),
+[data-theme="light"] a[class*="bg-indigo-"]:not([class*="/"]),
+[data-theme="light"] a[class*="bg-purple-"]:not([class*="/"]),
+[data-theme="light"] a[class*="bg-emerald-"]:not([class*="/"]),
+[data-theme="light"] a[class*="bg-rose-"]:not([class*="/"]),
+[data-theme="light"] a[class*="bg-red-"]:not([class*="/"]),
+[data-theme="light"] a[class*="bg-amber-"]:not([class*="/"]),
+[data-theme="light"] a[class*="bg-primary"] {
   color: #ffffff !important;
 }
 
-[data-theme="light"] .bg-blue-600 *,
-[data-theme="light"] .bg-indigo-600 *,
-[data-theme="light"] .bg-purple-600 *,
-[data-theme="light"] .bg-emerald-600 *,
-[data-theme="light"] .bg-rose-600 *,
-[data-theme="light"] .bg-red-600 *,
-[data-theme="light"] .bg-primary *,
-[data-theme="light"] .bg-amber-600 * {
+[data-theme="light"] button[class*="bg-blue-"]:not([class*="/"]) span,
+[data-theme="light"] button[class*="bg-indigo-"]:not([class*="/"]) span,
+[data-theme="light"] button[class*="bg-purple-"]:not([class*="/"]) span,
+[data-theme="light"] button[class*="bg-emerald-"]:not([class*="/"]) span,
+[data-theme="light"] button[class*="bg-rose-"]:not([class*="/"]) span,
+[data-theme="light"] button[class*="bg-red-"]:not([class*="/"]) span,
+[data-theme="light"] button[class*="bg-amber-"]:not([class*="/"]) span,
+[data-theme="light"] a[class*="bg-blue-"]:not([class*="/"]) span,
+[data-theme="light"] a[class*="bg-indigo-"]:not([class*="/"]) span,
+[data-theme="light"] a[class*="bg-purple-"]:not([class*="/"]) span,
+[data-theme="light"] a[class*="bg-emerald-"]:not([class*="/"]) span,
+[data-theme="light"] a[class*="bg-rose-"]:not([class*="/"]) span,
+[data-theme="light"] a[class*="bg-red-"]:not([class*="/"]) span,
+[data-theme="light"] a[class*="bg-amber-"]:not([class*="/"]) span {
   color: #ffffff !important;
 }

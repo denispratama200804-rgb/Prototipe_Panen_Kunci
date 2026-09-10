@@ -18,46 +18,87 @@ export class UsersView {
 
   render() {
     const users = this.dataService.getUsers({ search: this.searchQuery });
+    const verifiedCount = users.filter(u => u.isVerified).length;
+    const totalBalance = users.reduce((sum, u) => sum + Number(u.balance || 0), 0);
+
+    const formatCompactRupiah = (val) => {
+      if (!val || val <= 0) return 'Rp 0';
+      if (val >= 1000000) return `Rp ${(val / 1000000).toFixed(1).replace('.0', '')}jt`;
+      if (val >= 1000) return `Rp ${Math.round(val / 1000)}rb`;
+      return `Rp ${val}`;
+    };
 
     return `
-      <div class="space-y-6 view-fade-enter">
-        <!-- Top Stats Banner -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div class="admin-card rounded-2xl p-5 flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
-              <span class="material-symbols-outlined text-2xl">group</span>
-            </div>
-            <div>
-              <div class="text-xs text-slate-400">Total Akun Terdaftar</div>
-              <div class="text-2xl font-bold text-white font-mono">${users.length} User</div>
-            </div>
-          </div>
-
-          <div class="admin-card rounded-2xl p-5 flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
-              <span class="material-symbols-outlined text-2xl">verified_user</span>
-            </div>
-            <div>
-              <div class="text-xs text-slate-400">Terverifikasi (KYC)</div>
-              <div class="text-2xl font-bold text-emerald-400 font-mono">${users.filter(u => u.isVerified).length} User</div>
-            </div>
-          </div>
-
-          <div class="admin-card rounded-2xl p-5 flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center">
-              <span class="material-symbols-outlined text-2xl">account_balance_wallet</span>
-            </div>
-            <div>
-              <div class="text-xs text-slate-400">Total Saldo Member</div>
-              <div class="text-2xl font-bold text-amber-300 font-mono">
-                Rp ${users.reduce((sum, u) => sum + Number(u.balance || 0), 0).toLocaleString('id-ID')}
+      <div class="space-y-4 sm:space-y-6 view-fade-enter">
+        <!-- Top Stats Banner (Compact & Responsif Mobile) -->
+        <div class="grid grid-cols-3 gap-2 sm:gap-4">
+          <!-- Total Akun Card -->
+          <div class="admin-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 sm:gap-3 border border-indigo-500/30 bg-indigo-500/5 transition-all">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1 mb-0.5 sm:mb-1">
+                <span class="text-[9px] sm:text-xs font-semibold text-indigo-400 uppercase tracking-wider truncate">
+                  <span class="inline sm:hidden">Akun</span>
+                  <span class="hidden sm:inline">Total Akun Terdaftar</span>
+                </span>
               </div>
+              <div class="text-sm sm:text-2xl font-extrabold text-white font-mono leading-tight truncate">
+                ${users.length} <span class="text-[10px] sm:text-xs font-normal text-slate-400">User</span>
+              </div>
+              <div class="text-[9px] sm:text-xs text-slate-400 truncate mt-0.5 sm:mt-1 hidden sm:block">
+                Semua member terdaftar
+              </div>
+            </div>
+            <div class="w-7 h-7 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0 self-end sm:self-center">
+              <span class="material-symbols-outlined text-base sm:text-2xl">group</span>
+            </div>
+          </div>
+
+          <!-- Terverifikasi KYC Card -->
+          <div class="admin-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 sm:gap-3 border border-emerald-500/30 bg-emerald-500/5 transition-all">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1 mb-0.5 sm:mb-1">
+                <span class="text-[9px] sm:text-xs font-semibold text-emerald-400 uppercase tracking-wider truncate">
+                  <span class="inline sm:hidden">KYC</span>
+                  <span class="hidden sm:inline">Terverifikasi (KYC)</span>
+                </span>
+              </div>
+              <div class="text-sm sm:text-2xl font-extrabold text-emerald-400 font-mono leading-tight truncate">
+                ${verifiedCount} <span class="text-[10px] sm:text-xs font-normal text-slate-400">User</span>
+              </div>
+              <div class="text-[9px] sm:text-xs text-slate-400 truncate mt-0.5 sm:mt-1 hidden sm:block">
+                Identitas tervalidasi
+              </div>
+            </div>
+            <div class="w-7 h-7 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 self-end sm:self-center">
+              <span class="material-symbols-outlined text-base sm:text-2xl">verified_user</span>
+            </div>
+          </div>
+
+          <!-- Total Saldo Member Card -->
+          <div class="admin-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 sm:gap-3 border border-amber-500/30 bg-amber-500/5 transition-all">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1 mb-0.5 sm:mb-1">
+                <span class="text-[9px] sm:text-xs font-semibold text-amber-400 uppercase tracking-wider truncate">
+                  <span class="inline sm:hidden">Saldo</span>
+                  <span class="hidden sm:inline">Total Saldo Member</span>
+                </span>
+              </div>
+              <div class="text-sm sm:text-2xl font-extrabold text-amber-300 font-mono leading-tight truncate">
+                <span class="sm:hidden">${formatCompactRupiah(totalBalance)}</span>
+                <span class="hidden sm:inline">Rp ${totalBalance.toLocaleString('id-ID')}</span>
+              </div>
+              <div class="text-[9px] sm:text-xs text-slate-400 truncate mt-0.5 sm:mt-1 hidden sm:block">
+                Saldo aktif beredar
+              </div>
+            </div>
+            <div class="w-7 h-7 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 self-end sm:self-center">
+              <span class="material-symbols-outlined text-base sm:text-2xl">account_balance_wallet</span>
             </div>
           </div>
         </div>
 
         <!-- Controls Bar -->
-        <div class="admin-card rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="admin-card rounded-xl sm:rounded-2xl p-3 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <!-- Search -->
           <div class="relative w-full sm:w-80">
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
@@ -84,14 +125,14 @@ export class UsersView {
           </div>
         </div>
 
-        <!-- Daftar Pengguna & KYC (List Accordion Card sesuai Foto 2 - Bebas Scrollbar) -->
-        <div class="admin-card rounded-2xl overflow-hidden w-full max-w-full min-w-0 border border-slate-800/80 shadow-xl">
-          <div class="px-4 py-3 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-2">
+        <!-- Daftar Pengguna & KYC (Harmonious & Synchronized Theme) -->
+        <div class="admin-card rounded-2xl overflow-hidden w-full max-w-full min-w-0 border border-admin shadow-xl">
+          <div class="admin-card-header px-4 py-3 text-xs flex items-center justify-between gap-2">
             <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-base text-indigo-400">group</span>
-              <span class="font-bold text-white text-sm">Daftar Pengguna & KYC</span>
+              <span class="material-symbols-outlined text-base text-indigo-500">group</span>
+              <span class="font-bold text-admin-heading text-sm">Daftar Pengguna & KYC</span>
             </div>
-            <span class="text-[11px] text-slate-400 font-mono bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-700/60">
+            <span class="text-[11px] text-admin-muted font-mono admin-sub-card px-2.5 py-0.5 rounded-full border border-admin">
               ${users.length} pengguna
             </span>
           </div>
@@ -100,8 +141,8 @@ export class UsersView {
             ${
               users.length === 0
                 ? `
-              <div class="text-center py-12 text-slate-400">
-                <span class="material-symbols-outlined text-4xl mb-2 text-slate-600 block">inbox</span>
+              <div class="text-center py-12 text-admin-muted">
+                <span class="material-symbols-outlined text-4xl mb-2 text-slate-500 block">inbox</span>
                 ${this.isSyncing ? '<span class="inline-flex items-center gap-2"><span class="material-symbols-outlined animate-spin text-lg">progress_activity</span><span>Mengambil data pengguna dari Supabase...</span></span>' : 'Tidak ada data pengguna yang ditemukan.'}
               </div>
             `
@@ -114,24 +155,24 @@ export class UsersView {
                       const totalWD = Number(u.totalWithdrawn || 0);
 
                       return `
-              <div class="rounded-2xl border transition-all duration-200 overflow-hidden ${
+              <div class="admin-item-card rounded-2xl overflow-hidden transition-all duration-200 ${
                 u.isVerified
-                  ? 'border-emerald-500/25 bg-slate-900/60 hover:border-emerald-500/40'
-                  : 'border-amber-500/30 bg-slate-900/80 hover:border-amber-500/50'
+                  ? 'border-l-4 border-l-emerald-500'
+                  : 'border-l-4 border-l-amber-500'
               }">
-                <!-- Card Header (Sesuai Foto 2: Avatar + Nama & Kontak & Tag + Status + Chevron) -->
+                <!-- Card Header: Avatar + Nama & Kontak & Tag + Status + Chevron -->
                 <div 
-                  class="flex items-center justify-between gap-2.5 sm:gap-4 p-3 sm:p-4 cursor-pointer select-none hover:bg-slate-800/40 transition-colors"
+                  class="flex items-center justify-between gap-2.5 sm:gap-4 p-3 sm:p-4 cursor-pointer select-none hover:bg-slate-500/5 transition-colors"
                   data-action="toggle-user-details"
                   data-id="${u.id}"
                 >
                   <!-- Kiri: Avatar & Info Pengguna -->
                   <div class="flex items-center gap-3 sm:gap-3.5 min-w-0">
-                    <!-- Avatar Lingkaran (Foto Profil atau Inisial 2 Huruf seperti Foto 2) -->
+                    <!-- Avatar Lingkaran -->
                     <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-inner overflow-hidden border ${
                       u.isVerified
-                        ? 'bg-emerald-900/60 text-emerald-300 border-emerald-500/40'
-                        : 'bg-indigo-900/60 text-indigo-300 border-indigo-500/40'
+                        ? 'avatar-verified bg-emerald-900/60 text-emerald-300 border-emerald-500/40'
+                        : 'avatar-unverified bg-indigo-900/60 text-indigo-300 border-indigo-500/40'
                     }">
                       ${
                         u.avatar
@@ -143,26 +184,26 @@ export class UsersView {
                     <!-- Teks: Nama, Email, dan Pill Saldo -->
                     <div class="min-w-0">
                       <div class="flex items-center gap-1.5 flex-wrap">
-                        <span class="font-bold text-white text-xs sm:text-sm tracking-wide truncate max-w-[150px] sm:max-w-none">${u.name || 'Pengguna'}</span>
+                        <span class="font-bold text-admin-heading text-xs sm:text-sm tracking-wide truncate max-w-[150px] sm:max-w-none">${u.name || 'Pengguna'}</span>
                         ${
                           isRoleAdmin
-                            ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 border border-purple-500/40 font-bold">Admin</span>`
+                            ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-400 border border-purple-500/40 font-bold">Admin</span>`
                             : ''
                         }
-                        <span class="font-mono text-[10px] text-slate-400 hidden sm:inline" title="${u.id}">
+                        <span class="font-mono text-[10px] text-admin-muted hidden sm:inline" title="${u.id}">
                           (${u.id.length > 16 ? u.id.slice(0, 8) + '...' + u.id.slice(-4) : u.id})
                         </span>
                       </div>
-                      <div class="text-[11px] text-slate-400 truncate mt-0.5 max-w-[200px] sm:max-w-none">
+                      <div class="text-[11px] text-admin-muted truncate mt-0.5 max-w-[200px] sm:max-w-none">
                         ${u.email || '-'}${u.phone ? ` • ${u.phone}` : ''}
                       </div>
                       <div class="mt-1">
-                        <!-- Pill Tag Saldo & Kunci mirip Foto 2 -->
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono border border-indigo-500/30 bg-indigo-500/10 text-indigo-300">
+                        <!-- Pill Tag Saldo & Kunci -->
+                        <span class="pill-saldo inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono border border-indigo-500/30 bg-indigo-500/10 text-indigo-300">
                           <span class="material-symbols-outlined text-xs text-amber-400">payments</span>
                           <span>Rp ${balance.toLocaleString('id-ID')}</span>
-                          <span class="text-slate-500">•</span>
-                          <span class="text-emerald-300">${u.totalKeys || 0} Kunci</span>
+                          <span class="opacity-60">•</span>
+                          <span class="text-emerald-400">${u.totalKeys || 0} Kunci</span>
                         </span>
                       </div>
                     </div>
@@ -170,15 +211,15 @@ export class UsersView {
 
                   <!-- Kanan: Status KYC Badge & Tanda Panah Chevron -->
                   <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
-                    <!-- Status KYC Pill Badge (Sesuai Foto 2: Pill dengan icon checklist) -->
+                    <!-- Status KYC Pill Badge -->
                     ${
                       u.isVerified
-                        ? `<span class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-emerald-500/40 bg-emerald-950/60 text-emerald-400 tracking-wider">
+                        ? `<span class="badge-verified inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-emerald-500/40 bg-emerald-950/60 text-emerald-400 tracking-wider">
                             <span class="material-symbols-outlined text-xs sm:text-sm">verified</span>
                             <span class="hidden sm:inline">TERVERIFIKASI</span>
                             <span class="sm:hidden">KYC</span>
                           </span>`
-                        : `<span class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-amber-500/40 bg-amber-950/60 text-amber-400 tracking-wider">
+                        : `<span class="badge-unverified inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-amber-500/40 bg-amber-950/60 text-amber-400 tracking-wider">
                             <span class="material-symbols-outlined text-xs sm:text-sm">hourglass_empty</span>
                             <span>BELUM KYC</span>
                           </span>`
@@ -187,11 +228,11 @@ export class UsersView {
                     <!-- Tanda Panah Chevron untuk Lihat Detail -->
                     <button
                       type="button"
-                      class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                      class="w-8 h-8 rounded-lg flex items-center justify-center text-admin-muted hover:text-admin-heading hover:bg-slate-500/10 transition-colors cursor-pointer"
                       title="Lihat rincian pengguna"
                     >
                       <span
-                        class="material-symbols-outlined text-xl sm:text-2xl transition-transform duration-200 ${isExpanded ? 'rotate-180 text-indigo-400' : ''}"
+                        class="material-symbols-outlined text-xl sm:text-2xl transition-transform duration-200 ${isExpanded ? 'rotate-180 text-indigo-500' : ''}"
                         data-user-chevron="${u.id}"
                       >
                         expand_more
@@ -201,22 +242,22 @@ export class UsersView {
                 </div>
 
                 <!-- Bagian Detail yang Terbuka saat Tanda Panah / Baris Diklik -->
-                <div id="user-details-${u.id}" class="${isExpanded ? '' : 'hidden'} px-3 pb-3 sm:px-4 sm:pb-4 border-t border-slate-800/80 pt-3 space-y-3 view-fade-enter">
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-950/70 border border-slate-800/90 text-xs">
+                <div id="user-details-${u.id}" class="${isExpanded ? '' : 'hidden'} px-3 pb-3 sm:px-4 sm:pb-4 border-t border-admin pt-3 space-y-3 view-fade-enter">
+                  <div class="admin-sub-card grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3.5 rounded-xl text-xs">
                     <!-- Data Kontak & ID -->
                     <div>
-                      <span class="text-slate-400 block text-[10px] uppercase font-semibold">Identitas & Kontak:</span>
-                      <div class="mt-1 space-y-1">
-                        <div class="flex items-center gap-1.5 text-slate-300">
+                      <span class="text-admin-muted block text-[10px] uppercase font-semibold">Identitas & Kontak:</span>
+                      <div class="mt-1.5 space-y-1">
+                        <div class="flex items-center gap-1.5 text-admin-body">
                           <span class="material-symbols-outlined text-xs text-indigo-400">mail</span>
                           <span class="truncate">${u.email || '-'}</span>
                         </div>
-                        <div class="flex items-center gap-1.5 text-slate-300">
+                        <div class="flex items-center gap-1.5 text-admin-body">
                           <span class="material-symbols-outlined text-xs text-emerald-400">call</span>
                           <span>${u.phone || '-'}</span>
                         </div>
-                        <div class="flex items-center gap-1.5 text-slate-400 font-mono text-[10px]">
-                          <span class="material-symbols-outlined text-xs text-slate-500">fingerprint</span>
+                        <div class="flex items-center gap-1.5 text-admin-muted font-mono text-[10px]">
+                          <span class="material-symbols-outlined text-xs text-slate-400">fingerprint</span>
                           <span class="truncate">${u.id}</span>
                         </div>
                       </div>
@@ -224,46 +265,46 @@ export class UsersView {
 
                     <!-- Rekening Pencairan -->
                     <div>
-                      <span class="text-slate-400 block text-[10px] uppercase font-semibold">Rekening / E-Wallet Pencairan:</span>
-                      <div class="mt-1 space-y-1">
-                        <div class="font-bold text-white flex items-center gap-1.5">
+                      <span class="text-admin-muted block text-[10px] uppercase font-semibold">Rekening / E-Wallet Pencairan:</span>
+                      <div class="mt-1.5 space-y-1">
+                        <div class="font-bold text-admin-heading flex items-center gap-1.5">
                           <span class="material-symbols-outlined text-sm text-cyan-400">account_balance</span>
                           <span>${u.bankName || 'Belum diatur'}</span>
                         </div>
-                        <div class="font-mono text-slate-300">${u.accountNumber || '-'}</div>
-                        <div class="text-[11px] text-slate-400">a.n. ${u.accountHolder || u.name || '-'}</div>
+                        <div class="font-mono text-admin-body">${u.accountNumber || '-'}</div>
+                        <div class="text-[11px] text-admin-muted">a.n. ${u.accountHolder || u.name || '-'}</div>
                       </div>
                     </div>
 
                     <!-- Statistik Setoran & Finansial -->
-                    <div class="sm:col-span-2 pt-2 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                      <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block">Total Kunci</span>
-                        <span class="font-mono text-xs font-bold text-white">${u.totalKeys || 0} Kunci</span>
+                    <div class="sm:col-span-2 pt-2.5 border-t border-admin grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                      <div class="admin-mini-card p-2 rounded-lg">
+                        <span class="text-[10px] text-admin-muted block">Total Kunci</span>
+                        <span class="font-mono text-xs font-bold text-admin-heading">${u.totalKeys || 0} Kunci</span>
                       </div>
-                      <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block">Kunci Valid</span>
-                        <span class="font-mono text-xs font-bold text-emerald-400">${u.validKeys || 0} Valid</span>
+                      <div class="admin-mini-card p-2 rounded-lg">
+                        <span class="text-[10px] text-admin-muted block">Kunci Valid</span>
+                        <span class="font-mono text-xs font-bold text-emerald-500 dark:text-emerald-400">${u.validKeys || 0} Valid</span>
                       </div>
-                      <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block">Saldo Dompet</span>
-                        <span class="font-mono text-xs font-extrabold text-indigo-300">Rp ${balance.toLocaleString('id-ID')}</span>
+                      <div class="admin-mini-card p-2 rounded-lg">
+                        <span class="text-[10px] text-admin-muted block">Saldo Dompet</span>
+                        <span class="font-mono text-xs font-extrabold text-indigo-500 dark:text-indigo-300">Rp ${balance.toLocaleString('id-ID')}</span>
                       </div>
-                      <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block">Total Ditarik (WD)</span>
-                        <span class="font-mono text-xs font-bold text-amber-400">Rp ${totalWD.toLocaleString('id-ID')}</span>
+                      <div class="admin-mini-card p-2 rounded-lg">
+                        <span class="text-[10px] text-admin-muted block">Total Ditarik (WD)</span>
+                        <span class="font-mono text-xs font-bold text-amber-500 dark:text-amber-400">Rp ${totalWD.toLocaleString('id-ID')}</span>
                       </div>
                     </div>
                   </div>
 
                   <!-- Tindakan Admin -->
                   <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-                    <div class="text-[11px] text-slate-400">
+                    <div class="text-[11px] text-admin-muted">
                       <span>Status Akun: </span>
-                      <strong class="text-white">${u.isVerified ? 'Terverifikasi (KYC Lengkap)' : 'Belum Memenuhi Verifikasi'}</strong>
+                      <strong class="text-admin-heading">${u.isVerified ? 'Terverifikasi (KYC Lengkap)' : 'Belum Memenuhi Verifikasi'}</strong>
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                       <!-- Toggle KYC Button -->
                       <button
                         type="button"
@@ -271,10 +312,10 @@ export class UsersView {
                         data-id="${u.id}"
                         data-status="${u.isVerified}"
                         title="Klik untuk ubah status verifikasi di Supabase"
-                        class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                        class="px-3 py-1.5 rounded-xl text-xs font-semibold text-white shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${
                           u.isVerified
-                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
-                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                            ? 'bg-amber-600 hover:bg-amber-500'
+                            : 'bg-emerald-600 hover:bg-emerald-500'
                         }"
                       >
                         <span class="material-symbols-outlined text-sm">${u.isVerified ? 'cancel' : 'check_circle'}</span>
@@ -289,7 +330,7 @@ export class UsersView {
                         data-name="${u.name}"
                         data-balance="${u.balance || 0}"
                         title="Atur Saldo Promo/Bonus"
-                        class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                        class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                       >
                         <span class="material-symbols-outlined text-sm">currency_exchange</span>
                         <span>Atur Saldo</span>
@@ -301,7 +342,7 @@ export class UsersView {
                         data-action="view-user-details"
                         data-id="${u.id}"
                         title="Lihat Riwayat & Kunci Pengguna Ini"
-                        class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                        class="admin-btn-secondary px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                       >
                         <span class="material-symbols-outlined text-sm text-indigo-400">visibility</span>
                         <span>Lihat Riwayat</span>

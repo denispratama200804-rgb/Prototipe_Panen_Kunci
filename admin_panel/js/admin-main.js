@@ -227,9 +227,7 @@ class AdminApp {
   }
 
   refreshCurrentView(showToast = true, withAnimation = false) {
-    this._bindLayoutEvents();
-
-    // Re-render active view
+    // Re-render active view without rebinding navbar layout to prevent duplicate listeners
     this._mountView(this.currentTab, withAnimation);
 
     if (showToast) {

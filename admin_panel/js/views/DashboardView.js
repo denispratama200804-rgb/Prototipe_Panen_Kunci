@@ -27,76 +27,77 @@ export class DashboardView {
     return `
       <div class="space-y-8 view-fade-enter">
         <!-- KPI Cards Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
           <!-- Card 1: API Keys -->
-          <div class="admin-card rounded-2xl p-6 relative overflow-hidden group">
+          <div class="admin-card rounded-xl sm:rounded-2xl p-3 sm:p-6 relative overflow-hidden group">
             <div class="absolute -right-4 -bottom-4 w-28 h-28 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all"></div>
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total API Key</span>
-              <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
-                <span class="material-symbols-outlined text-xl">vpn_key</span>
+            <div class="flex items-center justify-between mb-2 sm:mb-4">
+              <span class="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider truncate">Total API Key</span>
+              <div class="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
+                <span class="material-symbols-outlined text-base sm:text-xl">vpn_key</span>
               </div>
             </div>
-            <div class="text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans'] mb-1">
-              ${stats.totalKeys} <span class="text-sm font-normal text-slate-400">Kunci</span>
+            <div class="text-base sm:text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans'] mb-1 truncate">
+              ${stats.totalKeys} <span class="text-xs sm:text-sm font-normal text-slate-400">Kunci</span>
             </div>
-            <div class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
-              <span class="material-symbols-outlined text-base">check_circle</span>
+            <div class="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-emerald-400 font-medium truncate">
+              <span class="material-symbols-outlined text-xs sm:text-base">check_circle</span>
               <span>${stats.validKeysCount} Valid</span>
-              <span class="text-slate-500">•</span>
-              <span class="text-indigo-300">${stats.totalCredits} Kredit Kie.ai</span>
+              <span class="text-slate-500 hidden sm:inline">•</span>
+              <span class="text-indigo-300 hidden sm:inline">${stats.totalCredits} Kredit</span>
             </div>
           </div>
 
           <!-- Card 2: Payouts -->
-          <div class="admin-card rounded-2xl p-6 relative overflow-hidden group">
+          <div class="admin-card rounded-xl sm:rounded-2xl p-3 sm:p-6 relative overflow-hidden group">
             <div class="absolute -right-4 -bottom-4 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Payout Dicairkan</span>
-              <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                <span class="material-symbols-outlined text-xl">payments</span>
+            <div class="flex items-center justify-between mb-2 sm:mb-4">
+              <span class="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider truncate">Payout Dicairkan</span>
+              <div class="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                <span class="material-symbols-outlined text-base sm:text-xl">payments</span>
               </div>
             </div>
-            <div class="text-3xl font-extrabold text-emerald-400 tracking-tight font-['Plus_Jakarta_Sans'] mb-1">
+            <div class="text-base sm:text-3xl font-extrabold text-emerald-400 tracking-tight font-['Plus_Jakarta_Sans'] mb-1 truncate">
               Rp ${stats.totalPaidOut.toLocaleString('id-ID')}
             </div>
-            <div class="flex items-center gap-1.5 text-xs text-amber-300 font-medium">
-              <span class="material-symbols-outlined text-base">hourglass_top</span>
-              <span>${stats.pendingCount} Pending (Rp ${stats.pendingPayoutAmount.toLocaleString('id-ID')})</span>
+            <div class="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-amber-300 font-medium truncate">
+              <span class="material-symbols-outlined text-xs sm:text-base">hourglass_top</span>
+              <span>${stats.pendingCount} Pending</span>
             </div>
           </div>
 
           <!-- Card 3: Admin Fee Revenue -->
-          <div class="admin-card rounded-2xl p-6 relative overflow-hidden group">
+          <div class="admin-card rounded-xl sm:rounded-2xl p-3 sm:p-6 relative overflow-hidden group">
             <div class="absolute -right-4 -bottom-4 w-28 h-28 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all"></div>
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pendapatan Fee Admin</span>
-              <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
-                <span class="material-symbols-outlined text-xl">savings</span>
+            <div class="flex items-center justify-between mb-2 sm:mb-4">
+              <span class="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider truncate">Fee Admin</span>
+              <div class="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0">
+                <span class="material-symbols-outlined text-base sm:text-xl">savings</span>
               </div>
             </div>
-            <div class="text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans'] mb-1">
+            <div class="text-base sm:text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans'] mb-1 truncate">
               Rp ${stats.totalAdminFees.toLocaleString('id-ID')}
             </div>
-            <div class="text-xs text-slate-400">
-              Biaya transfer yang dipotong dari transaksi
+            <div class="text-[10px] sm:text-xs text-slate-400 truncate hidden sm:block">
+              Biaya transfer dari transaksi
             </div>
           </div>
 
           <!-- Card 4: Users & Balance -->
-          <div class="admin-card rounded-2xl p-6 relative overflow-hidden group">
+          <div class="admin-card rounded-xl sm:rounded-2xl p-3 sm:p-6 relative overflow-hidden group">
             <div class="absolute -right-4 -bottom-4 w-28 h-28 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all"></div>
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pengguna Terdaftar</span>
-              <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
-                <span class="material-symbols-outlined text-xl">group</span>
+            <div class="flex items-center justify-between mb-2 sm:mb-4">
+              <span class="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider truncate">Pengguna</span>
+              <div class="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center flex-shrink-0">
+                <span class="material-symbols-outlined text-base sm:text-xl">group</span>
               </div>
             </div>
-            <div class="text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans'] mb-1">
-              ${stats.totalUsers} <span class="text-sm font-normal text-slate-400">Akun</span>
+            <div class="text-base sm:text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans'] mb-1 truncate">
+              ${stats.totalUsers} <span class="text-xs sm:text-sm font-normal text-slate-400">Akun</span>
             </div>
-            <div class="text-xs text-slate-300">
-              Saldo User Beredar: <strong class="text-indigo-300 font-mono">Rp ${stats.activeBalance.toLocaleString('id-ID')}</strong>
+            <div class="text-[10px] sm:text-xs text-slate-300 truncate">
+              <span class="sm:hidden font-mono text-indigo-300">Rp ${(stats.activeBalance / 1000).toFixed(0)}rb</span>
+              <span class="hidden sm:inline">Saldo: <strong class="text-indigo-300 font-mono">Rp ${stats.activeBalance.toLocaleString('id-ID')}</strong></span>
             </div>
           </div>
         </div>

@@ -198,14 +198,14 @@ export class WithdrawalsView {
           </div>
         </div>
 
-        <!-- Daftar Permohonan Penarikan Dana (List Accordion Card sesuai Foto 2 - Bebas Scrollbar) -->
-        <div class="admin-card rounded-2xl overflow-hidden w-full max-w-full min-w-0 border border-slate-800/80 shadow-xl">
-          <div class="px-4 py-3 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-2">
+        <!-- Daftar Permohonan Penarikan Dana (Harmonious & Synchronized Theme) -->
+        <div class="admin-card rounded-2xl overflow-hidden w-full max-w-full min-w-0 border border-admin shadow-xl">
+          <div class="admin-card-header px-4 py-3 text-xs flex items-center justify-between gap-2">
             <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-base text-amber-400">payments</span>
-              <span class="font-bold text-white text-sm">Daftar Permohonan Penarikan Dana</span>
+              <span class="material-symbols-outlined text-base text-amber-500">payments</span>
+              <span class="font-bold text-admin-heading text-sm">Daftar Permohonan Penarikan Dana</span>
             </div>
-            <span class="text-[11px] text-slate-400 font-mono bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-700/60">
+            <span class="text-[11px] text-admin-muted font-mono admin-sub-card px-2.5 py-0.5 rounded-full border border-admin">
               ${filtered.length} permohonan
             </span>
           </div>
@@ -214,8 +214,8 @@ export class WithdrawalsView {
             ${
               filtered.length === 0
                 ? `
-              <div class="text-center py-12 text-slate-400">
-                <span class="material-symbols-outlined text-4xl mb-2 text-slate-600 block">inbox</span>
+              <div class="text-center py-12 text-admin-muted">
+                <span class="material-symbols-outlined text-4xl mb-2 text-slate-500 block">inbox</span>
                 Tidak ada permohonan penarikan pada status ini.
               </div>
             `
@@ -256,27 +256,27 @@ export class WithdrawalsView {
                       }) + ' WIB';
 
                       return `
-              <div class="rounded-2xl border transition-all duration-200 overflow-hidden ${
+              <div class="admin-item-card rounded-2xl overflow-hidden transition-all duration-200 ${
                 isPending
-                  ? 'border-amber-500/30 bg-slate-900/80 hover:border-amber-500/50'
+                  ? 'border-l-4 border-l-amber-500'
                   : isSuccess
-                  ? 'border-emerald-500/25 bg-slate-900/60 hover:border-emerald-500/40'
-                  : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'
+                  ? 'border-l-4 border-l-emerald-500'
+                  : 'border-l-4 border-l-rose-500'
               }">
-                <!-- Card Header (Sesuai Foto 2: Avatar + Title & Waktu & Tag + Status + Chevron) -->
+                <!-- Card Header: Avatar + Title & Waktu & Tag + Status + Chevron -->
                 <div 
-                  class="flex items-center justify-between gap-2.5 sm:gap-4 p-3 sm:p-4 cursor-pointer select-none hover:bg-slate-800/40 transition-colors"
+                  class="flex items-center justify-between gap-2.5 sm:gap-4 p-3 sm:p-4 cursor-pointer select-none hover:bg-slate-500/5 transition-colors"
                   data-action="toggle-details"
                   data-id="${tx.id}"
                 >
                   <!-- Kiri: Avatar & Teks Informasi -->
                   <div class="flex items-center gap-3 sm:gap-3.5 min-w-0">
-                    <!-- Avatar Lingkaran Hijau/Sesuai Status (mirip 'A' di Foto 2) -->
+                    <!-- Avatar Lingkaran Sesuai Status -->
                     <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-inner ${
                       isSuccess
-                        ? 'bg-emerald-900/60 text-emerald-400 border border-emerald-500/40'
+                        ? 'avatar-verified bg-emerald-900/60 text-emerald-400 border border-emerald-500/40'
                         : isPending
-                        ? 'bg-amber-900/50 text-amber-300 border border-amber-500/40'
+                        ? 'avatar-unverified bg-amber-900/50 text-amber-300 border border-amber-500/40'
                         : 'bg-rose-900/50 text-rose-300 border border-rose-500/40'
                     }">
                       <span>${userInitial}</span>
@@ -285,15 +285,15 @@ export class WithdrawalsView {
                     <!-- Teks: #ID & User, Waktu, dan Badge Pill -->
                     <div class="min-w-0">
                       <div class="flex items-center gap-1.5 flex-wrap">
-                        <span class="font-mono font-bold text-white text-xs sm:text-sm tracking-wide">#${tx.id}</span>
-                        <span class="font-semibold text-slate-300 text-xs sm:text-sm truncate max-w-[130px] sm:max-w-none">${tx.userId || 'usr_budi_01'}</span>
+                        <span class="font-mono font-bold text-admin-heading text-xs sm:text-sm tracking-wide">#${tx.id}</span>
+                        <span class="font-semibold text-admin-body text-xs sm:text-sm truncate max-w-[130px] sm:max-w-none">${tx.userId || 'usr_budi_01'}</span>
                       </div>
-                      <div class="text-[11px] text-slate-400 font-mono mt-0.5">
+                      <div class="text-[11px] text-admin-muted font-mono mt-0.5">
                         ${dateFormatted}
                       </div>
                       <div class="mt-1">
-                        <!-- Pill Tag Mirip Badge Timer di Foto 2 -->
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono border ${
+                        <!-- Pill Tag Saldo & Metode -->
+                        <span class="pill-saldo inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono border ${
                           isSuccess
                             ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
                             : isPending
@@ -309,15 +309,15 @@ export class WithdrawalsView {
 
                   <!-- Kanan: Status Pill Badge & Tanda Panah Chevron -->
                   <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
-                    <!-- Status Badge (Sesuai Foto 2: Pill dengan icon checklist) -->
+                    <!-- Status Badge -->
                     ${
                       isSuccess
-                        ? `<span class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-emerald-500/40 bg-emerald-950/60 text-emerald-400 tracking-wider">
+                        ? `<span class="badge-verified inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-emerald-500/40 bg-emerald-950/60 text-emerald-400 tracking-wider">
                             <span class="material-symbols-outlined text-xs sm:text-sm">check_circle</span>
                             <span>SUCCESS</span>
                           </span>`
                         : isPending
-                        ? `<span class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-amber-500/40 bg-amber-950/60 text-amber-400 tracking-wider">
+                        ? `<span class="badge-unverified inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-amber-500/40 bg-amber-950/60 text-amber-400 tracking-wider">
                             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
                             <span>PENDING</span>
                           </span>`
@@ -330,11 +330,11 @@ export class WithdrawalsView {
                     <!-- Tanda Panah Chevron untuk Lihat Detail -->
                     <button
                       type="button"
-                      class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                      class="w-8 h-8 rounded-lg flex items-center justify-center text-admin-muted hover:text-admin-heading hover:bg-slate-500/10 transition-colors cursor-pointer"
                       title="Lihat detail permohonan"
                     >
                       <span
-                        class="material-symbols-outlined text-xl sm:text-2xl transition-transform duration-200 ${isExpanded ? 'rotate-180 text-indigo-400' : ''}"
+                        class="material-symbols-outlined text-xl sm:text-2xl transition-transform duration-200 ${isExpanded ? 'rotate-180 text-amber-500' : ''}"
                         data-chevron="${tx.id}"
                       >
                         expand_more
@@ -344,35 +344,35 @@ export class WithdrawalsView {
                 </div>
 
                 <!-- Bagian Detail yang Terbuka saat Tanda Panah / Baris Diklik -->
-                <div id="details-${tx.id}" class="${isExpanded ? '' : 'hidden'} px-3 pb-3 sm:px-4 sm:pb-4 border-t border-slate-800/80 pt-3 space-y-3 view-fade-enter">
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-950/70 border border-slate-800/90 text-xs">
+                <div id="details-${tx.id}" class="${isExpanded ? '' : 'hidden'} px-3 pb-3 sm:px-4 sm:pb-4 border-t border-admin pt-3 space-y-3 view-fade-enter">
+                  <div class="admin-sub-card grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3.5 rounded-xl text-xs">
                     <!-- Rekening / E-Wallet Penerima -->
                     <div>
-                      <span class="text-slate-400 block text-[10px] uppercase font-semibold">Tujuan Rekening / E-Wallet:</span>
-                      <div class="flex items-center gap-2 mt-1">
+                      <span class="text-admin-muted block text-[10px] uppercase font-semibold">Tujuan Rekening / E-Wallet:</span>
+                      <div class="flex items-center gap-2 mt-1.5">
                         <span class="material-symbols-outlined text-base ${methodColor}">${methodIcon}</span>
                         <div>
-                          <div class="font-bold text-white">${tx.title || 'Penarikan Saldo'}</div>
-                          <div class="font-mono text-slate-300 font-semibold text-xs">${tx.recipient || '-'}</div>
+                          <div class="font-bold text-admin-heading">${tx.title || 'Penarikan Saldo'}</div>
+                          <div class="font-mono text-admin-body font-semibold text-xs">${tx.recipient || '-'}</div>
                         </div>
                       </div>
                     </div>
 
                     <!-- Rincian Finansial -->
                     <div>
-                      <span class="text-slate-400 block text-[10px] uppercase font-semibold">Rincian Finansial:</span>
-                      <div class="mt-1 space-y-1">
-                        <div class="flex justify-between text-slate-300">
+                      <span class="text-admin-muted block text-[10px] uppercase font-semibold">Rincian Finansial:</span>
+                      <div class="mt-1.5 space-y-1">
+                        <div class="flex justify-between text-admin-body">
                           <span>Nominal Pengajuan:</span>
-                          <span class="font-mono font-bold text-white">Rp ${amount.toLocaleString('id-ID')}</span>
+                          <span class="font-mono font-bold text-admin-heading">Rp ${amount.toLocaleString('id-ID')}</span>
                         </div>
-                        <div class="flex justify-between text-slate-400">
+                        <div class="flex justify-between text-admin-muted">
                           <span>Biaya Admin:</span>
-                          <span class="font-mono text-rose-400">-Rp ${fee.toLocaleString('id-ID')}</span>
+                          <span class="font-mono text-rose-500 font-semibold">-Rp ${fee.toLocaleString('id-ID')}</span>
                         </div>
-                        <div class="flex justify-between text-emerald-400 font-bold border-t border-slate-800/80 pt-1">
+                        <div class="flex justify-between text-emerald-500 font-bold border-t border-admin pt-1">
                           <span>Transfer Bersih:</span>
-                          <span class="font-mono text-sm font-extrabold text-emerald-400">Rp ${netPayout.toLocaleString('id-ID')}</span>
+                          <span class="font-mono text-sm font-extrabold text-emerald-500 dark:text-emerald-400">Rp ${netPayout.toLocaleString('id-ID')}</span>
                         </div>
                       </div>
                     </div>
@@ -380,7 +380,7 @@ export class WithdrawalsView {
                     ${
                       tx.status === 'failed' && (tx.notes || tx.errorMessage)
                         ? `
-                      <div class="sm:col-span-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[11px]">
+                      <div class="sm:col-span-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px]">
                         <span class="font-bold">Alasan Penolakan:</span> ${tx.notes || tx.errorMessage}
                       </div>
                     `
@@ -390,7 +390,7 @@ export class WithdrawalsView {
                     ${
                       tx.processedAt
                         ? `
-                      <div class="sm:col-span-2 text-[11px] text-slate-400 flex items-center gap-1.5">
+                      <div class="sm:col-span-2 text-[11px] text-admin-muted flex items-center gap-1.5">
                         <span class="material-symbols-outlined text-xs text-emerald-400">task_alt</span>
                         <span>Diproses pada: ${new Date(tx.processedAt).toLocaleString('id-ID')}</span>
                       </div>
@@ -401,12 +401,12 @@ export class WithdrawalsView {
 
                   <!-- Tindakan Admin -->
                   <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-                    <div class="text-[11px] text-slate-400">
+                    <div class="text-[11px] text-admin-muted">
                       <span>Status: </span>
-                      <strong class="text-white">${isPending ? 'Menunggu Validasi Admin' : isSuccess ? 'Telah Ditransfer ke User' : 'Ditolak (Saldo di-refund)'}</strong>
+                      <strong class="text-admin-heading">${isPending ? 'Menunggu Validasi Admin' : isSuccess ? 'Telah Ditransfer ke User' : 'Ditolak (Saldo di-refund)'}</strong>
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                       ${
                         isPending
                           ? `
@@ -414,7 +414,7 @@ export class WithdrawalsView {
                           type="button"
                           data-action="approve-wd"
                           data-id="${tx.id}"
-                          class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                          class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
                         >
                           <span class="material-symbols-outlined text-sm">upload</span>
                           <span>Proses Cair</span>
@@ -423,7 +423,7 @@ export class WithdrawalsView {
                           type="button"
                           data-action="reject-wd"
                           data-id="${tx.id}"
-                          class="px-3 py-1.5 rounded-xl text-xs font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                          class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
                         >
                           <span class="material-symbols-outlined text-sm">cancel</span>
                           <span>Tolak</span>
@@ -435,7 +435,7 @@ export class WithdrawalsView {
                         type="button"
                         data-action="view-receipt"
                         data-id="${tx.id}"
-                        class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                        class="admin-btn-secondary px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                       >
                         <span class="material-symbols-outlined text-sm text-indigo-400">receipt_long</span>
                         <span>Lihat Bukti Digital</span>

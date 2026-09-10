@@ -63,10 +63,10 @@ export class HubDashboardView {
         
         <!-- Header Hero (Reference Style) -->
         <div class="text-center max-w-2xl mx-auto pt-2 sm:pt-4">
-          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans'] mb-2 sm:mb-3">
+          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-admin-heading tracking-tight font-['Plus_Jakarta_Sans'] mb-2 sm:mb-3">
             Admin Dashboard
           </h1>
-          <p class="text-slate-400 text-xs sm:text-base font-normal leading-relaxed">
+          <p class="text-admin-muted text-xs sm:text-base font-normal leading-relaxed">
             Manage your AI tools, payout queues, and user activity
           </p>
         </div>
@@ -86,11 +86,11 @@ export class HubDashboardView {
                   </span>
                 </div>
 
-                <h3 class="pt-3.5 sm:pt-4 text-xs sm:text-base font-bold text-white tracking-tight mb-0.5 sm:mb-1.5 group-hover:text-indigo-300 transition-colors">
+                <h3 class="pt-3.5 sm:pt-4 text-xs sm:text-base font-bold text-admin-heading tracking-tight mb-0.5 sm:mb-1.5 group-hover:text-indigo-400 transition-colors">
                   ${card.title}
                 </h3>
 
-                <p class="hidden sm:block text-[11px] sm:text-xs text-slate-400 leading-relaxed max-w-[220px]">
+                <p class="hidden sm:block text-[11px] sm:text-xs text-admin-muted leading-relaxed max-w-[220px]">
                   ${card.desc}
                 </p>
               </div>
