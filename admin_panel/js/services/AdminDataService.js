@@ -14,6 +14,7 @@ export class AdminDataService {
     // Auto-sync awal dari Supabase di background
     this.fetchUsersFromSupabase().catch(() => {});
     this.fetchApiKeysFromSupabase().catch(() => {});
+    this.fetchTransactionsFromSupabase().catch(() => {});
   }
 
   /**
@@ -92,8 +93,8 @@ export class AdminDataService {
     const apiKeys = this.getApiKeys();
     const transactions = this.getTransactions();
     const users = this.getUsers();
-    const balance = this._get('wallet_balance', 85000);
-    const lifetime = this._get('lifetime_earnings', 450000);
+    const balance = Number(this._get('wallet_balance', 0));
+    const lifetime = Number(this._get('lifetime_earnings', 0));
 
     const validKeys = apiKeys.filter(k => k.status === 'valid');
     const invalidKeys = apiKeys.filter(k => k.status === 'invalid');
@@ -108,7 +109,7 @@ export class AdminDataService {
     const totalPaidOut = completedWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const pendingPayoutAmount = pendingWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const totalAdminFees = completedWithdrawals.reduce((sum, t) => sum + Number(t.fee || 0), 0);
-    const passiveBalance = this._get('wallet_passive_balance', 0);
+    const passiveBalance = Number(this._get('wallet_passive_balance', 0));
 
     return {
       totalKeys: apiKeys.length,
@@ -804,8 +805,8 @@ export class AdminDataService {
   getTransactions({ type = 'all', status = 'all', search = '' } = {}) {
     let txs = this._get('transactions', []);
 
-    if (!Array.isArray(txs) || txs.length === 0) {
-      txs = this._getInitialTransactions();
+    if (!Array.isArray(txs)) {
+      txs = [];
       this._set('transactions', txs);
     }
 
@@ -820,6 +821,28 @@ export class AdminDataService {
         (t.title && t.title.toLowerCase().includes(q));
       return matchType && matchStatus && matchSearch;
     }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  /**
+   * Mengambil dan menyinkronkan data riwayat transaksi langsung dari database Supabase
+   * @returns {Promise<Array>}
+   */
+  async fetchTransactionsFromSupabase() {
+    try {
+      const res = await fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_transactions', table: 'transactions' })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          this._set('transactions', json.data);
+          return json.data;
+        }
+      }
+    } catch (_) {}
+    return this.getTransactions();
   }
 
   /**

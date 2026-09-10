@@ -156,23 +156,27 @@ export class WalletService {
       .filter(t => t.type === 'withdrawal' && (t.status === 'success' || t.status === 'pending'))
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-    // Saldo aktif adalah akumulasi deposit valid dikurangi penarikan, atau nilai tersimpan jika lebih tinggi
-    const calculatedActive = Math.max(0, expectedActiveDeposit - totalWithdrawals);
-    this._balance = rawSavedBal !== null ? Math.max(rawSavedBal, calculatedActive) : calculatedActive;
-
-    // Saldo pasif bersumber dari key pending
-    this._passiveBalance = rawSavedPassive !== null ? rawSavedPassive : expectedPassiveDeposit;
-    if (pendingKeys.length === 0 && this._passiveBalance > 0 && validKeys.length > 0) {
-      // Jika semua key sudah valid, saldo pasif harus 0
+    if (combinedKeys.length === 0 && loadedTxs.length === 0) {
+      this._balance = 0;
       this._passiveBalance = 0;
+      this._lifetimeEarnings = 0;
+      this._transactions = [];
+      this._persist();
+    } else {
+      // Saldo aktif adalah akumulasi deposit valid dikurangi penarikan
+      const calculatedActive = Math.max(0, expectedActiveDeposit - totalWithdrawals);
+      this._balance = calculatedActive;
+
+      // Saldo pasif SELALU bersumber secara authoritative dari total reward API key yang berstatus pending
+      this._passiveBalance = expectedPassiveDeposit;
+
+      // Lifetime earnings
+      this._lifetimeEarnings = expectedActiveDeposit;
+      this._transactions = loadedTxs;
+
+      // Pastikan jika ada key valid/pending yang belum ada di riwayat mutasi transaksi, tambahkan ke transaksi
+      this._ensureDepositTransactions(combinedKeys);
     }
-
-    // Lifetime earnings
-    this._lifetimeEarnings = rawSavedLifetime !== null ? Math.max(rawSavedLifetime, expectedActiveDeposit) : expectedActiveDeposit;
-    this._transactions = loadedTxs;
-
-    // Pastikan jika ada key valid/pending yang belum ada di riwayat mutasi transaksi, tambahkan ke transaksi
-    this._ensureDepositTransactions(combinedKeys);
 
     // Sync remote transactions dari Supabase
     this._syncFromRemote();
@@ -263,10 +267,25 @@ export class WalletService {
       const expectedActive = validKeys.reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
       const expectedPassive = pendingKeys.reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
 
+      if (combinedKeys.length === 0 && (!remoteTxs || remoteTxs.length === 0)) {
+        this._balance = 0;
+        this._passiveBalance = 0;
+        this._lifetimeEarnings = 0;
+        this._transactions = [];
+        this._persist();
+        this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+          balance: 0,
+          passiveBalance: 0,
+          lifetime: 0
+        });
+        return;
+      }
+
       if (Array.isArray(remoteTxs) && remoteTxs.length > 0) {
         // Deduplikasi transaksi: untuk setiap key unik (berdasarkan 4 karakter terakhir di deskripsi), pertahankan 1 transaksi terbaik
         const deduplicatedTxs = [];
         const seenDepositKeys = new Map();
+        const duplicateIdsToDelete = [];
 
         remoteTxs.forEach(tx => {
           if (tx.type === 'deposit') {
@@ -276,7 +295,10 @@ export class WalletService {
             if (seenDepositKeys.has(keyIdentifier)) {
               const existingIdx = seenDepositKeys.get(keyIdentifier);
               if (tx.status === 'success' && deduplicatedTxs[existingIdx].status !== 'success') {
+                if (deduplicatedTxs[existingIdx].id) duplicateIdsToDelete.push(deduplicatedTxs[existingIdx].id);
                 deduplicatedTxs[existingIdx] = tx;
+              } else {
+                if (tx.id) duplicateIdsToDelete.push(tx.id);
               }
             } else {
               seenDepositKeys.set(keyIdentifier, deduplicatedTxs.length);
@@ -287,20 +309,30 @@ export class WalletService {
           }
         });
 
+        // Hapus transaksi duplikat dari Supabase secara otomatis di background
+        if (duplicateIdsToDelete.length > 0 && typeof fetch !== 'undefined') {
+          duplicateIdsToDelete.forEach(dupId => {
+            if (dupId && dupId.includes('-')) {
+              fetch('/api/supabase-proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', table: 'transactions', id: dupId })
+              }).catch(() => {});
+            }
+          });
+        }
+
         this._transactions = deduplicatedTxs;
 
         let calculatedLifetime = 0;
         let calculatedBalance = 0;
-        let calculatedPassive = 0;
 
-        remoteTxs.forEach(tx => {
+        deduplicatedTxs.forEach(tx => {
           const amt = Number(tx.amount) || 0;
           if (tx.type === 'deposit') {
             if (tx.status === 'success') {
               calculatedBalance += amt;
               calculatedLifetime += amt;
-            } else if (tx.status === 'pending') {
-              calculatedPassive += amt;
             }
           } else if (tx.type === 'withdrawal') {
             if (tx.status === 'success' || tx.status === 'pending') {
@@ -309,9 +341,9 @@ export class WalletService {
           }
         });
 
-        // Selaraskan dengan data key agar tidak ada saldo yang hilang akibat selisih sinkronisasi
+        // Selaraskan dengan data key agar tidak ada saldo yang hilang atau menggelembung
         this._balance = Math.max(0, calculatedBalance, expectedActive);
-        this._passiveBalance = pendingKeys.length > 0 ? Math.max(calculatedPassive, expectedPassive) : 0;
+        this._passiveBalance = expectedPassive;
         this._lifetimeEarnings = Math.max(calculatedLifetime, expectedActive);
       } else {
         // Jika remoteTxs belum ada/kosong di database, gunakan perhitungan authoritative dari daftar key user!

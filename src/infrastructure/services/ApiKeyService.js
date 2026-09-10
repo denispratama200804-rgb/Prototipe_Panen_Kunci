@@ -106,7 +106,7 @@ export class ApiKeyService {
     try {
       // Filter key HANYA untuk pengguna yang sedang aktif
       const remoteKeys = await this._apiKeyRepository.getAll(userId);
-      if (remoteKeys && Array.isArray(remoteKeys) && remoteKeys.length > 0) {
+      if (remoteKeys && Array.isArray(remoteKeys)) {
         this._keys = remoteKeys;
         this._persist();
         this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});
