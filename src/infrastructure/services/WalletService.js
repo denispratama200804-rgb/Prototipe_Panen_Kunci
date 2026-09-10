@@ -1,5 +1,6 @@
 import { Transaction } from '../../domain/models/Transaction.js';
 import { AppEvents } from '../../core/events/EventBus.js';
+import { supabase, isSupabaseConfigured } from '../supabase/supabaseClient.js';
 
 /**
  * WalletService
@@ -28,6 +29,7 @@ export class WalletService {
     this._lifetimeEarnings = 0;
     this._transactions = [];
     this._minWithdrawal = 50000;
+    this._realtimeChannel = null;
 
     this._loadWallet();
 
@@ -35,6 +37,7 @@ export class WalletService {
     this._eventBus.on(AppEvents.AUTH_STATE_CHANGED, () => {
       this._loadWallet();
       this._syncFromRemote();
+      this._setupRealtimeSubscription();
       this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
         balance: this._balance,
         passiveBalance: this._passiveBalance,
@@ -42,8 +45,29 @@ export class WalletService {
       });
     });
 
-    // Cross-tab synchronization via storage event
     if (typeof window !== 'undefined') {
+      // 1. Sinkronisasi Antar-Tab via BroadcastChannel instan
+      if (typeof BroadcastChannel !== 'undefined') {
+        try {
+          this._broadcastChannel = new BroadcastChannel('panenkunci_sync');
+          this._broadcastChannel.onmessage = async (event) => {
+            const data = event.data;
+            if (data && (data.type === 'KEY_APPROVED' || data.type === 'KEY_REJECTED' || data.type === 'KEY_STATUS_UPDATED' || data.type === 'KEY_DELETED' || data.type === 'BALANCE_UPDATED')) {
+              this._loadWallet();
+              await this._syncFromRemote();
+              this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+                balance: this._balance,
+                passiveBalance: this._passiveBalance,
+                lifetime: this._lifetimeEarnings
+              });
+            }
+          };
+        } catch (e) {
+          console.warn('[WalletService] BroadcastChannel not supported:', e.message);
+        }
+      }
+
+      // 2. Cross-tab synchronization via storage event
       window.addEventListener('storage', (e) => {
         if (
           e.key &&
@@ -60,6 +84,65 @@ export class WalletService {
           });
         }
       });
+
+      // 3. Tab Visibility & Focus listener: otomatis re-sync saat tab aktif kembali
+      window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this._loadWallet();
+          this._syncFromRemote();
+        }
+      });
+      window.addEventListener('focus', () => {
+        this._loadWallet();
+        this._syncFromRemote();
+      });
+
+      // 4. Background Polling berkala (setiap 3,5 detik saat tab aktif)
+      this._pollTimer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          const userId = this._getUserId();
+          if (userId) {
+            this._loadWallet();
+            this._syncFromRemote();
+          }
+        }
+      }, 3500);
+
+      // 5. Supabase Realtime Subscription untuk tabel transactions
+      this._setupRealtimeSubscription();
+    }
+  }
+
+  /**
+   * Menghubungkan Supabase Realtime channel untuk memantau perubahan transaksi secara langsung
+   */
+  _setupRealtimeSubscription() {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    try {
+      if (this._realtimeChannel) {
+        supabase.removeChannel(this._realtimeChannel);
+        this._realtimeChannel = null;
+      }
+
+      const userId = this._getUserId();
+      this._realtimeChannel = supabase
+        .channel(`client_tx_${userId || 'public'}_${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'transactions' },
+          (payload) => {
+            const currentUserId = this._getUserId();
+            const isTargetUser = !payload.new?.user_id || payload.new?.user_id === currentUserId || payload.old?.user_id === currentUserId;
+            if (isTargetUser) {
+              this._loadWallet();
+              this._syncFromRemote();
+            }
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn('[WalletService] Realtime subscription init warning:', e.message);
     }
   }
 

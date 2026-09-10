@@ -1,4 +1,5 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
+import { AppEvents } from '../../core/events/EventBus.js';
 
 /**
  * SaldoDetailView
@@ -13,6 +14,7 @@ export class SaldoDetailView extends IComponent {
     super();
     this._container = container;
     this._walletService = container.resolve('WalletService');
+    this._eventBus = container.resolve('EventBus');
   }
 
   render() {
@@ -36,7 +38,7 @@ export class SaldoDetailView extends IComponent {
               <div class="flex justify-between items-start">
                 <div class="flex flex-col gap-1">
                   <span class="text-xs font-semibold text-primary-fixed-dim uppercase tracking-wider">Saldo Aktif (Tersedia)</span>
-                  <h2 class="text-3xl sm:text-4xl font-extrabold text-white">
+                  <h2 id="saldo-active-amount" class="text-3xl sm:text-4xl font-extrabold text-white">
                     Rp ${balance.toLocaleString('id-ID')}
                   </h2>
                 </div>
@@ -52,7 +54,7 @@ export class SaldoDetailView extends IComponent {
                   </div>
                   <div class="flex flex-col">
                     <span class="text-[10px] text-white/70">Saldo Pasif</span>
-                    <span class="text-xs font-bold text-amber-300">Rp ${passiveBalance.toLocaleString('id-ID')}</span>
+                    <span id="saldo-passive-amount" class="text-xs font-bold text-amber-300">Rp ${passiveBalance.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
 
@@ -62,7 +64,7 @@ export class SaldoDetailView extends IComponent {
                   </div>
                   <div class="flex flex-col">
                     <span class="text-[10px] text-white/70">Total Pendapatan</span>
-                    <span class="text-xs font-bold text-white">Rp ${lifetime.toLocaleString('id-ID')}</span>
+                    <span id="saldo-lifetime-amount" class="text-xs font-bold text-white">Rp ${lifetime.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
               </div>
@@ -76,18 +78,19 @@ export class SaldoDetailView extends IComponent {
                 <span class="font-headline-md text-base font-bold text-text-heading">Target Penarikan</span>
                 <span class="text-xs text-text-body">Batas Minimum: Rp ${minWithdrawal.toLocaleString('id-ID')}</span>
               </div>
-              <span class="text-sm font-extrabold text-secondary">${progress.percentage}%</span>
+              <span id="saldo-progress-pct" class="text-sm font-extrabold text-secondary">${progress.percentage}%</span>
             </div>
 
             <!-- Custom Progress Bar -->
             <div class="h-3.5 w-full bg-surface-container rounded-full overflow-hidden relative shadow-inner">
               <div
+                id="saldo-progress-bar"
                 class="absolute top-0 left-0 h-full bg-gradient-to-r from-secondary to-secondary-fixed rounded-full shadow-[0_0_10px_rgba(111,251,190,0.5)] transition-all duration-1000 ease-out"
                 style="width: ${progress.percentage}%;"
               ></div>
             </div>
 
-            <p class="text-xs text-text-body text-center font-medium mt-1">
+            <p id="saldo-progress-text" class="text-xs text-text-body text-center font-medium mt-1">
               ${progress.isEligible 
                 ? '🎉 Saldo Anda telah memenuhi batas minimal untuk ditarik!' 
                 : `Rp ${progress.remaining.toLocaleString('id-ID')} lagi untuk dapat melakukan penarikan.`}
@@ -113,39 +116,8 @@ export class SaldoDetailView extends IComponent {
               </a>
             </div>
 
-            <div class="flex flex-col gap-2">
-              ${withdrawals.length === 0 ? `
-                <div class="bg-surface-card rounded-2xl p-6 text-center text-outline">
-                  <p class="text-xs">Belum ada riwayat penarikan dana.</p>
-                </div>
-              ` : withdrawals.map(w => {
-                const dateStr = new Date(w.createdAt).toLocaleDateString('id-ID', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric'
-                });
-
-                return `
-                  <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
-                    <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-primary relative">
-                        <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">account_balance</span>
-                        <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-secondary rounded-full flex items-center justify-center text-white border-2 border-surface-card">
-                          <span class="material-symbols-outlined text-[10px] font-bold">check</span>
-                        </div>
-                      </div>
-                      <div class="flex flex-col">
-                        <span class="font-label-md text-xs font-bold text-text-heading">${w.title}</span>
-                        <span class="text-[11px] text-text-body">${dateStr}</span>
-                      </div>
-                    </div>
-                    <div class="flex flex-col items-end">
-                      <span class="font-headline-md text-xs font-bold text-text-heading">- Rp ${w.amount.toLocaleString('id-ID')}</span>
-                      <span class="px-2 py-0.5 bg-secondary/10 text-secondary rounded-md text-[10px] font-bold mt-0.5">Berhasil</span>
-                    </div>
-                  </div>
-                `;
-              }).join('')}
+            <div id="saldo-recent-withdrawals" class="flex flex-col gap-2">
+              ${this._renderRecentWithdrawalsHtml(withdrawals)}
             </div>
           </section>
 
@@ -154,7 +126,87 @@ export class SaldoDetailView extends IComponent {
     `;
   }
 
+  _renderRecentWithdrawalsHtml(withdrawals) {
+    if (!withdrawals || withdrawals.length === 0) {
+      return `
+        <div class="bg-surface-card rounded-2xl p-6 text-center text-outline">
+          <p class="text-xs">Belum ada riwayat penarikan dana.</p>
+        </div>
+      `;
+    }
+
+    return withdrawals.map(w => {
+      const dateStr = new Date(w.createdAt).toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+
+      return `
+        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-primary relative">
+              <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+              <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-secondary rounded-full flex items-center justify-center text-white border-2 border-surface-card">
+                <span class="material-symbols-outlined text-[10px] font-bold">check</span>
+              </div>
+            </div>
+            <div class="flex flex-col">
+              <span class="font-label-md text-xs font-bold text-text-heading">${w.title}</span>
+              <span class="text-[11px] text-text-body">${dateStr}</span>
+            </div>
+          </div>
+          <div class="flex flex-col items-end">
+            <span class="font-headline-md text-xs font-bold text-text-heading">- Rp ${w.amount.toLocaleString('id-ID')}</span>
+            <span class="px-2 py-0.5 bg-secondary/10 text-secondary rounded-md text-[10px] font-bold mt-0.5">Berhasil</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  _updateUI(container) {
+    if (!container) return;
+
+    const balance = this._walletService.getBalance();
+    const passiveBalance = this._walletService.getPassiveBalance();
+    const lifetime = this._walletService.getLifetimeEarnings();
+    const progress = this._walletService.getWithdrawalProgress();
+    const withdrawals = this._walletService.getWithdrawals().slice(0, 5);
+
+    const activeEl = container.querySelector('#saldo-active-amount');
+    const passiveEl = container.querySelector('#saldo-passive-amount');
+    const lifetimeEl = container.querySelector('#saldo-lifetime-amount');
+    const progressPctEl = container.querySelector('#saldo-progress-pct');
+    const progressBarEl = container.querySelector('#saldo-progress-bar');
+    const progressTextEl = container.querySelector('#saldo-progress-text');
+    const recentWdEl = container.querySelector('#saldo-recent-withdrawals');
+
+    if (activeEl) activeEl.textContent = `Rp ${balance.toLocaleString('id-ID')}`;
+    if (passiveEl) passiveEl.textContent = `Rp ${passiveBalance.toLocaleString('id-ID')}`;
+    if (lifetimeEl) lifetimeEl.textContent = `Rp ${lifetime.toLocaleString('id-ID')}`;
+    if (progressPctEl) progressPctEl.textContent = `${progress.percentage}%`;
+    if (progressBarEl) progressBarEl.style.width = `${progress.percentage}%`;
+    if (progressTextEl) {
+      progressTextEl.textContent = progress.isEligible 
+        ? '🎉 Saldo Anda telah memenuhi batas minimal untuk ditarik!' 
+        : `Rp ${progress.remaining.toLocaleString('id-ID')} lagi untuk dapat melakukan penarikan.`;
+    }
+    if (recentWdEl) {
+      recentWdEl.innerHTML = this._renderRecentWithdrawalsHtml(withdrawals);
+    }
+  }
+
   mount(container) {
-    // Rendered reactively via router
+    this._unsubBalance = this._eventBus.on(AppEvents.BALANCE_UPDATED, () => {
+      this._updateUI(container);
+    });
+  }
+
+  destroy() {
+    if (this._unsubBalance) {
+      this._unsubBalance();
+      this._unsubBalance = null;
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { ApiKey } from '../../domain/models/ApiKey.js';
 import { AppEvents } from '../../core/events/EventBus.js';
+import { supabase, isSupabaseConfigured } from '../supabase/supabaseClient.js';
 
 /**
  * ApiKeyService
@@ -22,6 +23,7 @@ export class ApiKeyService {
     this._eventBus = eventBus;
     this._apiKeyRepository = apiKeyRepository;
     this._keys = [];
+    this._realtimeChannel = null;
 
     this._loadKeys();
 
@@ -29,10 +31,39 @@ export class ApiKeyService {
     this._eventBus.on(AppEvents.AUTH_STATE_CHANGED, () => {
       this._loadKeys();
       this._syncFromRemote();
+      this._setupRealtimeSubscription();
     });
 
-    // Cross-tab synchronization via storage event (saat Admin memverifikasi key di admin panel)
     if (typeof window !== 'undefined') {
+      // 1. Sinkronisasi Antar-Tab via BroadcastChannel instan (0ms latency)
+      if (typeof BroadcastChannel !== 'undefined') {
+        try {
+          this._broadcastChannel = new BroadcastChannel('panenkunci_sync');
+          this._broadcastChannel.onmessage = async (event) => {
+            const data = event.data;
+            if (data && (data.type === 'KEY_APPROVED' || data.type === 'KEY_REJECTED' || data.type === 'KEY_STATUS_UPDATED' || data.type === 'KEY_DELETED')) {
+              await this._syncFromRemote();
+              if (data.type === 'KEY_APPROVED') {
+                this._eventBus.emit(AppEvents.SHOW_TOAST, {
+                  message: `🎉 Setoran API Key telah disetujui Admin! Saldo Rp ${(data.rewardAmount || 3000).toLocaleString('id-ID')} dicairkan ke Saldo Aktif.`,
+                  type: 'success',
+                  duration: 4500
+                });
+              } else if (data.type === 'KEY_REJECTED') {
+                this._eventBus.emit(AppEvents.SHOW_TOAST, {
+                  message: `⚠️ Setoran API Key ditolak: ${data.reason || 'Ditolak oleh Admin'}.`,
+                  type: 'warning',
+                  duration: 4500
+                });
+              }
+            }
+          };
+        } catch (e) {
+          console.warn('[ApiKeyService] BroadcastChannel not supported:', e.message);
+        }
+      }
+
+      // 2. Cross-tab fallback via storage event
       window.addEventListener('storage', (e) => {
         if (e.key && (e.key.includes('api_keys') || e.key.includes('wallet_balance'))) {
           this._loadKeys();
@@ -40,6 +71,78 @@ export class ApiKeyService {
           this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});
         }
       });
+
+      // 3. Tab Visibility & Focus listener: otomatis re-sync seketika user membuka/beralih kembali ke web
+      window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this._syncFromRemote();
+        }
+      });
+      window.addEventListener('focus', () => {
+        this._syncFromRemote();
+      });
+
+      // 4. Background Polling berkala setiap 3,5 detik saat tab aktif (failover jika websocket terputus)
+      this._pollTimer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          const userId = this._getUserId();
+          if (userId) {
+            this._syncFromRemote();
+          }
+        }
+      }, 3500);
+
+      // 5. Supabase Realtime Subscription (Sinkronisasi Lintas Perangkat: Laptop <-> HP)
+      this._setupRealtimeSubscription();
+    }
+  }
+
+  /**
+   * Menghubungkan Supabase Realtime channel untuk memantau perubahan status api_keys secara langsung
+   */
+  _setupRealtimeSubscription() {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    try {
+      if (this._realtimeChannel) {
+        supabase.removeChannel(this._realtimeChannel);
+        this._realtimeChannel = null;
+      }
+
+      const userId = this._getUserId();
+      this._realtimeChannel = supabase
+        .channel(`client_keys_${userId || 'public'}_${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'api_keys' },
+          (payload) => {
+            const currentUserId = this._getUserId();
+            const isTargetUser = !payload.new?.user_id || payload.new?.user_id === currentUserId || payload.old?.user_id === currentUserId;
+            if (isTargetUser) {
+              const oldStatus = payload.old?.status;
+              const newStatus = payload.new?.status;
+
+              this._syncFromRemote();
+
+              if (payload.eventType === 'UPDATE' && oldStatus === 'pending' && newStatus === 'valid') {
+                this._eventBus.emit(AppEvents.SHOW_TOAST, {
+                  message: '🎉 Setoran API Key telah disetujui Admin! Saldo aktif Anda telah bertambah Rp 3.000.',
+                  type: 'success',
+                  duration: 5000
+                });
+              } else if (payload.eventType === 'UPDATE' && oldStatus === 'pending' && newStatus === 'invalid') {
+                this._eventBus.emit(AppEvents.SHOW_TOAST, {
+                  message: `⚠️ Setoran API Key ditolak oleh Admin: ${payload.new?.error_message || 'Tidak valid'}`,
+                  type: 'warning',
+                  duration: 5000
+                });
+              }
+            }
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn('[ApiKeyService] Realtime subscription init warning:', e.message);
     }
   }
 

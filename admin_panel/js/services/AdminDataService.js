@@ -328,6 +328,22 @@ export class AdminDataService {
   }
 
   /**
+   * Mengirim sinyal sinkronisasi instan ke tab pengguna via BroadcastChannel
+   */
+  _broadcastSync(data) {
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('panenkunci_sync');
+        bc.postMessage({
+          ...data,
+          timestamp: Date.now()
+        });
+        bc.close();
+      } catch (e) {}
+    }
+  }
+
+  /**
    * Perbarui status API Key (misal: 'valid', 'invalid', 'used') dan sinkronkan ke Supabase
    */
   async updateApiKeyStatus(id, newStatus) {
@@ -336,6 +352,12 @@ export class AdminDataService {
     if (idx !== -1) {
       keys[idx].status = newStatus;
       this._set('api_keys', keys);
+
+      this._broadcastSync({
+        type: 'KEY_STATUS_UPDATED',
+        id,
+        newStatus
+      });
 
       // Sinkronkan ke Supabase
       try {
@@ -602,6 +624,15 @@ export class AdminDataService {
       console.warn('[AdminDataService] Sync approve ke Supabase error:', err.message);
     }
 
+    this._broadcastSync({
+      type: 'KEY_APPROVED',
+      keyId,
+      userId: targetUserId,
+      rewardAmount,
+      newActive,
+      newPassive
+    });
+
     return { success: true, key, rewardAmount, newActive, newPassive };
   }
 
@@ -722,6 +753,13 @@ export class AdminDataService {
       console.warn('[AdminDataService] Sync reject ke Supabase error:', err.message);
     }
 
+    this._broadcastSync({
+      type: 'KEY_REJECTED',
+      keyId,
+      userId: targetUserId,
+      reason
+    });
+
     return { success: true, key, reason };
   }
 
@@ -732,6 +770,11 @@ export class AdminDataService {
     const keys = this.getApiKeys();
     const updated = keys.filter(k => k.id !== id);
     this._set('api_keys', updated);
+
+    this._broadcastSync({
+      type: 'KEY_DELETED',
+      id
+    });
 
     // Sinkronkan penghapusan ke Supabase
     try {

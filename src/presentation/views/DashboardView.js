@@ -95,7 +95,7 @@ export class DashboardView extends IComponent {
                 <span class="text-xs text-text-body">Disetorkan hari ini</span>
               </div>
             </div>
-            <span class="font-headline-md text-2xl font-extrabold text-secondary">${todayKeysCount}</span>
+            <span id="dashboard-valid-count" class="font-headline-md text-2xl font-extrabold text-secondary">${todayKeysCount}</span>
           </div>
 
           <!-- Recent Activity Section -->
@@ -108,43 +108,8 @@ export class DashboardView extends IComponent {
               </a>
             </div>
 
-            <div class="flex flex-col gap-2">
-              ${recentTx.length === 0 ? `
-                <div class="bg-surface-card rounded-2xl p-8 text-center text-outline">
-                  <span class="material-symbols-outlined text-4xl mb-2 text-outline/50">inbox</span>
-                  <p class="text-xs">Belum ada aktivitas transaksi.</p>
-                </div>
-              ` : recentTx.map(tx => {
-                const isDeposit = tx.type === 'deposit';
-                const dateStr = new Date(tx.createdAt).toLocaleDateString('id-ID', {
-                  day: 'numeric',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                });
-
-                return `
-                  <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm hover:bg-surface-container-low transition-colors">
-                    <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-xl ${isDeposit ? 'bg-secondary/10 text-secondary' : 'bg-error/10 text-error-ruby'} flex items-center justify-center shrink-0">
-                        <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">
-                          ${isDeposit ? 'vpn_key' : 'account_balance_wallet'}
-                        </span>
-                      </div>
-                      <div class="flex flex-col">
-                        <div class="flex items-center gap-1.5">
-                          <span class="font-label-md text-xs font-bold text-text-heading">${tx.title}</span>
-                          ${tx.status === 'pending' ? '<span class="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded font-medium border border-amber-500/20">Pending</span>' : ''}
-                        </div>
-                        <span class="text-[11px] text-text-body">${dateStr}</span>
-                      </div>
-                    </div>
-                    <span class="font-headline-md text-xs font-bold ${isDeposit ? (tx.status === 'pending' ? 'text-amber-500' : 'text-secondary') : 'text-error-ruby'}">
-                      ${tx.getFormattedAmount()}
-                    </span>
-                  </div>
-                `;
-              }).join('')}
+            <div id="dashboard-recent-tx" class="flex flex-col gap-2">
+              ${this._renderRecentTxHtml(recentTx)}
             </div>
           </div>
 
@@ -161,6 +126,78 @@ export class DashboardView extends IComponent {
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Helper HTML untuk daftar transaksi terkini di Dashboard
+   */
+  _renderRecentTxHtml(recentTx) {
+    if (!recentTx || recentTx.length === 0) {
+      return `
+        <div class="bg-surface-card rounded-2xl p-8 text-center text-outline">
+          <span class="material-symbols-outlined text-4xl mb-2 text-outline/50">inbox</span>
+          <p class="text-xs">Belum ada aktivitas transaksi.</p>
+        </div>
+      `;
+    }
+
+    return recentTx.map(tx => {
+      const isDeposit = tx.type === 'deposit';
+      const dateStr = new Date(tx.createdAt).toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      return `
+        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm hover:bg-surface-container-low transition-colors">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl ${isDeposit ? 'bg-secondary/10 text-secondary' : 'bg-error/10 text-error-ruby'} flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">
+                ${isDeposit ? 'vpn_key' : 'account_balance_wallet'}
+              </span>
+            </div>
+            <div class="flex flex-col">
+              <div class="flex items-center gap-1.5">
+                <span class="font-label-md text-xs font-bold text-text-heading">${tx.title}</span>
+                ${tx.status === 'pending' ? '<span class="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded font-medium border border-amber-500/20 inline-flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>Pending</span>' : ''}
+              </div>
+              <span class="text-[11px] text-text-body">${dateStr}</span>
+            </div>
+          </div>
+          <span class="font-headline-md text-xs font-bold ${isDeposit ? (tx.status === 'pending' ? 'text-amber-500' : 'text-secondary') : 'text-error-ruby'}">
+            ${tx.getFormattedAmount()}
+          </span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  /**
+   * Pembaruan DOM reaktif seketika tanpa refresh manual
+   */
+  _updateDashboardUI(container) {
+    if (!container) return;
+
+    const balanceEl = container.querySelector('#dashboard-balance');
+    const passiveEl = container.querySelector('#dashboard-passive');
+    const validCountEl = container.querySelector('#dashboard-valid-count');
+    const recentTxContainer = container.querySelector('#dashboard-recent-tx');
+
+    if (balanceEl) {
+      balanceEl.textContent = `Rp ${this._walletService.getBalance().toLocaleString('id-ID')}`;
+    }
+    if (passiveEl) {
+      passiveEl.textContent = `Rp ${this._walletService.getPassiveBalance().toLocaleString('id-ID')}`;
+    }
+    if (validCountEl) {
+      validCountEl.textContent = `${this._apiKeyService.getTodayValidCount()}`;
+    }
+    if (recentTxContainer) {
+      const recentTx = this._walletService.getTransactions().slice(0, 4);
+      recentTxContainer.innerHTML = this._renderRecentTxHtml(recentTx);
+    }
   }
 
   mount(container) {
@@ -181,12 +218,13 @@ export class DashboardView extends IComponent {
     };
     window.addEventListener('appinstalled', this._onAppInstalled);
 
-    // Auto-update saldo tampilan secara real-time saat diverifikasi admin di tab lain
+    // Auto-update saldo & aktivitas tampilan secara real-time saat setor key atau diverifikasi admin
     this._unsubBalance = this._eventBus.on(AppEvents.BALANCE_UPDATED, () => {
-      const balanceEl = container.querySelector('#dashboard-balance');
-      const passiveEl = container.querySelector('#dashboard-passive');
-      if (balanceEl) balanceEl.textContent = `Rp ${this._walletService.getBalance().toLocaleString('id-ID')}`;
-      if (passiveEl) passiveEl.textContent = `Rp ${this._walletService.getPassiveBalance().toLocaleString('id-ID')}`;
+      this._updateDashboardUI(container);
+    });
+
+    this._unsubKeySubmitted = this._eventBus.on(AppEvents.API_KEY_SUBMITTED, () => {
+      this._updateDashboardUI(container);
     });
   }
 
@@ -198,6 +236,10 @@ export class DashboardView extends IComponent {
     if (this._unsubBalance) {
       this._unsubBalance();
       this._unsubBalance = null;
+    }
+    if (this._unsubKeySubmitted) {
+      this._unsubKeySubmitted();
+      this._unsubKeySubmitted = null;
     }
   }
 

@@ -13,8 +13,10 @@ export class SetorApiKeyView extends IComponent {
     super();
     this._container = container;
     this._apiKeyService = container.resolve('ApiKeyService');
+    this._walletService = container.resolve('WalletService');
     this._notification = container.resolve('NotificationService');
     this._authService = container.resolve('AuthService');
+    this._eventBus = container.resolve('EventBus');
   }
 
   render() {
@@ -151,57 +153,80 @@ export class SetorApiKeyView extends IComponent {
             </div>
 
             <div class="flex flex-col gap-2" id="keysHistoryList">
-              ${keys.length === 0 ? `
-                <div class="bg-surface-card rounded-2xl p-6 text-center text-outline">
-                  <p class="text-xs">Belum ada API key yang disetorkan.</p>
-                </div>
-              ` : keys.map(k => {
-                const isPending = k.status === 'pending';
-                const isValid = k.status === 'valid';
-                const borderClass = isPending ? 'bg-amber-500' : (isValid ? 'bg-secondary' : 'bg-error-ruby');
-                const dateStr = new Date(k.createdAt).toLocaleDateString('id-ID', {
-                  day: 'numeric',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                });
-
-                return `
-                  <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm relative overflow-hidden">
-                    <div class="absolute left-0 top-0 bottom-0 w-1 ${borderClass}"></div>
-                    <div class="flex flex-col gap-0.5 pl-2">
-                      <div class="font-mono text-xs font-semibold text-text-heading">${k.getMaskedKey()}</div>
-                      <div class="text-[11px] text-text-body">${dateStr}</div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      ${isPending ? `
-                        <span class="text-xs font-extrabold text-amber-500">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
-                        <div class="bg-amber-500/15 text-amber-600 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-amber-500/30">
-                          <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                          <span>Menunggu Verifikasi</span>
-                        </div>
-                      ` : isValid ? `
-                        <span class="text-xs font-extrabold text-secondary">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
-                        <div class="bg-secondary-container text-on-secondary-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
-                          <span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-                          <span>Valid</span>
-                        </div>
-                      ` : `
-                        <div class="bg-error-container text-on-error-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
-                          <span class="material-symbols-outlined text-[12px]">cancel</span>
-                          <span>Invalid</span>
-                        </div>
-                      `}
-                    </div>
-                  </div>
-                `;
-              }).join('')}
+              ${this._renderKeysHistoryHtml(keys)}
             </div>
           </section>
 
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Helper HTML untuk daftar riwayat API key di halaman setor
+   */
+  _renderKeysHistoryHtml(keys) {
+    if (!keys || keys.length === 0) {
+      return `
+        <div class="bg-surface-card rounded-2xl p-6 text-center text-outline">
+          <p class="text-xs">Belum ada API key yang disetorkan.</p>
+        </div>
+      `;
+    }
+
+    return keys.map(k => {
+      const isPending = k.status === 'pending';
+      const isValid = k.status === 'valid';
+      const borderClass = isPending ? 'bg-amber-500' : (isValid ? 'bg-secondary' : 'bg-error-ruby');
+      const dateStr = new Date(k.createdAt).toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      return `
+        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm relative overflow-hidden">
+          <div class="absolute left-0 top-0 bottom-0 w-1 ${borderClass}"></div>
+          <div class="flex flex-col gap-0.5 pl-2">
+            <div class="font-mono text-xs font-semibold text-text-heading">${k.getMaskedKey()}</div>
+            <div class="text-[11px] text-text-body">${dateStr}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            ${isPending ? `
+              <span class="text-xs font-extrabold text-amber-500">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
+              <div class="bg-amber-500/15 text-amber-600 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-amber-500/30">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                <span>Menunggu Verifikasi</span>
+              </div>
+            ` : isValid ? `
+              <span class="text-xs font-extrabold text-secondary">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
+              <div class="bg-secondary-container text-on-secondary-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                <span>Valid</span>
+              </div>
+            ` : `
+              <div class="bg-error-container text-on-error-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-[12px]">cancel</span>
+                <span>Invalid</span>
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  /**
+   * Pembaruan DOM riwayat key seketika tanpa refresh manual
+   */
+  _updateKeysHistoryUI(container) {
+    if (!container) return;
+    const listEl = container.querySelector('#keysHistoryList');
+    if (listEl) {
+      const keys = this._apiKeyService.getAllKeys().slice(0, 5);
+      listEl.innerHTML = this._renderKeysHistoryHtml(keys);
+    }
   }
 
   mount(container) {
@@ -284,10 +309,15 @@ export class SetorApiKeyView extends IComponent {
       if (res.success) {
         input.value = '';
 
+        // Segera perbarui daftar riwayat di bawah formulir secara reaktif seketika
+        this._updateKeysHistoryUI(container);
+
+        const currentPassive = this._walletService.getPassiveBalance();
+
         // Tampilkan Popup Setor Berhasil Masuk ke Saldo Pasif
         this._notification.showModal({
           title: 'Setoran Masuk ke Saldo Pasif!',
-          message: `API Key valid dan reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.<br><br>Reward akan otomatis cair ke <strong>Saldo Aktif</strong> setelah diverifikasi oleh Admin.`,
+          message: `API Key valid dan reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.<br><br>Total Saldo Pasif saat ini: <strong class="text-amber-500 font-bold">Rp ${currentPassive.toLocaleString('id-ID')}</strong>.<br><br>Saldo pasif akan <strong>otomatis berubah menjadi Saldo Aktif</strong> seketika setelah Admin memverifikasi API Key Anda tanpa perlu refresh manual.`,
           type: 'success',
           confirmText: 'Kembali ke Dashboard',
           onConfirm: () => {
@@ -304,5 +334,25 @@ export class SetorApiKeyView extends IComponent {
         });
       }
     });
+
+    // Auto-update riwayat tampilan secara real-time saat diverifikasi admin atau ada key baru
+    this._unsubBalance = this._eventBus.on(AppEvents.BALANCE_UPDATED, () => {
+      this._updateKeysHistoryUI(container);
+    });
+
+    this._unsubKey = this._eventBus.on(AppEvents.API_KEY_SUBMITTED, () => {
+      this._updateKeysHistoryUI(container);
+    });
+  }
+
+  destroy() {
+    if (this._unsubBalance) {
+      this._unsubBalance();
+      this._unsubBalance = null;
+    }
+    if (this._unsubKey) {
+      this._unsubKey();
+      this._unsubKey = null;
+    }
   }
 }
