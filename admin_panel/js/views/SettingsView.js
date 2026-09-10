@@ -218,11 +218,32 @@ export class SettingsView {
   }
 
   bindEvents(container, refreshCallback) {
+    // Sinkronkan form dengan config terbaru dari database di background
+    this.dataService.fetchConfigFromSupabase().then(latestCfg => {
+      if (!latestCfg || !container) return;
+      const form = container.querySelector('#settings-form');
+      if (!form) return;
+      if (form.elements['rewardPerKey']) form.elements['rewardPerKey'].value = latestCfg.rewardPerKey || 3000;
+      if (form.elements['minWithdrawal']) form.elements['minWithdrawal'].value = latestCfg.minWithdrawal || 50000;
+      if (form.elements['feeDana']) form.elements['feeDana'].value = latestCfg.feeDana ?? 1000;
+      if (form.elements['feeGopay']) form.elements['feeGopay'].value = latestCfg.feeGopay ?? 1000;
+      if (form.elements['feeOvo']) form.elements['feeOvo'].value = latestCfg.feeOvo ?? 1000;
+      if (form.elements['feeBank']) form.elements['feeBank'].value = latestCfg.feeBank ?? 2500;
+      if (form.elements['validationMode']) form.elements['validationMode'].value = latestCfg.validationMode || 'simulation';
+    }).catch(() => {});
+
     // Form submit
     const form = container.querySelector('#settings-form');
     if (form) {
-      form.addEventListener('submit', e => {
+      form.addEventListener('submit', async e => {
         e.preventDefault();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-base">progress_activity</span><span>Menyinkronkan...</span>';
+        }
+
         const fd = new FormData(form);
         const getNum = (val, def) => (val !== null && String(val).trim() !== '' && !isNaN(Number(val))) ? Number(val) : def;
         const newConfig = {
@@ -235,8 +256,13 @@ export class SettingsView {
           validationMode: fd.get('validationMode') || 'simulation'
         };
 
-        this.dataService.saveConfig(newConfig);
-        this.toast.success('Pengaturan tarif sistem berhasil disimpan dan langsung aktif!', 'Tersimpan');
+        await this.dataService.saveConfig(newConfig);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        }
+
+        this.toast.success(`Target penarikan Rp ${newConfig.minWithdrawal.toLocaleString('id-ID')} & konfigurasi sistem berhasil disimpan dan disinkronkan ke seluruh pengguna!`, 'Tersimpan');
         refreshCallback();
       });
     }

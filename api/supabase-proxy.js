@@ -66,6 +66,27 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, data: keys });
       }
 
+      if (url.includes('type=config')) {
+        const { data: cfgRow, error } = await adminSupabase
+          .from('users')
+          .select('avatar')
+          .eq('id', '00000000-0000-0000-0000-000000000001')
+          .maybeSingle();
+
+        if (error) {
+          return res.status(400).json({ success: false, error: error.message });
+        }
+
+        let config = null;
+        if (cfgRow && cfgRow.avatar) {
+          try {
+            config = typeof cfgRow.avatar === 'string' ? JSON.parse(cfgRow.avatar) : cfgRow.avatar;
+          } catch (_) {}
+        }
+
+        return res.status(200).json({ success: true, config });
+      }
+
       const { data: users, error } = await adminSupabase
         .from('users')
         .select('*')
@@ -75,7 +96,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: error.message });
       }
 
-      return res.status(200).json({ success: true, data: users });
+      const cleanUsers = (users || []).filter(u => u.role !== 'system_config' && !u.email?.includes('system_config'));
+      return res.status(200).json({ success: true, data: cleanUsers });
     } catch (err) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -96,6 +118,51 @@ export default async function handler(req, res) {
       });
     }
 
+    // 1b. Konfigurasi Sistem Terpusat (Batas penarikan, tarif per key, biaya admin)
+    if (action === 'get_system_config') {
+      const { data: cfgRow, error } = await adminSupabase
+        .from('users')
+        .select('avatar')
+        .eq('id', '00000000-0000-0000-0000-000000000001')
+        .maybeSingle();
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+
+      let config = null;
+      if (cfgRow && cfgRow.avatar) {
+        try {
+          config = typeof cfgRow.avatar === 'string' ? JSON.parse(cfgRow.avatar) : cfgRow.avatar;
+        } catch (_) {}
+      }
+
+      return res.status(200).json({ success: true, config });
+    }
+
+    if (action === 'save_system_config' && data) {
+      const configJson = typeof data === 'string' ? data : JSON.stringify(data);
+      const { data: saved, error } = await adminSupabase
+        .from('users')
+        .upsert({
+          id: '00000000-0000-0000-0000-000000000001',
+          name: 'System Config',
+          email: 'system_config@panenkunci.internal',
+          role: 'system_config',
+          avatar: configJson,
+          is_verified: true,
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+
+      return res.status(200).json({ success: true, data: saved });
+    }
+
     // 2. Ambil data seluruh pengguna (Kelola Pengguna Admin Panel)
     if (action === 'get_users' || (action === 'select' && table === 'users')) {
       const { data: users, error } = await adminSupabase
@@ -107,7 +174,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: error.message });
       }
 
-      return res.status(200).json({ success: true, data: users });
+      const cleanUsers = (users || []).filter(u => u.role !== 'system_config' && !u.email?.includes('system_config'));
+      return res.status(200).json({ success: true, data: cleanUsers });
     }
 
     // 2b. Ambil data seluruh API Key (Gudang API Key Admin Panel) dengan relasi pengguna

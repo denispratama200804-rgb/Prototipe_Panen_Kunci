@@ -12,6 +12,7 @@ export class AdminDataService {
     this._cleanDummyUsers();
     this._cleanDummyKeys();
     // Auto-sync awal dari Supabase di background
+    this.fetchConfigFromSupabase().catch(() => {});
     this.fetchUsersFromSupabase().catch(() => {});
     this.fetchApiKeysFromSupabase().catch(() => {});
     this.fetchTransactionsFromSupabase().catch(() => {});
@@ -1095,8 +1096,15 @@ export class AdminDataService {
           }
         });
 
+        // Filter keluar akun konfigurasi sistem
+        const cleanRemote = remoteUsers.filter(row =>
+          row.id !== '00000000-0000-0000-0000-000000000001' &&
+          row.role !== 'system_config' &&
+          !row.email?.includes('system_config')
+        );
+
         // Petakan kolom Supabase ke objek pengguna di admin panel
-        const mappedUsers = remoteUsers.map(row => ({
+        const mappedUsers = cleanRemote.map(row => ({
           id: row.id,
           name: row.name || 'Tanpa Nama',
           email: row.email || '-',
@@ -1127,14 +1135,17 @@ export class AdminDataService {
   getUsers({ search = '' } = {}) {
     const rawUsers = this._get('all_users', []);
 
-    // Filter keluar data dummy (Budi, Siti, Ahmad, Dewi)
+    // Filter keluar data dummy dan akun sistem
     const users = (Array.isArray(rawUsers) ? rawUsers : []).filter(u =>
       u &&
       u.id !== 'usr_siti_02' &&
       u.id !== 'usr_ahmad_03' &&
       u.id !== 'usr_dewi_04' &&
       u.id !== 'usr_budi_01' &&
-      u.id !== 'usr_admin_master'
+      u.id !== 'usr_admin_master' &&
+      u.id !== '00000000-0000-0000-0000-000000000001' &&
+      u.role !== 'system_config' &&
+      !u.email?.includes('system_config')
     );
 
     // Hubungkan dengan data setoran kunci & transaksi penarikan
@@ -1275,11 +1286,119 @@ export class AdminDataService {
     });
   }
 
-  saveConfig(newConfig) {
+  /**
+   * Mengambil konfigurasi sistem dari Supabase / Server
+   * @returns {Promise<Object>}
+   */
+  async fetchConfigFromSupabase() {
+    try {
+      let remoteConfig = null;
+
+      // 1. Coba lewat proxy POST
+      try {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get_system_config' })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.config) {
+            remoteConfig = json.config;
+          }
+        }
+      } catch (_) {}
+
+      // 2. Coba lewat proxy GET
+      if (!remoteConfig) {
+        try {
+          const res = await fetch('/api/supabase-proxy?type=config');
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && json.config) {
+              remoteConfig = json.config;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 3. Fallback direct client Supabase
+      if (!remoteConfig && isSupabaseConfigured() && supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('avatar')
+            .eq('id', '00000000-0000-0000-0000-000000000001')
+            .maybeSingle();
+
+          if (!error && data && data.avatar) {
+            remoteConfig = typeof data.avatar === 'string' ? JSON.parse(data.avatar) : data.avatar;
+          }
+        } catch (_) {}
+      }
+
+      if (remoteConfig && typeof remoteConfig === 'object') {
+        const current = this.getConfig();
+        const merged = { ...current, ...remoteConfig };
+        this._set('admin_config', merged);
+        return merged;
+      }
+    } catch (err) {
+      console.warn('[AdminDataService] fetchConfigFromSupabase error:', err.message);
+    }
+    return this.getConfig();
+  }
+
+  /**
+   * Menyimpan konfigurasi sistem ke LocalStorage dan Supabase secara persisten
+   * @param {Object} newConfig
+   */
+  async saveConfig(newConfig) {
     this._set('admin_config', newConfig);
+
+    // Pancarkan event lokal
     try {
       window.dispatchEvent(new CustomEvent('panenkunci:config_updated', { detail: newConfig }));
     } catch (e) {}
+
+    // Broadcast lintas tab / browser window
+    this._broadcastSync({
+      type: 'CONFIG_UPDATED',
+      config: newConfig
+    });
+
+    // Simpan ke Supabase (Database Pusat)
+    try {
+      let proxySaved = false;
+      try {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'save_system_config', data: newConfig })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) proxySaved = true;
+        }
+      } catch (_) {}
+
+      if (!proxySaved && isSupabaseConfigured() && supabase) {
+        await supabase
+          .from('users')
+          .upsert({
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'System Config',
+            email: 'system_config@panenkunci.internal',
+            role: 'system_config',
+            avatar: JSON.stringify(newConfig),
+            is_verified: true,
+            updated_at: new Date().toISOString()
+          });
+      }
+    } catch (err) {
+      console.warn('[AdminDataService] saveConfig to Supabase warning:', err.message);
+    }
+
     return true;
   }
 

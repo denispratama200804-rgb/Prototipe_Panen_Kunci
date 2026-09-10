@@ -76,7 +76,7 @@ export class SaldoDetailView extends IComponent {
             <div class="flex justify-between items-end">
               <div class="flex flex-col">
                 <span class="font-headline-md text-base font-bold text-text-heading">Target Penarikan</span>
-                <span class="text-xs text-text-body">Batas Minimum: Rp ${minWithdrawal.toLocaleString('id-ID')}</span>
+                <span id="saldo-min-withdrawal-target" class="text-xs text-text-body">Batas Minimum: Rp ${minWithdrawal.toLocaleString('id-ID')}</span>
               </div>
               <span id="saldo-progress-pct" class="text-sm font-extrabold text-secondary">${progress.percentage}%</span>
             </div>
@@ -97,6 +97,7 @@ export class SaldoDetailView extends IComponent {
             </p>
 
             <a
+              id="saldo-tarik-btn"
               href="#/tarik"
               class="w-full mt-2 py-3.5 rounded-2xl font-label-md text-sm font-bold uppercase tracking-wider text-center transition-all ${progress.isEligible 
                 ? 'bg-secondary text-white shadow-lg shadow-secondary/25 hover:opacity-95 active:scale-[0.98]' 
@@ -172,6 +173,7 @@ export class SaldoDetailView extends IComponent {
     const passiveBalance = this._walletService.getPassiveBalance();
     const lifetime = this._walletService.getLifetimeEarnings();
     const progress = this._walletService.getWithdrawalProgress();
+    const minWithdrawal = this._walletService.minWithdrawal;
     const withdrawals = this._walletService.getWithdrawals().slice(0, 5);
 
     const activeEl = container.querySelector('#saldo-active-amount');
@@ -180,17 +182,28 @@ export class SaldoDetailView extends IComponent {
     const progressPctEl = container.querySelector('#saldo-progress-pct');
     const progressBarEl = container.querySelector('#saldo-progress-bar');
     const progressTextEl = container.querySelector('#saldo-progress-text');
+    const minWdTargetEl = container.querySelector('#saldo-min-withdrawal-target');
+    const tarikBtnEl = container.querySelector('#saldo-tarik-btn');
     const recentWdEl = container.querySelector('#saldo-recent-withdrawals');
 
     if (activeEl) activeEl.textContent = `Rp ${balance.toLocaleString('id-ID')}`;
     if (passiveEl) passiveEl.textContent = `Rp ${passiveBalance.toLocaleString('id-ID')}`;
     if (lifetimeEl) lifetimeEl.textContent = `Rp ${lifetime.toLocaleString('id-ID')}`;
+    if (minWdTargetEl) minWdTargetEl.textContent = `Batas Minimum: Rp ${minWithdrawal.toLocaleString('id-ID')}`;
     if (progressPctEl) progressPctEl.textContent = `${progress.percentage}%`;
     if (progressBarEl) progressBarEl.style.width = `${progress.percentage}%`;
     if (progressTextEl) {
       progressTextEl.textContent = progress.isEligible 
         ? '🎉 Saldo Anda telah memenuhi batas minimal untuk ditarik!' 
         : `Rp ${progress.remaining.toLocaleString('id-ID')} lagi untuk dapat melakukan penarikan.`;
+    }
+    if (tarikBtnEl) {
+      tarikBtnEl.textContent = progress.isEligible ? 'Tarik Saldo Sekarang' : 'Buka Menu Penarikan';
+      if (progress.isEligible) {
+        tarikBtnEl.className = 'w-full mt-2 py-3.5 rounded-2xl font-label-md text-sm font-bold uppercase tracking-wider text-center transition-all bg-secondary text-white shadow-lg shadow-secondary/25 hover:opacity-95 active:scale-[0.98]';
+      } else {
+        tarikBtnEl.className = 'w-full mt-2 py-3.5 rounded-2xl font-label-md text-sm font-bold uppercase tracking-wider text-center transition-all bg-primary text-white shadow-md shadow-primary/20 hover:bg-primary-container';
+      }
     }
     if (recentWdEl) {
       recentWdEl.innerHTML = this._renderRecentWithdrawalsHtml(withdrawals);
@@ -201,12 +214,20 @@ export class SaldoDetailView extends IComponent {
     this._unsubBalance = this._eventBus.on(AppEvents.BALANCE_UPDATED, () => {
       this._updateUI(container);
     });
+    this._onConfigUpdated = () => {
+      this._updateUI(container);
+    };
+    window.addEventListener('panenkunci:config_updated', this._onConfigUpdated);
   }
 
   destroy() {
     if (this._unsubBalance) {
       this._unsubBalance();
       this._unsubBalance = null;
+    }
+    if (this._onConfigUpdated) {
+      window.removeEventListener('panenkunci:config_updated', this._onConfigUpdated);
+      this._onConfigUpdated = null;
     }
   }
 }

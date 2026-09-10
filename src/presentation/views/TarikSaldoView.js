@@ -426,6 +426,32 @@ export class TarikSaldoView extends IComponent {
         notice.textContent = `Batas minimal penarikan adalah Rp ${currentMin.toLocaleString('id-ID')}.`;
       }
 
+      // Update quick chips nominal penarikan
+      const quickContainer = container.querySelector('#quickAmountsContainer');
+      if (quickContainer) {
+        const quickAmounts = [currentMin, currentMin * 2, currentMin * 4, currentMin * 10];
+        const uniqueQuick = [...new Set(quickAmounts)].sort((a, b) => a - b).slice(0, 4);
+        const formatChip = (val) => {
+          if (val >= 1000000) return `${Number((val / 1000000).toFixed(1))} jt`;
+          return `${Math.round(val / 1000)} rb`;
+        };
+        quickContainer.innerHTML = uniqueQuick.map(amt => `
+          <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="${amt}">
+            ${formatChip(amt)}
+          </button>
+        `).join('');
+
+        quickContainer.querySelectorAll('.btn-quick-amount').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const amt = Number(btn.getAttribute('data-amount'));
+            if (amt && amountInput) {
+              amountInput.value = amt;
+              updateBreakdown();
+            }
+          });
+        });
+      }
+
       // Update badge biaya admin di setiap kartu metode
       ['dana', 'gopay', 'ovo', 'bank'].forEach(m => {
         const badge = container.querySelector(`.method-fee-badge[data-method="${m}"]`);
@@ -438,9 +464,17 @@ export class TarikSaldoView extends IComponent {
       updateBreakdown();
     };
 
+    this._handleConfigSync = handleConfigSync;
     window.addEventListener('storage', (e) => {
       if (e.key && e.key.includes('admin_config')) handleConfigSync();
     });
     window.addEventListener('panenkunci:config_updated', handleConfigSync);
+  }
+
+  destroy() {
+    if (this._handleConfigSync) {
+      window.removeEventListener('panenkunci:config_updated', this._handleConfigSync);
+      this._handleConfigSync = null;
+    }
   }
 }

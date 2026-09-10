@@ -45,6 +45,9 @@ export class WalletService {
       });
     });
 
+    // Sinkronkan konfigurasi sistem (target batas penarikan & tarif) dari database di awal
+    this.fetchSystemConfig().catch(() => {});
+
     if (typeof window !== 'undefined') {
       // 1. Sinkronisasi Antar-Tab via BroadcastChannel instan
       if (typeof BroadcastChannel !== 'undefined') {
@@ -52,14 +55,24 @@ export class WalletService {
           this._broadcastChannel = new BroadcastChannel('panenkunci_sync');
           this._broadcastChannel.onmessage = async (event) => {
             const data = event.data;
-            if (data && (data.type === 'KEY_APPROVED' || data.type === 'KEY_REJECTED' || data.type === 'KEY_STATUS_UPDATED' || data.type === 'KEY_DELETED' || data.type === 'BALANCE_UPDATED')) {
-              this._loadWallet();
-              await this._syncFromRemote();
-              this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
-                balance: this._balance,
-                passiveBalance: this._passiveBalance,
-                lifetime: this._lifetimeEarnings
-              });
+            if (data) {
+              if (data.type === 'CONFIG_UPDATED' && data.config) {
+                this._applyNewConfig(data.config);
+              } else if (
+                data.type === 'KEY_APPROVED' ||
+                data.type === 'KEY_REJECTED' ||
+                data.type === 'KEY_STATUS_UPDATED' ||
+                data.type === 'KEY_DELETED' ||
+                data.type === 'BALANCE_UPDATED'
+              ) {
+                this._loadWallet();
+                await this._syncFromRemote();
+                this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+                  balance: this._balance,
+                  passiveBalance: this._passiveBalance,
+                  lifetime: this._lifetimeEarnings
+                });
+              }
             }
           };
         } catch (e) {
@@ -69,7 +82,18 @@ export class WalletService {
 
       // 2. Cross-tab synchronization via storage event
       window.addEventListener('storage', (e) => {
-        if (
+        if (e.key && e.key.includes('admin_config')) {
+          const cfg = this._storage.get('admin_config');
+          if (cfg) {
+            this._validator.minWithdrawal = this.minWithdrawal;
+          }
+          this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+            balance: this._balance,
+            passiveBalance: this._passiveBalance,
+            lifetime: this._lifetimeEarnings
+          });
+          window.dispatchEvent(new CustomEvent('panenkunci:config_updated', { detail: cfg }));
+        } else if (
           e.key &&
           (e.key.includes('wallet_balance') ||
            e.key.includes('wallet_passive_balance') ||
@@ -90,11 +114,13 @@ export class WalletService {
         if (document.visibilityState === 'visible') {
           this._loadWallet();
           this._syncFromRemote();
+          this.fetchSystemConfig().catch(() => {});
         }
       });
       window.addEventListener('focus', () => {
         this._loadWallet();
         this._syncFromRemote();
+        this.fetchSystemConfig().catch(() => {});
       });
 
       // 4. Background Polling berkala (setiap 3,5 detik saat tab aktif)
@@ -105,16 +131,17 @@ export class WalletService {
             this._loadWallet();
             this._syncFromRemote();
           }
+          this.fetchSystemConfig().catch(() => {});
         }
       }, 3500);
 
-      // 5. Supabase Realtime Subscription untuk tabel transactions
+      // 5. Supabase Realtime Subscription untuk tabel transactions & system_config
       this._setupRealtimeSubscription();
     }
   }
 
   /**
-   * Menghubungkan Supabase Realtime channel untuk memantau perubahan transaksi secara langsung
+   * Menghubungkan Supabase Realtime channel untuk memantau perubahan transaksi dan pengaturan sistem secara langsung
    */
   _setupRealtimeSubscription() {
     if (!isSupabaseConfigured() || !supabase) return;
@@ -137,6 +164,33 @@ export class WalletService {
             if (isTargetUser) {
               this._loadWallet();
               this._syncFromRemote();
+            }
+          }
+        )
+        .subscribe();
+
+      // Realtime channel untuk memantau perubahan batas penarikan & konfigurasi sistem dari admin secara instan
+      if (this._configRealtimeChannel) {
+        supabase.removeChannel(this._configRealtimeChannel);
+        this._configRealtimeChannel = null;
+      }
+
+      this._configRealtimeChannel = supabase
+        .channel(`client_sys_config_${Date.now()}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'users',
+            filter: 'id=eq.00000000-0000-0000-0000-000000000001'
+          },
+          (payload) => {
+            if (payload.new && payload.new.avatar) {
+              try {
+                const cfg = typeof payload.new.avatar === 'string' ? JSON.parse(payload.new.avatar) : payload.new.avatar;
+                this._applyNewConfig(cfg);
+              } catch (_) {}
             }
           }
         )
@@ -186,6 +240,95 @@ export class WalletService {
       feeBank: 2500,
       validationMode: 'simulation'
     };
+  }
+
+  /**
+   * Mengambil konfigurasi sistem terbaru (target batas penarikan, reward, tarif) dari Supabase
+   * @returns {Promise<Object>}
+   */
+  async fetchSystemConfig() {
+    try {
+      let remoteConfig = null;
+
+      // 1. Coba via Proxy POST
+      if (typeof fetch !== 'undefined') {
+        try {
+          const res = await fetch('/api/supabase-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'get_system_config' })
+          });
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && json.config) {
+              remoteConfig = json.config;
+            }
+          }
+        } catch (_) {}
+
+        // 2. Coba via Proxy GET
+        if (!remoteConfig) {
+          try {
+            const res = await fetch('/api/supabase-proxy?type=config');
+            if (res.ok) {
+              const json = await res.json();
+              if (json.success && json.config) {
+                remoteConfig = json.config;
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
+      // 3. Fallback direct client Supabase
+      if (!remoteConfig && isSupabaseConfigured() && supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('avatar')
+            .eq('id', '00000000-0000-0000-0000-000000000001')
+            .maybeSingle();
+
+          if (!error && data && data.avatar) {
+            remoteConfig = typeof data.avatar === 'string' ? JSON.parse(data.avatar) : data.avatar;
+          }
+        } catch (_) {}
+      }
+
+      if (remoteConfig && typeof remoteConfig === 'object') {
+        this._applyNewConfig(remoteConfig);
+        return remoteConfig;
+      }
+    } catch (err) {
+      console.warn('[WalletService] fetchSystemConfig error:', err.message);
+    }
+    return this.getAdminConfig();
+  }
+
+  /**
+   * Terapkan konfigurasi sistem baru ke dompet dan emit event pembaruan
+   * @param {Object} newConfig
+   * @private
+   */
+  _applyNewConfig(newConfig) {
+    if (!newConfig) return;
+    const current = this.getAdminConfig();
+    const isDiff = JSON.stringify(current) !== JSON.stringify(newConfig);
+    if (isDiff) {
+      const merged = { ...current, ...newConfig };
+      this._storage.set('admin_config', merged);
+      this._validator.minWithdrawal = this.minWithdrawal;
+
+      this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+        balance: this._balance,
+        passiveBalance: this._passiveBalance,
+        lifetime: this._lifetimeEarnings
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('panenkunci:config_updated', { detail: merged }));
+      }
+    }
   }
 
   _loadWallet() {
