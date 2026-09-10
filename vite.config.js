@@ -81,6 +81,29 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
+                  if (url.includes('type=config')) {
+                    const { data: cfgRow, error } = await adminSupabase
+                      .from('users')
+                      .select('avatar')
+                      .eq('id', '00000000-0000-0000-0000-000000000001')
+                      .maybeSingle();
+
+                    if (error) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: error.message }));
+                    } else {
+                      let config = null;
+                      if (cfgRow && cfgRow.avatar) {
+                        try {
+                          config = typeof cfgRow.avatar === 'string' ? JSON.parse(cfgRow.avatar) : cfgRow.avatar;
+                        } catch (_) {}
+                      }
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true, config }));
+                    }
+                    return;
+                  }
+
                   const { data: users, error } = await adminSupabase
                     .from('users')
                     .select('*')
@@ -90,8 +113,9 @@ export default defineConfig(({ mode }) => {
                     res.statusCode = 400;
                     res.end(JSON.stringify({ success: false, error: error.message }));
                   } else {
+                    const cleanUsers = (users || []).filter(u => u.role !== 'system_config' && !u.email?.includes('system_config'));
                     res.statusCode = 200;
-                    res.end(JSON.stringify({ success: true, data: users }));
+                    res.end(JSON.stringify({ success: true, data: cleanUsers }));
                   }
                 } else {
                   res.statusCode = 500;
@@ -112,6 +136,65 @@ export default defineConfig(({ mode }) => {
                   const parsed = JSON.parse(bodyStr || '{}');
                   const { action, table, data, id } = parsed;
 
+                  if (action === 'get_system_config') {
+                    if (adminSupabase) {
+                      const { data: cfgRow, error } = await adminSupabase
+                        .from('users')
+                        .select('avatar')
+                        .eq('id', '00000000-0000-0000-0000-000000000001')
+                        .maybeSingle();
+
+                      if (error) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: error.message }));
+                      } else {
+                        let config = null;
+                        if (cfgRow && cfgRow.avatar) {
+                          try {
+                            config = typeof cfgRow.avatar === 'string' ? JSON.parse(cfgRow.avatar) : cfgRow.avatar;
+                          } catch (_) {}
+                        }
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({ success: true, config }));
+                      }
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                    }
+                    return;
+                  }
+
+                  if (action === 'save_system_config' && data) {
+                    if (adminSupabase) {
+                      const configJson = typeof data === 'string' ? data : JSON.stringify(data);
+                      const { data: saved, error } = await adminSupabase
+                        .from('users')
+                        .upsert({
+                          id: '00000000-0000-0000-0000-000000000001',
+                          name: 'System Config',
+                          email: 'system_config@panenkunci.internal',
+                          role: 'system_config',
+                          avatar: configJson,
+                          is_verified: true,
+                          updated_at: new Date().toISOString()
+                        })
+                        .select()
+                        .single();
+
+                      if (error) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: error.message }));
+                      } else {
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({ success: true, data: saved }));
+                      }
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                    }
+                    return;
+                  }
+
                   if (action === 'get_users' || (action === 'select' && table === 'users')) {
                     if (adminSupabase) {
                       const { data: users, error } = await adminSupabase
@@ -123,8 +206,9 @@ export default defineConfig(({ mode }) => {
                         res.statusCode = 400;
                         res.end(JSON.stringify({ success: false, error: error.message }));
                       } else {
+                        const cleanUsers = (users || []).filter(u => u.role !== 'system_config' && !u.email?.includes('system_config'));
                         res.statusCode = 200;
-                        res.end(JSON.stringify({ success: true, data: users }));
+                        res.end(JSON.stringify({ success: true, data: cleanUsers }));
                       }
                     } else {
                       res.statusCode = 500;

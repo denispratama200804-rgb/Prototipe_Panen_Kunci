@@ -68,9 +68,10 @@ export class SettingsView {
                   <input
                     type="number"
                     name="minWithdrawal"
+                    id="input-minWithdrawal"
                     value="${config.minWithdrawal || 50000}"
-                    step="10000"
-                    min="10000"
+                    step="1000"
+                    min="1000"
                     class="w-full pl-11 pr-4 py-3 sm:py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-base sm:text-sm font-bold text-white focus:outline-none focus:border-indigo-500 font-mono transition-colors"
                   />
                 </div>
@@ -223,6 +224,8 @@ export class SettingsView {
       if (!latestCfg || !container) return;
       const form = container.querySelector('#settings-form');
       if (!form) return;
+      // Jangan timpa jika admin sedang aktif mengetik di dalam form
+      if (document.activeElement && form.contains(document.activeElement)) return;
       if (form.elements['rewardPerKey']) form.elements['rewardPerKey'].value = latestCfg.rewardPerKey || 3000;
       if (form.elements['minWithdrawal']) form.elements['minWithdrawal'].value = latestCfg.minWithdrawal || 50000;
       if (form.elements['feeDana']) form.elements['feeDana'].value = latestCfg.feeDana ?? 1000;
@@ -262,8 +265,11 @@ export class SettingsView {
           submitBtn.innerHTML = originalText;
         }
 
+        // Kunci nilai input agar tetap konsisten dengan yang baru disimpan
+        if (form.elements['minWithdrawal']) form.elements['minWithdrawal'].value = newConfig.minWithdrawal;
+        if (form.elements['rewardPerKey']) form.elements['rewardPerKey'].value = newConfig.rewardPerKey;
+
         this.toast.success(`Target penarikan Rp ${newConfig.minWithdrawal.toLocaleString('id-ID')} & konfigurasi sistem berhasil disimpan dan disinkronkan ke seluruh pengguna!`, 'Tersimpan');
-        refreshCallback();
       });
     }
   }
