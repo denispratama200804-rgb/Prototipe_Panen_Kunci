@@ -98,6 +98,104 @@ export class DashboardView extends IComponent {
             <span id="dashboard-valid-count" class="font-headline-md text-2xl font-extrabold text-secondary">${todayKeysCount}</span>
           </div>
 
+          <!-- Banner Lengkapi Rekening (Tampil jika akun belum diatur rekening pencairan) -->
+          ${(!user?.bankName || !user?.accountNumber) ? `
+            <div class="bg-surface-card border border-warning-amber/40 rounded-3xl p-4 flex items-center justify-between gap-3 shadow-sm bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-[22px]">account_balance_wallet</span>
+                </div>
+                <div class="flex flex-col">
+                  <span class="font-label-md text-xs font-bold text-text-heading">Atur Rekening Pencairan</span>
+                  <span class="text-[11px] text-text-body">Lengkapi DANA, GoPay, atau Bank Anda untuk payout</span>
+                </div>
+              </div>
+              <a href="#/profil" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shrink-0 transition-colors shadow-sm flex items-center gap-1">
+                <span>Atur</span>
+                <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+              </a>
+            </div>
+          ` : ''}
+
+          <!-- Rate Info & Keunggulan Layanan -->
+          <div class="grid grid-cols-2 gap-3">
+            <!-- Rate per Key -->
+            <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex flex-col gap-1 shadow-sm">
+              <div class="flex items-center gap-1.5 text-xs text-text-body">
+                <span class="material-symbols-outlined text-[17px] text-primary">sell</span>
+                <span class="font-medium text-[11px]">Harga Beli Kunci</span>
+              </div>
+              <span class="font-headline-md text-base font-extrabold text-text-heading font-mono">Rp 3.000 <span class="text-[10px] font-normal text-text-body">/ key</span></span>
+              <span class="text-[10px] text-secondary font-semibold flex items-center gap-0.5">
+                <span class="material-symbols-outlined text-[12px]">bolt</span>
+                <span>Proses Cepat</span>
+              </span>
+            </div>
+
+            <!-- Min Payout -->
+            <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex flex-col gap-1 shadow-sm">
+              <div class="flex items-center gap-1.5 text-xs text-text-body">
+                <span class="material-symbols-outlined text-[17px] text-emerald-500">payments</span>
+                <span class="font-medium text-[11px]">Min. Penarikan</span>
+              </div>
+              <span class="font-headline-md text-base font-extrabold text-text-heading font-mono">Rp 50.000</span>
+              <span class="text-[10px] text-text-body flex items-center gap-0.5">
+                <span class="material-symbols-outlined text-[12px] text-emerald-500">verified</span>
+                <span>DANA • GoPay • Bank</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Panduan Cepat: 3 Langkah Mulai Menghasilkan -->
+          <div class="bg-surface-card border border-surface-container rounded-3xl p-5 shadow-sm space-y-3.5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                  <span class="material-symbols-outlined text-[20px]">rocket_launch</span>
+                </div>
+                <div>
+                  <h3 class="font-headline-md text-sm font-bold text-text-heading">3 Langkah Menghasilkan</h3>
+                  <p class="text-[11px] text-text-body">Cara ubah API Key Kie.ai jadi saldo rupiah</p>
+                </div>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/15 text-secondary">Panduan</span>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2.5">
+              <!-- Step 1 -->
+              <div class="flex items-start gap-3 p-3 rounded-2xl bg-surface-container-lowest border border-surface-container/60">
+                <div class="w-7 h-7 rounded-lg bg-primary-fixed text-on-primary-fixed font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">1</div>
+                <div class="flex flex-col">
+                  <span class="font-label-md text-xs font-bold text-text-heading">Dapatkan API Key di Kie.ai</span>
+                  <span class="text-[11px] text-text-body leading-relaxed">Buat akun gratis di situs Kie.ai untuk meng-generate API Key valid milik Anda.</span>
+                </div>
+              </div>
+
+              <!-- Step 2 -->
+              <div class="flex items-start gap-3 p-3 rounded-2xl bg-surface-container-lowest border border-surface-container/60">
+                <div class="w-7 h-7 rounded-lg bg-secondary-container text-on-secondary-container font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">2</div>
+                <div class="flex flex-col">
+                  <span class="font-label-md text-xs font-bold text-text-heading">Setor Kunci di Menu Setor Key</span>
+                  <span class="text-[11px] text-text-body leading-relaxed">Tempel API Key ke dalam aplikasi Panen Kunci untuk diverifikasi otomatis instan.</span>
+                </div>
+              </div>
+
+              <!-- Step 3 -->
+              <div class="flex items-start gap-3 p-3 rounded-2xl bg-surface-container-lowest border border-surface-container/60">
+                <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-600 font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">3</div>
+                <div class="flex flex-col">
+                  <span class="font-label-md text-xs font-bold text-text-heading">Tarik Saldo ke E-Wallet Favorit</span>
+                  <span class="text-[11px] text-text-body leading-relaxed">Setelah kunci valid, saldo langsung bertambah dan bisa dicairkan ke DANA, GoPay, OVO, atau Bank.</span>
+                </div>
+              </div>
+            </div>
+
+            <a href="#/setor" class="w-full py-3 px-4 rounded-xl bg-primary hover:bg-primary-container text-white text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md shadow-primary/20">
+              <span class="material-symbols-outlined text-[18px]">vpn_key</span>
+              <span>Setor API Key Sekarang</span>
+            </a>
+          </div>
+
           <!-- Recent Activity Section -->
           <div class="flex flex-col gap-3">
             <div class="flex items-center justify-between px-1">
@@ -116,12 +214,33 @@ export class DashboardView extends IComponent {
           <!-- Download App Button (Hanya tampil di HP & belum didownload) -->
           ${!isDownloaded ? `
             <div id="dashboard-download-container" class="pt-1 transition-all duration-300 md:hidden">
-              <button type="button" id="btn-dashboard-download" class="w-full bg-primary text-on-primary rounded-2xl py-3.5 px-5 flex items-center justify-center gap-2.5 shadow-md shadow-primary/20 hover:bg-primary-container transition-all active:scale-95 font-label-md text-sm font-bold group cursor-pointer">
-                <span class="material-symbols-outlined text-[20px] group-hover:translate-y-0.5 transition-transform">download</span>
-                <span>Download Aplikasi Panen Kunci</span>
+              <button type="button" id="btn-dashboard-download" class="w-full bg-surface-card border border-surface-container hover:bg-surface-container-low text-primary rounded-2xl py-3.5 px-5 flex items-center justify-center gap-2.5 shadow-sm transition-all active:scale-95 font-label-md text-sm font-bold group cursor-pointer">
+                <span class="material-symbols-outlined text-[20px] group-hover:translate-y-0.5 transition-transform text-secondary">download</span>
+                <span>Pasang Aplikasi Panen Kunci (PWA)</span>
               </button>
             </div>
           ` : ''}
+
+          <!-- Pusat Bantuan & FAQ Ringkas -->
+          <div class="bg-surface-card border border-surface-container rounded-3xl p-4 shadow-sm space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-text-body">help_outline</span>
+                <span class="font-label-md text-xs font-bold text-text-heading">Informasi & Bantuan</span>
+              </div>
+              <a href="#/profil" class="text-[11px] text-primary font-semibold hover:underline">Detail</a>
+            </div>
+            <div class="divide-y divide-surface-container text-xs text-text-body">
+              <div class="py-2 flex items-center justify-between">
+                <span>Waktu proses transfer pencairan</span>
+                <span class="text-[11px] font-bold text-secondary">Maks. 1x24 Jam</span>
+              </div>
+              <div class="py-2 flex items-center justify-between">
+                <span>Biaya transfer admin e-wallet</span>
+                <span class="text-[11px] font-bold text-text-heading font-mono">Rp 1.000 / tx</span>
+              </div>
+            </div>
+          </div>
 
         </div>
       </div>
@@ -134,9 +253,18 @@ export class DashboardView extends IComponent {
   _renderRecentTxHtml(recentTx) {
     if (!recentTx || recentTx.length === 0) {
       return `
-        <div class="bg-surface-card rounded-2xl p-8 text-center text-outline">
-          <span class="material-symbols-outlined text-4xl mb-2 text-outline/50">inbox</span>
-          <p class="text-xs">Belum ada aktivitas transaksi.</p>
+        <div class="bg-surface-card border border-surface-container rounded-3xl p-6 text-center flex flex-col items-center justify-center gap-2.5 shadow-sm">
+          <div class="w-12 h-12 rounded-2xl bg-surface-container-low flex items-center justify-center text-outline/60">
+            <span class="material-symbols-outlined text-2xl">receipt_long</span>
+          </div>
+          <div class="space-y-0.5">
+            <p class="font-bold text-xs text-text-heading">Belum Ada Riwayat Transaksi</p>
+            <p class="text-[11px] text-text-body max-w-[240px]">Setorkan API Key pertama Anda hari ini untuk mulai menghasilkan saldo rupiah.</p>
+          </div>
+          <a href="#/setor" class="mt-1 text-xs font-bold text-primary hover:underline flex items-center gap-1">
+            <span>Setor Kunci Sekarang</span>
+            <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+          </a>
         </div>
       `;
     }

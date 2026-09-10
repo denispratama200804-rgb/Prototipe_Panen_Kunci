@@ -55,15 +55,6 @@ export class HubDashboardView {
         squircleClass: 'squircle-emerald',
         badge: 'Konfigurasi',
         badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-      },
-      {
-        id: 'transactions',
-        title: 'Log Mutasi Saldo',
-        desc: 'Audit riwayat penarikan berhasil, potongan biaya admin, dan pengembalian dana refund.',
-        icon: 'receipt_long',
-        squircleClass: 'squircle-rose',
-        badge: 'Mutasi Realtime',
-        badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30'
       }
     ];
 
@@ -80,14 +71,12 @@ export class HubDashboardView {
           </p>
         </div>
 
-        <!-- Unified Card Grid (5 Cards: 5 Cols on Desktop, 3 on Tablet, 2 on Mobile) -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-5">
-          ${cards.map((card, idx) => `
+        <!-- Unified Card Grid (4 Cards: 4 Cols on Desktop, 2 on Mobile/Tablet) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+          ${cards.map((card) => `
             <div
               data-hub-target="${card.id}"
-              class="hub-card p-4 sm:p-6 flex flex-col items-center text-center justify-center min-h-[135px] sm:min-h-[230px] group select-none ${
-                idx === 4 ? 'col-span-2 md:col-span-1' : ''
-              }"
+              class="hub-card p-4 sm:p-6 flex flex-col items-center text-center justify-center min-h-[135px] sm:min-h-[230px] group select-none cursor-pointer"
             >
               <!-- Center Squircle Icon & Title -->
               <div class="flex flex-col items-center py-1 sm:py-2">
@@ -117,11 +106,7 @@ export class HubDashboardView {
     container.querySelectorAll('[data-hub-target]').forEach(card => {
       card.addEventListener('click', () => {
         const target = card.getAttribute('data-hub-target');
-        if (target === 'transactions') {
-          this.onNavigate('withdrawals');
-        } else {
-          this.onNavigate(target);
-        }
+        this.onNavigate(target);
       });
     });
   }

@@ -1,11 +1,3 @@
-import { themeService } from '../services/ThemeService.js';
-
-/**
- * SettingsView
- * Konfigurasi Sistem & Tarif Panen Kunci:
- * Mengatur reward per key, batas penarikan, biaya admin per channel,
- * preferensi tema (malam/siang), serta kontrol mode validasi.
- */
 export class SettingsView {
   constructor(dataService, toastService) {
     this.dataService = dataService;
@@ -16,88 +8,37 @@ export class SettingsView {
 
   render() {
     const config = this.dataService.getConfig();
-    const isDark = themeService.isDark();
 
     return `
-      <div class="space-y-8 view-fade-enter max-w-5xl">
-        <!-- Pengaturan Tampilan & Tema Sistem -->
-        <div class="admin-card rounded-2xl p-6 space-y-5">
-          <div class="border-b border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h3 class="text-lg font-bold text-white font-['Plus_Jakarta_Sans']">Tampilan & Tema Panel Admin</h3>
-              <p class="text-xs text-slate-400">Pilih skema warna antarmuka: Tema Malam (Gelap) atau Tema Siang (Terang)</p>
-            </div>
-            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-xs ${isDark ? 'text-indigo-300' : 'text-amber-600'} border border-slate-700 shrink-0">
-              <span class="material-symbols-outlined text-sm">${isDark ? 'dark_mode' : 'light_mode'}</span>
-              <span class="font-semibold">${isDark ? 'Tema Malam Aktif' : 'Tema Siang Aktif'}</span>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <!-- Pilihan Tema Malam -->
-            <label class="theme-option-card flex items-start gap-4 p-4 rounded-2xl border cursor-pointer transition-all ${isDark ? 'border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10 ring-1 ring-indigo-500' : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'}">
-              <input
-                type="radio"
-                name="settingAppTheme"
-                value="dark"
-                ${isDark ? 'checked' : ''}
-                class="mt-1 accent-indigo-500 cursor-pointer"
-              />
-              <div class="space-y-1.5 flex-1">
-                <div class="flex items-center gap-2">
-                  <div class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center text-indigo-400">
-                    <span class="material-symbols-outlined text-base">dark_mode</span>
-                  </div>
-                  <span class="text-sm font-bold text-white">Tema Malam (Dark Mode)</span>
-                </div>
-                <p class="text-xs text-slate-400 leading-relaxed">Palet futuristik dengan latar deep navy (#060b18), aksen neon glow, dan kenyamanan mata saat malam hari.</p>
-                <div class="flex items-center gap-2 pt-1">
-                  <span class="w-4 h-4 rounded-full bg-[#060b18] border border-slate-700 inline-block" title="#060b18"></span>
-                  <span class="w-4 h-4 rounded-full bg-[#0e172e] border border-slate-700 inline-block" title="#0e172e"></span>
-                  <span class="w-4 h-4 rounded-full bg-indigo-500 inline-block" title="Indigo"></span>
-                  <span class="w-4 h-4 rounded-full bg-emerald-500 inline-block" title="Emerald"></span>
-                </div>
-              </div>
-            </label>
-
-            <!-- Pilihan Tema Siang -->
-            <label class="theme-option-card flex items-start gap-4 p-4 rounded-2xl border cursor-pointer transition-all ${!isDark ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500' : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'}">
-              <input
-                type="radio"
-                name="settingAppTheme"
-                value="light"
-                ${!isDark ? 'checked' : ''}
-                class="mt-1 accent-amber-500 cursor-pointer"
-              />
-              <div class="space-y-1.5 flex-1">
-                <div class="flex items-center gap-2">
-                  <div class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500">
-                    <span class="material-symbols-outlined text-base">light_mode</span>
-                  </div>
-                  <span class="text-sm font-bold text-white">Tema Siang (Light Mode)</span>
-                </div>
-                <p class="text-xs text-slate-400 leading-relaxed">Palet cerah, bersih dan profesional dengan latar slate-50 (#f8fafc), kartu putih bersih, dan keterbacaan tinggi di siang hari.</p>
-                <div class="flex items-center gap-2 pt-1">
-                  <span class="w-4 h-4 rounded-full bg-[#f8fafc] border border-slate-300 inline-block" title="#f8fafc"></span>
-                  <span class="w-4 h-4 rounded-full bg-white border border-slate-300 inline-block" title="#ffffff"></span>
-                  <span class="w-4 h-4 rounded-full bg-indigo-600 inline-block" title="Indigo"></span>
-                  <span class="w-4 h-4 rounded-full bg-amber-500 inline-block" title="Amber"></span>
-                </div>
-              </div>
-            </label>
-          </div>
-        </div>
+      <div class="w-full max-w-5xl mx-auto space-y-6 sm:space-y-8 view-fade-enter">
 
         <!-- Form Konfigurasi Tarif -->
-        <div class="admin-card rounded-2xl p-6 space-y-6">
-          <div class="border-b border-slate-800 pb-4">
-            <h3 class="text-lg font-bold text-white font-['Plus_Jakarta_Sans']">Pengaturan Tarif & Kebijakan Sistem</h3>
-            <p class="text-xs text-slate-400">Atur nominal reward per kunci dan parameter penarikan dana untuk pengguna</p>
+        <div class="admin-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-7 shadow-xl">
+          
+          <!-- Header Pengaturan -->
+          <div class="border-b border-slate-800/80 pb-4 sm:pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-start sm:items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-2xl">tune</span>
+              </div>
+              <div>
+                <h3 class="text-base sm:text-lg font-bold text-white font-['Plus_Jakarta_Sans'] tracking-tight">
+                  Pengaturan Tarif & Kebijakan Sistem
+                </h3>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                  Atur nominal reward per kunci dan parameter penarikan dana untuk pengguna
+                </p>
+              </div>
+            </div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold self-start sm:self-auto shrink-0">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Konfigurasi Realtime</span>
+            </div>
           </div>
 
           <form id="settings-form" class="space-y-6">
-            <!-- Grid Input -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Grid Input Utama: Reward & Batas Minimal -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <!-- Reward per Valid Key -->
               <div class="space-y-2">
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -111,10 +52,10 @@ export class SettingsView {
                     value="${config.rewardPerKey || 3000}"
                     step="500"
                     min="1000"
-                    class="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-indigo-500 font-mono transition-colors"
+                    class="w-full pl-11 pr-4 py-3 sm:py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-base sm:text-sm font-bold text-white focus:outline-none focus:border-indigo-500 font-mono transition-colors"
                   />
                 </div>
-                <p class="text-[11px] text-slate-400">Nominal reward yang diterima pengguna saat menyetor 1 API Key Kie.ai valid.</p>
+                <p class="text-[11px] text-slate-400 leading-relaxed">Nominal reward yang diterima pengguna saat menyetor 1 API Key Kie.ai valid.</p>
               </div>
 
               <!-- Minimal Penarikan Dana -->
@@ -130,118 +71,143 @@ export class SettingsView {
                     value="${config.minWithdrawal || 50000}"
                     step="10000"
                     min="10000"
-                    class="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-indigo-500 font-mono transition-colors"
+                    class="w-full pl-11 pr-4 py-3 sm:py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-base sm:text-sm font-bold text-white focus:outline-none focus:border-indigo-500 font-mono transition-colors"
                   />
                 </div>
-                <p class="text-[11px] text-slate-400">Ambang batas saldo minimum sebelum pengguna diizinkan mencairkan dana.</p>
+                <p class="text-[11px] text-slate-400 leading-relaxed">Ambang batas saldo minimum sebelum pengguna diizinkan mencairkan dana.</p>
               </div>
             </div>
 
             <!-- Biaya Admin E-Wallet & Bank Grid -->
             <div>
-              <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Biaya Admin per Metode Pencairan</h4>
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="space-y-1.5 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <label class="text-xs font-medium text-cyan-400 flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-base">wallet</span>
-                    <span>Fee DANA</span>
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  Biaya Admin per Metode Pencairan
+                </h4>
+                <span class="text-[11px] text-slate-400">Dipotong saat payout disetujui</span>
+              </div>
+              <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+                <!-- DANA -->
+                <div class="space-y-2 p-3 sm:p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 focus-within:border-cyan-500/50 transition-colors">
+                  <label class="text-xs font-bold text-cyan-400 flex items-center gap-1.5 truncate">
+                    <span class="material-symbols-outlined text-base shrink-0">wallet</span>
+                    <span class="truncate">Fee DANA</span>
                   </label>
-                  <input
-                    type="number"
-                    name="feeDana"
-                    value="${config.feeDana || 1000}"
-                    step="500"
-                    class="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs font-mono font-bold text-white"
-                  />
+                  <div class="relative">
+                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono text-slate-400">Rp</span>
+                    <input
+                      type="number"
+                      name="feeDana"
+                      value="${config.feeDana || 1000}"
+                      step="500"
+                      class="w-full pl-8 pr-2.5 py-2.5 sm:py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-base sm:text-xs font-mono font-bold text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                    />
+                  </div>
                 </div>
 
-                <div class="space-y-1.5 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <label class="text-xs font-medium text-emerald-400 flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-base">bolt</span>
-                    <span>Fee GoPay</span>
+                <!-- GoPay -->
+                <div class="space-y-2 p-3 sm:p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 focus-within:border-emerald-500/50 transition-colors">
+                  <label class="text-xs font-bold text-emerald-400 flex items-center gap-1.5 truncate">
+                    <span class="material-symbols-outlined text-base shrink-0">bolt</span>
+                    <span class="truncate">Fee GoPay</span>
                   </label>
-                  <input
-                    type="number"
-                    name="feeGopay"
-                    value="${config.feeGopay || 1000}"
-                    step="500"
-                    class="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs font-mono font-bold text-white"
-                  />
+                  <div class="relative">
+                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono text-slate-400">Rp</span>
+                    <input
+                      type="number"
+                      name="feeGopay"
+                      value="${config.feeGopay || 1000}"
+                      step="500"
+                      class="w-full pl-8 pr-2.5 py-2.5 sm:py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-base sm:text-xs font-mono font-bold text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                    />
+                  </div>
                 </div>
 
-                <div class="space-y-1.5 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <label class="text-xs font-medium text-purple-400 flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-base">account_balance_wallet</span>
-                    <span>Fee OVO</span>
+                <!-- OVO -->
+                <div class="space-y-2 p-3 sm:p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 focus-within:border-purple-500/50 transition-colors">
+                  <label class="text-xs font-bold text-purple-400 flex items-center gap-1.5 truncate">
+                    <span class="material-symbols-outlined text-base shrink-0">account_balance_wallet</span>
+                    <span class="truncate">Fee OVO</span>
                   </label>
-                  <input
-                    type="number"
-                    name="feeOvo"
-                    value="${config.feeOvo || 1000}"
-                    step="500"
-                    class="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs font-mono font-bold text-white"
-                  />
+                  <div class="relative">
+                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono text-slate-400">Rp</span>
+                    <input
+                      type="number"
+                      name="feeOvo"
+                      value="${config.feeOvo || 1000}"
+                      step="500"
+                      class="w-full pl-8 pr-2.5 py-2.5 sm:py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-base sm:text-xs font-mono font-bold text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    />
+                  </div>
                 </div>
 
-                <div class="space-y-1.5 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <label class="text-xs font-medium text-indigo-400 flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-base">account_balance</span>
-                    <span>Fee Bank Transfer</span>
+                <!-- Bank Transfer -->
+                <div class="space-y-2 p-3 sm:p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 focus-within:border-indigo-500/50 transition-colors">
+                  <label class="text-xs font-bold text-indigo-400 flex items-center gap-1.5 truncate">
+                    <span class="material-symbols-outlined text-base shrink-0">account_balance</span>
+                    <span class="truncate">Fee Bank</span>
                   </label>
-                  <input
-                    type="number"
-                    name="feeBank"
-                    value="${config.feeBank || 2500}"
-                    step="500"
-                    class="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs font-mono font-bold text-white"
-                  />
+                  <div class="relative">
+                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono text-slate-400">Rp</span>
+                    <input
+                      type="number"
+                      name="feeBank"
+                      value="${config.feeBank || 2500}"
+                      step="500"
+                      class="w-full pl-8 pr-2.5 py-2.5 sm:py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-base sm:text-xs font-mono font-bold text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             <!-- Mode Validasi Kie.ai -->
-            <div class="space-y-2">
+            <div class="space-y-2.5">
               <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                 Mode Validasi Setoran API Key
               </label>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label class="flex items-center gap-3 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 cursor-pointer hover:border-indigo-500/40 transition-colors">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <label class="flex items-start gap-3 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-900/80 border border-slate-800 cursor-pointer hover:border-indigo-500/40 transition-all select-none active:scale-[0.99]">
                   <input
                     type="radio"
                     name="validationMode"
                     value="simulation"
                     ${config.validationMode === 'simulation' ? 'checked' : ''}
-                    class="accent-indigo-500"
+                    class="mt-1 accent-indigo-500 cursor-pointer shrink-0"
                   />
-                  <div>
-                    <div class="text-xs font-bold text-white">Simulasi Cepat (Default Prototipe)</div>
-                    <div class="text-[11px] text-slate-400">Mendeteksi format key & kredit secara otomatis instan.</div>
+                  <div class="space-y-0.5">
+                    <div class="text-xs sm:text-sm font-bold text-white">Simulasi Cepat (Default Prototipe)</div>
+                    <p class="text-[11px] sm:text-xs text-slate-400 leading-relaxed">Mendeteksi format key & kredit secara otomatis instan tanpa ketergantungan koneksi pihak ketiga.</p>
                   </div>
                 </label>
 
-                <label class="flex items-center gap-3 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 cursor-pointer hover:border-indigo-500/40 transition-colors">
+                <label class="flex items-start gap-3 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-900/80 border border-slate-800 cursor-pointer hover:border-indigo-500/40 transition-all select-none active:scale-[0.99]">
                   <input
                     type="radio"
                     name="validationMode"
                     value="real"
                     ${config.validationMode === 'real' ? 'checked' : ''}
-                    class="accent-indigo-500"
+                    class="mt-1 accent-indigo-500 cursor-pointer shrink-0"
                   />
-                  <div>
-                    <div class="text-xs font-bold text-white">Endpoint Live Kie.ai</div>
-                    <div class="text-[11px] text-slate-400">Melakukan HTTP ping ke API resmi Kie.ai sebelum menyetujui.</div>
+                  <div class="space-y-0.5">
+                    <div class="text-xs sm:text-sm font-bold text-white">Endpoint Live Kie.ai</div>
+                    <p class="text-[11px] sm:text-xs text-slate-400 leading-relaxed">Melakukan HTTP ping ke API resmi Kie.ai sebelum menyetujui dan menambah saldo pengguna.</p>
                   </div>
                 </label>
               </div>
             </div>
 
-            <!-- Save Button -->
-            <div class="pt-2 flex justify-end">
+            <!-- Save Button & Realtime Status -->
+            <div class="pt-4 sm:pt-6 border-t border-slate-800/80 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+              <div class="text-[11px] sm:text-xs text-slate-400 flex items-center justify-center sm:justify-start gap-1.5 text-center sm:text-left">
+                <span class="material-symbols-outlined text-sm text-emerald-400 shrink-0">check_circle</span>
+                <span>Pengaturan langsung diterapkan secara realtime di seluruh aplikasi.</span>
+              </div>
               <button
                 type="submit"
-                class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/30 flex items-center gap-2 cursor-pointer"
+                class="w-full sm:w-auto px-6 py-3.5 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs sm:text-sm font-bold transition-all shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
               >
-                <span class="material-symbols-outlined text-base">save</span>
+                <span class="material-symbols-outlined text-base sm:text-lg">save</span>
                 <span>Simpan Perubahan Tarif</span>
               </button>
             </div>
@@ -252,15 +218,6 @@ export class SettingsView {
   }
 
   bindEvents(container, refreshCallback) {
-    // Radio Theme Change Event
-    container.querySelectorAll('input[name="settingAppTheme"]').forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        const selectedTheme = e.target.value;
-        themeService.setTheme(selectedTheme);
-        refreshCallback();
-      });
-    });
-
     // Form submit
     const form = container.querySelector('#settings-form');
     if (form) {

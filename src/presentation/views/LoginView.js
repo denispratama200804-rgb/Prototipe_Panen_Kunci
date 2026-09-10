@@ -177,7 +177,7 @@ export class LoginView extends IComponent {
       }
     });
 
-    // Login via Google OAuth
+    // Login via Google OAuth (Fallback Redirect dengan prompt select_account)
     googleBtn?.addEventListener('click', async (e) => {
       e.preventDefault();
       googleBtn.disabled = true;
@@ -192,6 +192,46 @@ export class LoginView extends IComponent {
         this._notification.error(res.message || 'Gagal memulai autentikasi Google.');
       }
     });
+
+    // Inisialisasi Google One Tap (Native Bottom Sheet di Mobile)
+    if (googleClientId && typeof window !== 'undefined') {
+      const initOneTap = () => {
+        if (window.google?.accounts?.id) {
+          try {
+            window.google.accounts.id.initialize({
+              client_id: googleClientId,
+              callback: async (response) => {
+                if (response.credential) {
+                  this._notification.info('Sedang masuk dengan Google...');
+                  const res = await this._authService.loginWithGoogleIdToken(response.credential);
+                  if (res.success) {
+                    this._notification.success('Login berhasil! Selamat datang.');
+                    window.location.hash = '/dashboard';
+                  } else {
+                    this._notification.error(res.message || 'Gagal masuk dengan Google One Tap.');
+                  }
+                }
+              },
+              auto_select: false,
+              cancel_on_tap_outside: true
+            });
+            window.google.accounts.id.prompt((notification) => {
+              if (notification.isNotDisplayed()) {
+                console.log('[Google One Tap] Not displayed:', notification.getNotDisplayedReason());
+              }
+            });
+          } catch (err) {
+            console.warn('[Google One Tap] Init skipped:', err);
+          }
+        }
+      };
+
+      if (window.google?.accounts?.id) {
+        initOneTap();
+      } else {
+        window.addEventListener('load', initOneTap, { once: true });
+      }
+    }
 
     // Lupa password modal
     forgotBtn?.addEventListener('click', () => {
