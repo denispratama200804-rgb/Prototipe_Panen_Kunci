@@ -34,14 +34,20 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
             let list = json.data;
             if (userId) list = list.filter(k => k.userId === userId || k.user_id === userId);
             return list.map(item => {
+              let domainStatus = item.status;
+              let errorMessage = item.errorMessage || item.error_message || '';
+              if (errorMessage.startsWith('__PENDING__')) {
+                domainStatus = 'pending';
+                errorMessage = errorMessage.replace('__PENDING__', '');
+              }
               const k = new ApiKey({
                 id: item.id,
                 userId: item.userId || item.user_id,
                 keyString: item.keyString || item.key_string,
-                status: item.status,
+                status: domainStatus,
                 rewardAmount: Number(item.rewardAmount ?? item.reward_amount ?? 3000),
                 credits: Number(item.credits ?? 80),
-                errorMessage: item.errorMessage || item.error_message || '',
+                errorMessage: errorMessage,
                 createdAt: item.createdAt || item.created_at
               });
               k.userName = item.userName || 'Pengguna';

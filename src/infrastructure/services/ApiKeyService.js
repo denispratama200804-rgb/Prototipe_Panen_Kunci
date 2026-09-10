@@ -210,36 +210,6 @@ export class ApiKeyService {
       // Filter key HANYA untuk pengguna yang sedang aktif
       const remoteKeys = await this._apiKeyRepository.getAll(userId);
       if (remoteKeys && Array.isArray(remoteKeys)) {
-        // Rekonsiliasi cerdas: Jika ada transaksi deposit terverifikasi yang record key-nya belum tercatat, pulihkan secara otomatis
-        const userTxs = this._walletService ? this._walletService.getTransactions() : [];
-        const depositTxs = userTxs.filter(t => t.type === 'deposit');
-
-        depositTxs.forEach(tx => {
-          const matchSuffix = tx.description?.match(/([a-zA-Z0-9]{4})$/);
-          const suffix = matchSuffix ? matchSuffix[1] : '';
-          const hasKey = remoteKeys.some(k =>
-            (suffix && k.keyString?.endsWith(suffix)) ||
-            k.id === tx.id ||
-            (tx.description && k.keyString && tx.description.includes(k.getMaskedKey?.() || ''))
-          );
-
-          if (!hasKey) {
-            const pseudoKey = new ApiKey({
-              id: tx.id || ('key_' + Math.random().toString(36).substring(2, 9)),
-              userId,
-              keyString: suffix ? `sk-kie-auto-${suffix}` : (tx.description || 'sk-kie-auto'),
-              status: tx.status === 'success' ? 'valid' : 'pending',
-              rewardAmount: Number(tx.amount) || 3000,
-              credits: 80,
-              createdAt: tx.createdAt || new Date().toISOString()
-            });
-            remoteKeys.push(pseudoKey);
-            if (this._apiKeyRepository.create) {
-              this._apiKeyRepository.create(pseudoKey).catch(() => {});
-            }
-          }
-        });
-
         this._keys = remoteKeys;
         this._persist();
         this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});

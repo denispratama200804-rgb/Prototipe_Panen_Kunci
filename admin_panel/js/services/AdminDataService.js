@@ -262,17 +262,23 @@ export class AdminDataService {
         });
 
         const mappedKeys = remoteKeys.map(k => {
-          const matchedUser = userMap[k.userId];
+          const matchedUser = userMap[k.userId || k.user_id];
+          let domainStatus = k.status;
+          let errorMessage = k.errorMessage || k.error_message || '';
+          if (errorMessage.startsWith('__PENDING__')) {
+            domainStatus = 'pending';
+            errorMessage = errorMessage.replace('__PENDING__', '');
+          }
           return {
             id: k.id,
             keyString: k.keyString || k.key_string,
             userId: k.userId || k.user_id,
             userName: k.userName || matchedUser?.name || 'Pengguna',
             userEmail: k.userEmail || matchedUser?.email || '-',
-            status: k.status,
+            status: domainStatus,
             rewardAmount: Number(k.rewardAmount ?? k.reward_amount ?? 3000),
             credits: Number(k.credits ?? 80),
-            errorMessage: k.errorMessage || k.error_message || '',
+            errorMessage: errorMessage,
             createdAt: k.createdAt || k.created_at || new Date().toISOString(),
             source: 'supabase'
           };
