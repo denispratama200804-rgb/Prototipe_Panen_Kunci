@@ -101,6 +101,30 @@ export class AuthService {
       this._storage.remove('current_user');
       this._storage.remove('session');
     }
+
+    // Periksa apakah ada pesan selamat datang dari OAuth Google yang tersimpan
+    this.checkPendingOAuthWelcome();
+  }
+
+  /**
+   * Periksa dan tampilkan toast selamat datang setelah reload bersih pasca OAuth Google
+   */
+  checkPendingOAuthWelcome() {
+    try {
+      if (typeof sessionStorage === 'undefined') return;
+      const welcomeName = sessionStorage.getItem('panenkunci:oauth_welcome');
+      if (welcomeName) {
+        sessionStorage.removeItem('panenkunci:oauth_welcome');
+        setTimeout(() => {
+          this._eventBus.emit(AppEvents.SHOW_TOAST, {
+            type: 'success',
+            message: `Selamat datang, ${welcomeName}! Berhasil masuk menggunakan akun Google.`
+          });
+        }, 400);
+      }
+    } catch (e) {
+      console.warn('[AuthService] checkPendingOAuthWelcome note:', e);
+    }
   }
 
   /**
@@ -771,6 +795,29 @@ export class AuthService {
       });
       this._eventBus.emit(AppEvents.USER_UPDATED, userRecord);
 
+      // Bersihkan parameter token OAuth pada URL dan navigasikan ke halaman yang tepat
+      const curHash = window.location.hash || '';
+      const curSearch = window.location.search || '';
+      const hasOAuthTokens = curHash.includes('access_token') || curHash.includes('refresh_token') || curSearch.includes('code=');
+
+      if (hasOAuthTokens) {
+        // Simpan nama pengguna ke sessionStorage agar toast selamat datang muncul saat halaman termuat segar
+        try {
+          sessionStorage.setItem('panenkunci:oauth_welcome', userRecord.name || fullName);
+        } catch (e) {}
+
+        const targetUrl = role === 'admin'
+          ? '/admin_panel/index.html'
+          : (window.location.pathname + '#/dashboard');
+
+        // Ganti URL menjadi bersih dan muat ulang halaman otomatis.
+        // Tindakan reload ini menjamin browser mobile (Chrome/Safari/PWA) menghitung ulang
+        // viewport layar 100% penuh tanpa mengecil/ter-zoom out pasca redirect OAuth eksternal.
+        window.location.replace(targetUrl);
+        window.location.reload();
+        return;
+      }
+
       if (isFreshLogin) {
         this._eventBus.emit(AppEvents.SHOW_TOAST, {
           type: 'success',
@@ -778,10 +825,7 @@ export class AuthService {
         });
       }
 
-      // Bersihkan parameter token OAuth pada URL dan navigasikan ke halaman yang tepat
-      const curHash = window.location.hash || '';
-      const curSearch = window.location.search || '';
-      if (curHash.includes('access_token') || curHash.includes('refresh_token') || curSearch.includes('code=') || curHash === '#/login' || curHash === '#/register' || !curHash || curHash === '#/') {
+      if (curHash === '#/login' || curHash === '#/register' || !curHash || curHash === '#/') {
         window.history.replaceState(null, '', window.location.pathname + '#/dashboard');
         window.dispatchEvent(new HashChangeEvent('hashchange'));
 

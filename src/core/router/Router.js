@@ -83,6 +83,15 @@ export class Router {
 
     // Jika URL memuat token callback OAuth biasa (Google dsb), biarkan Supabase SDK memprosesnya
     if (!isRecovery && (rawHash.includes('access_token=') || rawHash.includes('refresh_token=') || rawHash.startsWith('error='))) {
+      if (this._mountContainer) {
+        this._mountContainer.innerHTML = `
+          <div class="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center p-6 text-center">
+            <div class="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mb-4"></div>
+            <h3 class="font-headline-md text-base font-bold text-text-heading">Menghubungkan Akun Google...</h3>
+            <p class="text-xs text-text-body mt-1">Menyiapkan dashboard Anda, mohon tunggu sebentar.</p>
+          </div>
+        `;
+      }
       return;
     }
 

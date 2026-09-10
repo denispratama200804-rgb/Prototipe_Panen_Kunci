@@ -165,6 +165,9 @@ function bootstrap() {
   container.registerSingleton('Router', router);
   router.init();
 
+  // Periksa pesan sambutan Google OAuth jika ada yang tertunda pasca reload otomatis
+  authService.checkPendingOAuthWelcome();
+
   console.log('🚀 Panen Kunci application initialized successfully with SOLID Architecture.');
 }
 
