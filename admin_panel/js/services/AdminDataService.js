@@ -527,27 +527,75 @@ export class AdminDataService {
         await supabase.from('api_keys').update({ status: 'valid', error_message: '' }).eq('id', keyId);
       }
 
-      // b. Simpan mutasi deposit sukses ke Supabase transactions via proxy agar sync remote user tidak nol
+      // b. Perbarui mutasi deposit di Supabase transactions menjadi success (atau buat jika belum ada)
       try {
-        await fetch('/api/supabase-proxy', {
+        const keySuffix = key.keyString && key.keyString.length >= 4 ? key.keyString.slice(-4) : '';
+        let existingTxId = null;
+
+        // Cek apakah transaksi deposit untuk key ini sudah ada di Supabase
+        const getTxRes = await fetch('/api/supabase-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            action: 'insert',
+            action: 'get_transactions',
             table: 'transactions',
-            data: {
-              user_id: targetUserId,
-              type: 'deposit',
-              amount: rewardAmount,
-              fee: 0,
-              title: 'Setoran API Key (Terverifikasi)',
-              description: `Terverifikasi oleh Admin: ${masked || key.id}`,
-              status: 'success'
-            }
+            userId: targetUserId
           })
         });
+
+        if (getTxRes.ok) {
+          const txJson = await getTxRes.json();
+          if (txJson.success && Array.isArray(txJson.data)) {
+            const foundTx = txJson.data.find(t =>
+              t.type === 'deposit' &&
+              ((keySuffix && t.description?.includes(keySuffix)) ||
+               (masked && t.description?.includes(masked)) ||
+               t.description?.includes(keyId))
+            );
+            if (foundTx) {
+              existingTxId = foundTx.id;
+            }
+          }
+        }
+
+        if (existingTxId) {
+          // Update transaksi yang sudah ada menjadi success
+          await fetch('/api/supabase-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update',
+              table: 'transactions',
+              id: existingTxId,
+              data: {
+                status: 'success',
+                title: 'Setoran API Key (Terverifikasi)',
+                description: `Terverifikasi oleh Admin: ${masked || key.id}`
+              }
+            })
+          });
+        } else {
+          // Hanya insert jika belum pernah ada transaksi sama sekali
+          await fetch('/api/supabase-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'insert',
+              table: 'transactions',
+              data: {
+                user_id: targetUserId,
+                type: 'deposit',
+                amount: rewardAmount,
+                fee: 0,
+                title: 'Setoran API Key (Terverifikasi)',
+                description: `Terverifikasi oleh Admin: ${masked || key.id}`,
+                status: 'success'
+              }
+            })
+          });
+        }
       } catch (txProxyErr) {
-        console.warn('[AdminDataService] Proxy insert tx warning:', txProxyErr.message);
+        console.warn('[AdminDataService] Proxy update/insert tx warning:', txProxyErr.message);
       }
     } catch (err) {
       console.warn('[AdminDataService] Sync approve ke Supabase error:', err.message);

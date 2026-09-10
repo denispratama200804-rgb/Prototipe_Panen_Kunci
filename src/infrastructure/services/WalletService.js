@@ -196,9 +196,14 @@ export class WalletService {
         ? `${k.keyString.slice(0, 9)}...${k.keyString.slice(-4)}`
         : (k.keyString || '');
 
+      const keySuffix = k.keyString && k.keyString.length >= 4 ? k.keyString.slice(-4) : '';
+
       const existing = this._transactions.find(t =>
         t.type === 'deposit' &&
-        (t.description?.includes(masked) || t.description?.includes(k.id) || (k.keyString && t.description?.includes(k.keyString)))
+        ((keySuffix && t.description?.includes(keySuffix)) ||
+         (masked && t.description?.includes(masked)) ||
+         (k.keyString && t.description?.includes(k.keyString)) ||
+         t.description?.includes(k.id))
       );
 
       const isVerified = k.status === 'valid';
@@ -259,7 +264,30 @@ export class WalletService {
       const expectedPassive = pendingKeys.reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
 
       if (Array.isArray(remoteTxs) && remoteTxs.length > 0) {
-        this._transactions = remoteTxs;
+        // Deduplikasi transaksi: untuk setiap key unik (berdasarkan 4 karakter terakhir di deskripsi), pertahankan 1 transaksi terbaik
+        const deduplicatedTxs = [];
+        const seenDepositKeys = new Map();
+
+        remoteTxs.forEach(tx => {
+          if (tx.type === 'deposit') {
+            const match = tx.description?.match(/([a-zA-Z0-9]{4})$/);
+            const keyIdentifier = match ? match[1] : tx.id;
+
+            if (seenDepositKeys.has(keyIdentifier)) {
+              const existingIdx = seenDepositKeys.get(keyIdentifier);
+              if (tx.status === 'success' && deduplicatedTxs[existingIdx].status !== 'success') {
+                deduplicatedTxs[existingIdx] = tx;
+              }
+            } else {
+              seenDepositKeys.set(keyIdentifier, deduplicatedTxs.length);
+              deduplicatedTxs.push(tx);
+            }
+          } else {
+            deduplicatedTxs.push(tx);
+          }
+        });
+
+        this._transactions = deduplicatedTxs;
 
         let calculatedLifetime = 0;
         let calculatedBalance = 0;
