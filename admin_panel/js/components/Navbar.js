@@ -1,7 +1,9 @@
+import { themeService } from '../services/ThemeService.js';
+
 /**
  * Navbar Component
  * Header navigasi atas modern sesuai referensi foto AI Dashboard
- * Fitur: Logo gradasi, Badge Admin, Tombol Sync, Tombol Emerald Install Admin App, Buka App User, dan Dropdown Admin User
+ * Fitur: Logo gradasi, Badge Admin, Tombol Sync, Tombol Tema (Malam/Siang), Buka App User, dan Dropdown Admin User
  */
 export class Navbar {
   constructor({ onRefresh = () => {}, onNavigate = () => {}, onSeed = () => {}, onLogout = () => {} }) {
@@ -28,9 +30,10 @@ export class Navbar {
 
   render(currentTab = 'dashboard', title = '') {
     const isDashboard = currentTab === 'dashboard';
+    const isDark = themeService.isDark();
 
     return `
-      <header class="h-14 sm:h-16 bg-[#060b18] px-3 sm:px-8 flex items-center justify-between">
+      <header class="h-14 sm:h-16 admin-navbar px-3 sm:px-8 flex items-center justify-between border-b border-transparent">
         <!-- Left: Back Button (Sub-views) + Brand Logo + Title -->
         <div class="flex items-center gap-2 sm:gap-3">
           ${!isDashboard ? `
@@ -50,12 +53,13 @@ export class Navbar {
             class="flex items-center gap-2 sm:gap-3 group text-decoration-none"
             title="Kembali ke Dashboard Utama"
           >
-            <!-- Colorful Gradient Logo Squircle -->
-            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-purple-500 via-indigo-500 to-pink-500 p-0.5 shadow-lg shadow-purple-500/25 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <div class="w-full h-full bg-[#080d1e] rounded-[10px] flex items-center justify-center">
-                <span class="material-symbols-outlined text-indigo-300 text-xl font-light">key</span>
-              </div>
-            </div>
+            <!-- Official Panen Kunci Logo (Tanpa Garis Ungu) -->
+            <img
+              src="/Logo_PK.jpg"
+              alt="Panen Kunci Logo"
+              class="h-8 sm:h-9 w-auto object-contain rounded-lg shrink-0 group-hover:scale-105 transition-transform"
+              onerror="this.src='/logo.png'"
+            />
 
             <!-- Brand Text -->
             <div class="flex items-center gap-2">
@@ -77,7 +81,7 @@ export class Navbar {
           ` : ''}
         </div>
 
-        <!-- Right: Actions (Sync & Admin User Dropdown) -->
+        <!-- Right: Actions (Sync & Theme Toggle & Admin User Dropdown) -->
         <div class="flex items-center gap-2 sm:gap-3">
           <!-- Sync Data Button -->
           <button
@@ -88,6 +92,22 @@ export class Navbar {
           >
             <span class="material-symbols-outlined text-base group-hover:rotate-180 transition-transform duration-500">sync</span>
             <span class="hidden sm:inline font-medium">Sync</span>
+          </button>
+
+          <!-- Theme Toggle Button (Malam / Siang) -->
+          <button
+            type="button"
+            id="navbar-theme-toggle-btn"
+            title="Ganti Tema (Malam / Siang)"
+            aria-label="Ganti Tema Tampilan"
+            class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-xs ${isDark ? 'text-indigo-300 hover:text-indigo-200' : 'text-amber-500 hover:text-amber-600'} transition-all flex items-center gap-1.5 cursor-pointer group"
+          >
+            <span class="material-symbols-outlined text-base transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" id="navbar-theme-icon">
+              ${isDark ? 'dark_mode' : 'light_mode'}
+            </span>
+            <span class="hidden sm:inline font-medium" id="navbar-theme-label">
+              ${isDark ? 'Malam' : 'Siang'}
+            </span>
           </button>
 
           <!-- Admin User Profile Dropdown (Purple Circle + Admin User + Chevron) -->
@@ -107,7 +127,7 @@ export class Navbar {
             <!-- Dropdown Menu -->
             <div
               id="admin-user-dropdown-menu"
-              class="hidden absolute right-0 mt-2 w-56 bg-[#0c1427] border border-slate-700/80 rounded-2xl shadow-2xl shadow-black/80 py-2 z-50 backdrop-blur-2xl"
+              class="hidden absolute right-0 mt-2 w-60 bg-[#0c1427] border border-slate-700/80 rounded-2xl shadow-2xl shadow-black/80 py-2 z-50 backdrop-blur-2xl"
             >
               <div class="px-4 py-2.5 border-b border-slate-800">
                 <div class="text-xs font-bold text-white">Administrator</div>
@@ -158,6 +178,26 @@ export class Navbar {
                 >
                   <span class="material-symbols-outlined text-sm text-emerald-400">tune</span>
                   <span>Pengaturan Tarif</span>
+                </button>
+              </div>
+
+              <div class="border-t border-slate-800 my-1"></div>
+
+              <!-- Theme Toggle in Dropdown -->
+              <div class="py-1">
+                <button
+                  type="button"
+                  id="dropdown-btn-toggle-theme"
+                  class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center justify-between cursor-pointer"
+                >
+                  <div class="flex items-center gap-2.5">
+                    <span class="material-symbols-outlined text-sm text-indigo-400">brightness_medium</span>
+                    <span>Tema Tampilan</span>
+                  </div>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${isDark ? 'bg-slate-700 text-indigo-300' : 'bg-amber-500/15 text-amber-600'} flex items-center gap-1" id="dropdown-theme-badge">
+                    <span class="material-symbols-outlined text-[12px]">${isDark ? 'dark_mode' : 'light_mode'}</span>
+                    <span>${isDark ? 'Malam' : 'Siang'}</span>
+                  </span>
                 </button>
               </div>
 
@@ -263,6 +303,55 @@ export class Navbar {
         dropdownMenu?.classList.add('hidden');
         this.onLogout();
       });
+    }
+
+    // ── Theme Toggle Event Handlers ──
+    const handleToggleTheme = () => {
+      const newTheme = themeService.toggleTheme();
+      this._updateThemeUI(container, newTheme);
+    };
+
+    const navbarThemeBtn = container.querySelector('#navbar-theme-toggle-btn');
+    if (navbarThemeBtn) {
+      navbarThemeBtn.addEventListener('click', handleToggleTheme);
+    }
+
+    const dropdownThemeBtn = container.querySelector('#dropdown-btn-toggle-theme');
+    if (dropdownThemeBtn) {
+      dropdownThemeBtn.addEventListener('click', () => {
+        dropdownMenu?.classList.add('hidden');
+        handleToggleTheme();
+      });
+    }
+
+    // Sinkronisasi otomatis jika tema berganti dari view lain (misal Settings)
+    themeService.onThemeChange((theme) => {
+      this._updateThemeUI(container, theme);
+    });
+  }
+
+  _updateThemeUI(container, theme) {
+    const isDark = theme === 'dark';
+    const icon = container.querySelector('#navbar-theme-icon');
+    const label = container.querySelector('#navbar-theme-label');
+    const badge = container.querySelector('#dropdown-theme-badge');
+    const themeBtn = container.querySelector('#navbar-theme-toggle-btn');
+
+    if (icon) {
+      icon.textContent = isDark ? 'dark_mode' : 'light_mode';
+    }
+    if (label) {
+      label.textContent = isDark ? 'Malam' : 'Siang';
+    }
+    if (badge) {
+      badge.innerHTML = `
+        <span class="material-symbols-outlined text-[12px]">${isDark ? 'dark_mode' : 'light_mode'}</span>
+        <span>${isDark ? 'Malam' : 'Siang'}</span>
+      `;
+      badge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold ${isDark ? 'bg-slate-700 text-indigo-300' : 'bg-amber-500/15 text-amber-600'} flex items-center gap-1`;
+    }
+    if (themeBtn) {
+      themeBtn.className = `px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-xs ${isDark ? 'text-indigo-300 hover:text-indigo-200' : 'text-amber-500 hover:text-amber-600'} transition-all flex items-center gap-1.5 cursor-pointer group`;
     }
   }
 }

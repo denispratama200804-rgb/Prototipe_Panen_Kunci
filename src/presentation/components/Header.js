@@ -77,6 +77,7 @@ export class HeaderComponent {
       '/register': 'Daftar Akun'
     };
 
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.classList.contains('dark');
     const title = pageTitles[path] || (isLogin ? 'Masuk Akun' : (isRegister ? 'Daftar Akun' : 'Panen Kunci'));
 
     if (path === '/') {
@@ -87,12 +88,25 @@ export class HeaderComponent {
             <span class="font-headline-md text-lg font-bold text-primary tracking-tight">Panen Kunci</span>
           </div>
           <div class="flex items-center gap-2">
+            <!-- Tombol Toggle Tema Landing Page -->
+            <button
+              type="button"
+              id="header-theme-btn"
+              class="w-8 h-8 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-all active:scale-95 cursor-pointer"
+              title="Ganti Tema (${isDark ? 'Tema Siang' : 'Tema Malam'})"
+              aria-label="Ganti Tema"
+            >
+              <span class="material-symbols-outlined text-[20px] ${isDark ? 'text-amber-400' : 'text-slate-700'}">
+                ${isDark ? 'light_mode' : 'dark_mode'}
+              </span>
+            </button>
             <a href="#/login" class="px-3.5 py-1.5 rounded-full bg-primary text-white text-xs font-semibold hover:bg-primary-container transition-all">
               Login
             </a>
           </div>
         </div>
       `;
+      this._bindHeaderThemeBtn();
       return;
     }
 
@@ -106,10 +120,20 @@ export class HeaderComponent {
           <h1 class="font-headline-md text-base sm:text-lg font-bold text-on-surface truncate">${title}</h1>
         </div>
 
-        <div class="flex items-center gap-2.5">
+        <div class="flex items-center gap-2">
           ${isAuthPage ? `
-            <!-- Di halaman login dan register: TIDAK menampilkan profil sama sekali -->
-            <div class="w-8 h-8"></div>
+            <!-- Tombol Toggle Tema di Halaman Auth -->
+            <button
+              type="button"
+              id="header-theme-btn"
+              class="w-8 h-8 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-all active:scale-95 cursor-pointer"
+              title="Ganti Tema (${isDark ? 'Tema Siang' : 'Tema Malam'})"
+              aria-label="Ganti Tema"
+            >
+              <span class="material-symbols-outlined text-[20px] ${isDark ? 'text-amber-400' : 'text-slate-700'}">
+                ${isDark ? 'light_mode' : 'dark_mode'}
+              </span>
+            </button>
           ` : (isAuth ? `
             ${user?.role === 'admin' ? `
               <a href="/admin_panel/index.html" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-600/15 text-purple-600 border border-purple-500/30 hover:bg-purple-600 hover:text-white transition-all" title="Buka Panel Admin">
@@ -117,6 +141,19 @@ export class HeaderComponent {
                 <span>Admin</span>
               </a>
             ` : ''}
+
+            <!-- Tombol Toggle Tema (Siang / Malam) -->
+            <button
+              type="button"
+              id="header-theme-btn"
+              class="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-all active:scale-95 cursor-pointer"
+              title="Ganti Tema (${isDark ? 'Tema Siang' : 'Tema Malam'})"
+              aria-label="Ganti Tema"
+            >
+              <span class="material-symbols-outlined text-[20px] transition-transform duration-300 hover:rotate-12 ${isDark ? 'text-amber-400' : 'text-slate-700'}">
+                ${isDark ? 'light_mode' : 'dark_mode'}
+              </span>
+            </button>
 
             <!-- Tombol Notifikasi (Sebelah Foto Profil) -->
             <button
@@ -157,11 +194,25 @@ export class HeaderComponent {
               </a>
             ` : '<div class="w-8 h-8"></div>'}
           ` : `
+            <!-- Tombol Toggle Tema Belum Login -->
+            <button
+              type="button"
+              id="header-theme-btn"
+              class="w-8 h-8 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-all active:scale-95 cursor-pointer"
+              title="Ganti Tema (${isDark ? 'Tema Siang' : 'Tema Malam'})"
+              aria-label="Ganti Tema"
+            >
+              <span class="material-symbols-outlined text-[20px] ${isDark ? 'text-amber-400' : 'text-slate-700'}">
+                ${isDark ? 'light_mode' : 'dark_mode'}
+              </span>
+            </button>
             <a href="#/login" class="text-xs font-semibold text-primary hover:underline">Masuk</a>
           `)}
         </div>
       </div>
     `;
+
+    this._bindHeaderThemeBtn();
 
     // Bind Back Button
     const backBtn = this._element.querySelector('#header-back-btn');
@@ -182,6 +233,29 @@ export class HeaderComponent {
     if (notifBtn) {
       notifBtn.addEventListener('click', () => {
         this._openNotificationDrawer();
+      });
+    }
+  }
+
+  _bindHeaderThemeBtn() {
+    const themeBtn = this._element.querySelector('#header-theme-btn');
+    if (themeBtn) {
+      themeBtn.addEventListener('click', () => {
+        const currentlyDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.classList.contains('dark');
+        const nextTheme = currentlyDark ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', nextTheme);
+        if (nextTheme === 'dark') {
+          document.documentElement.classList.add('dark');
+          document.documentElement.classList.remove('light');
+        } else {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('light');
+        }
+        try {
+          localStorage.setItem('panenkunci:theme', nextTheme);
+        } catch (e) {}
+        this.render();
+        window.dispatchEvent(new CustomEvent('panenkunci:theme-changed', { detail: { theme: nextTheme } }));
       });
     }
   }

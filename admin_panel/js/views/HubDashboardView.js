@@ -97,7 +97,7 @@ export class HubDashboardView {
                   </span>
                 </div>
 
-                <h3 class="text-xs sm:text-base font-bold text-white tracking-tight mb-0.5 sm:mb-1.5 group-hover:text-indigo-300 transition-colors">
+                <h3 class="pt-3.5 sm:pt-4 text-xs sm:text-base font-bold text-white tracking-tight mb-0.5 sm:mb-1.5 group-hover:text-indigo-300 transition-colors">
                   ${card.title}
                 </h3>
 

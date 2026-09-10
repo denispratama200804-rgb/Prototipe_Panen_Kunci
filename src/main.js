@@ -1,5 +1,26 @@
 import './styles/style.css';
 
+// Theme Bootstrap (Malam / Siang)
+try {
+  const savedTheme = localStorage.getItem('panenkunci:theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  if (savedTheme === 'dark') {
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+    if (document.body) {
+      document.body.classList.add('dark');
+      document.body.classList.remove('light');
+    }
+  } else {
+    document.documentElement.classList.add('light');
+    document.documentElement.classList.remove('dark');
+    if (document.body) {
+      document.body.classList.add('light');
+      document.body.classList.remove('dark');
+    }
+  }
+} catch (e) {}
+
 // Core DI & Events
 import { ServiceContainer } from './core/container/ServiceContainer.js';
 import { EventBus } from './core/events/EventBus.js';

@@ -225,6 +225,40 @@ export class ProfileView extends IComponent {
             </div>
           </section>
 
+          <!-- Preferences Section (Theme Malam / Siang) -->
+          <section class="flex flex-col gap-2">
+            <h3 class="font-label-md text-xs font-bold text-text-heading px-1 uppercase tracking-wider">
+              Preferensi Tampilan
+            </h3>
+            <div class="bg-surface-card rounded-3xl shadow-sm border border-surface-container overflow-hidden">
+              <button
+                type="button"
+                id="btnToggleThemeProfile"
+                class="w-full flex items-center justify-between p-4 hover:bg-surface-container-low transition-colors text-left group cursor-pointer"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary">
+                    <span class="material-symbols-outlined text-[20px]">
+                      ${document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.classList.contains('dark') ? 'dark_mode' : 'light_mode'}
+                    </span>
+                  </div>
+                  <div>
+                    <span class="text-xs font-bold text-text-heading block">Tema Aplikasi</span>
+                    <span class="text-[11px] text-text-body">
+                      ${document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.classList.contains('dark') ? 'Tema Malam (Gelap)' : 'Tema Siang (Terang)'}
+                    </span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-surface-container text-primary">
+                    ${document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.classList.contains('dark') ? 'Malam' : 'Siang'}
+                  </span>
+                  <span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-[20px]">chevron_right</span>
+                </div>
+              </button>
+            </div>
+          </section>
+
           <!-- Support & Help Section -->
           <section class="flex flex-col gap-2">
             <h3 class="font-label-md text-xs font-bold text-text-heading px-1 uppercase tracking-wider">
@@ -368,6 +402,33 @@ export class ProfileView extends IComponent {
     const resetPassBtn = container.querySelector('#btnResetPassword');
     const logoutBtn = container.querySelector('#btnLogout');
     const infoBtns = container.querySelectorAll('.btn-info-modal');
+    const toggleThemeBtn = container.querySelector('#btnToggleThemeProfile');
+
+    // Handler Ganti Tema dari Profil
+    toggleThemeBtn?.addEventListener('click', () => {
+      const currentlyDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.classList.contains('dark');
+      const nextTheme = currentlyDark ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', nextTheme);
+      if (nextTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      }
+      try {
+        localStorage.setItem('panenkunci:theme', nextTheme);
+      } catch (e) {}
+      window.dispatchEvent(new CustomEvent('panenkunci:theme-changed', { detail: { theme: nextTheme } }));
+
+      // Update tampilan tombol seketika
+      const themeDesc = toggleThemeBtn.querySelector('span.text-\\[11px\\]');
+      const themeBadge = toggleThemeBtn.querySelector('span.rounded-full');
+      const themeIcon = toggleThemeBtn.querySelector('.material-symbols-outlined');
+      if (themeDesc) themeDesc.textContent = nextTheme === 'dark' ? 'Tema Malam (Gelap)' : 'Tema Siang (Terang)';
+      if (themeBadge) themeBadge.textContent = nextTheme === 'dark' ? 'Malam' : 'Siang';
+      if (themeIcon) themeIcon.textContent = nextTheme === 'dark' ? 'dark_mode' : 'light_mode';
+    });
 
     // Modal Edit Rekening / E-Wallet
     editBankBtn?.addEventListener('click', () => {

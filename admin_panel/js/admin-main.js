@@ -6,6 +6,7 @@
 import { adminDataService } from './services/AdminDataService.js';
 import { toast } from './services/ToastService.js';
 import { Navbar } from './components/Navbar.js';
+import { themeService } from './services/ThemeService.js';
 
 import { HubDashboardView } from './views/HubDashboardView.js';
 import { ApiKeysView } from './views/ApiKeysView.js';
@@ -51,6 +52,9 @@ class AdminApp {
       console.error('#admin-app container not found.');
       return;
     }
+
+    // Inisialisasi status tema (Malam / Siang)
+    themeService.init();
 
     // ── Session Guard: Pastikan yang mengakses memiliki sesi Administrator ──
     const isAdmin = localStorage.getItem('panenkunci:admin_logged_in') === 'true' ||
@@ -123,8 +127,8 @@ class AdminApp {
       <div class="admin-ambient-glow"></div>
 
       <div class="relative z-10 flex flex-col min-h-screen w-full max-w-full">
-        <!-- Unified Sticky Header: Solusi 100% Bebas Tembus Pandang & Bebas Celah -->
-        <div class="sticky top-0 z-30 bg-[#060b18] border-b border-slate-800 shadow-2xl safe-area-pt w-full max-w-full">
+        <!-- Unified Sticky Header: Responsif terhadap Tema Siang / Malam -->
+        <div class="sticky top-0 z-30 admin-sticky-header shadow-2xl safe-area-pt w-full max-w-full">
           <!-- Top Navbar Mount (Header Referensi AI Dashboard) -->
           <div id="admin-navbar-mount" class="w-full max-w-full">
             ${this.navbar.render(this.currentTab, this._getViewTitle(this.currentTab))}

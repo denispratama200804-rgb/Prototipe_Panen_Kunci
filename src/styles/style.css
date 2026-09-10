@@ -58,3 +58,70 @@ button, a {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ══════════════════════════════════════════════
+   DARK THEME SUPPORT FOR USER APP
+   ══════════════════════════════════════════════ */
+html.dark body,
+body.dark,
+[data-theme="dark"] body {
+  color: #f1f5f9;
+  background-color: #080d1e;
+}
+
+html.dark .glass,
+[data-theme="dark"] .glass {
+  background: rgba(12, 19, 39, 0.88);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .glass-card,
+[data-theme="dark"] .glass-card {
+  background: rgba(16, 26, 52, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .bg-background,
+[data-theme="dark"] .bg-background {
+  background-color: #080d1e !important;
+}
+
+html.dark .bg-surface-card,
+[data-theme="dark"] .bg-surface-card {
+  background-color: #0e172e !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .bg-surface-container-low,
+[data-theme="dark"] .bg-surface-container-low {
+  background-color: #0a1124 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .bg-surface-container-lowest,
+[data-theme="dark"] .bg-surface-container-lowest {
+  background-color: #060b18 !important;
+}
+
+html.dark .bg-surface-container,
+[data-theme="dark"] .bg-surface-container {
+  background-color: #14203d !important;
+}
+
+html.dark .border-surface-container,
+[data-theme="dark"] .border-surface-container {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .text-text-heading,
+[data-theme="dark"] .text-text-heading,
+html.dark .text-on-surface,
+[data-theme="dark"] .text-on-surface {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-text-body,
+[data-theme="dark"] .text-text-body {
+  color: #94a3b8 !important;
+}
+
