@@ -1,4 +1,5 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
+import { AppEvents } from '../../core/events/EventBus.js';
 
 /**
  * SetorApiKeyView
