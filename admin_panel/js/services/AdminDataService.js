@@ -391,8 +391,26 @@ export class AdminDataService {
     this._set('api_keys', keys);
 
     const rewardAmount = Number(key.rewardAmount) || 3000;
+    const targetUserId = key.userId;
 
-    // Pindahkan dari Saldo Pasif ke Saldo Aktif
+    // 1. Perbarui daftar api_keys spesifik pengguna (api_keys_{userId})
+    if (targetUserId) {
+      const userKeysKey = `api_keys_${targetUserId}`;
+      const userKeys = this._get(userKeysKey, []);
+      if (Array.isArray(userKeys)) {
+        const uKeyIdx = userKeys.findIndex(k => k.id === keyId || k.keyString === key.keyString);
+        if (uKeyIdx !== -1) {
+          userKeys[uKeyIdx].status = 'valid';
+          userKeys[uKeyIdx].verifiedAt = key.verifiedAt;
+          delete userKeys[uKeyIdx].errorMessage;
+        } else {
+          userKeys.unshift({ ...key });
+        }
+        this._set(userKeysKey, userKeys);
+      }
+    }
+
+    // 2. Pindahkan dari Saldo Pasif ke Saldo Aktif (Global Storage)
     const currentPassive = Number(this._get('wallet_passive_balance', 0));
     const newPassive = Math.max(0, currentPassive - rewardAmount);
     this._set('wallet_passive_balance', newPassive);
@@ -404,9 +422,24 @@ export class AdminDataService {
     const currentLifetime = Number(this._get('lifetime_earnings', 0));
     this._set('lifetime_earnings', currentLifetime + rewardAmount);
 
-    // Update saldo spesifik pengguna di all_users jika cocok
+    // 3. Pindahkan saldo pada penyimpanan spesifik pengguna (wallet_balance_{userId} & wallet_passive_balance_{userId})
+    if (targetUserId) {
+      const uBalKey = `wallet_balance_${targetUserId}`;
+      const uPassKey = `wallet_passive_balance_${targetUserId}`;
+      const uLifeKey = `lifetime_earnings_${targetUserId}`;
+
+      const uCurrentActive = Number(this._get(uBalKey, 0));
+      const uCurrentPassive = Number(this._get(uPassKey, 0));
+      const uCurrentLifetime = Number(this._get(uLifeKey, 0));
+
+      this._set(uBalKey, uCurrentActive + rewardAmount);
+      this._set(uPassKey, Math.max(0, uCurrentPassive - rewardAmount));
+      this._set(uLifeKey, uCurrentLifetime + rewardAmount);
+    }
+
+    // 4. Update saldo spesifik pengguna di all_users jika cocok
     const users = this._get('all_users', []);
-    const uIdx = users.findIndex(u => u.id === key.userId);
+    const uIdx = users.findIndex(u => u.id === targetUserId);
     if (uIdx !== -1) {
       const userBal = Number(users[uIdx].balance || 0);
       users[uIdx].balance = userBal + rewardAmount;
@@ -414,17 +447,17 @@ export class AdminDataService {
       this._set('all_users', users);
     }
 
-    // Update transaksi terkait
+    // 5. Update transaksi mutasi deposit terkait di riwayat lokal
     const txs = this.getTransactions();
     const masked = key.keyString && key.keyString.length > 12 
       ? `${key.keyString.slice(0, 9)}...${key.keyString.slice(-4)}`
       : (key.keyString || '');
 
-    const tx = txs.find(t => 
+    let tx = txs.find(t => 
       t.type === 'deposit' && 
       t.status === 'pending' && 
       (t.description?.includes(masked) || t.description?.includes(key.id))
-    ) || txs.find(t => t.type === 'deposit' && t.status === 'pending');
+    ) || txs.find(t => t.type === 'deposit' && t.status === 'pending' && (!targetUserId || t.userId === targetUserId));
 
     if (tx) {
       tx.status = 'success';
@@ -432,22 +465,45 @@ export class AdminDataService {
       tx.description = `Terverifikasi oleh Admin: ${masked || key.id}`;
       tx.processedAt = new Date().toISOString();
     } else {
-      txs.unshift({
+      tx = {
         id: 'tx_' + Math.random().toString(36).substring(2, 9),
-        userId: key.userId || 'usr_current',
+        userId: targetUserId || 'usr_current',
         type: 'deposit',
         amount: rewardAmount,
         title: 'Setoran API Key (Terverifikasi)',
         description: `Terverifikasi oleh Admin: ${masked || key.id}`,
         status: 'success',
         createdAt: new Date().toISOString()
-      });
+      };
+      txs.unshift(tx);
     }
     this._set('transactions', txs);
 
-    // Sinkronkan perubahan status ke database Supabase
+    // 6. Sinkronkan juga ke riwayat transaksi spesifik user (transactions_{userId})
+    if (targetUserId) {
+      const userTxKey = `transactions_${targetUserId}`;
+      const userTxs = this._get(userTxKey, []);
+      if (Array.isArray(userTxs)) {
+        const uTxIdx = userTxs.findIndex(t =>
+          t.type === 'deposit' &&
+          (t.description?.includes(masked) || t.description?.includes(key.id) || t.id === tx.id)
+        );
+        if (uTxIdx !== -1) {
+          userTxs[uTxIdx].status = 'success';
+          userTxs[uTxIdx].title = 'Setoran API Key (Terverifikasi)';
+          userTxs[uTxIdx].description = `Terverifikasi oleh Admin: ${masked || key.id}`;
+          userTxs[uTxIdx].processedAt = new Date().toISOString();
+        } else {
+          userTxs.unshift({ ...tx });
+        }
+        this._set(userTxKey, userTxs);
+      }
+    }
+
+    // 7. Sinkronkan status key dan record transaksi terverifikasi ke database Supabase
     try {
-      let proxySuccess = false;
+      // a. Update status api_keys ke Supabase via proxy
+      let proxyKeySuccess = false;
       try {
         const proxyRes = await fetch('/api/supabase-proxy', {
           method: 'POST',
@@ -461,14 +517,37 @@ export class AdminDataService {
         });
         if (proxyRes.ok) {
           const resJson = await proxyRes.json();
-          if (resJson.success) proxySuccess = true;
+          if (resJson.success) proxyKeySuccess = true;
         }
       } catch (pe) {
-        console.warn('[AdminDataService] Proxy approve warning:', pe.message);
+        console.warn('[AdminDataService] Proxy approve key warning:', pe.message);
       }
 
-      if (!proxySuccess && isSupabaseConfigured()) {
+      if (!proxyKeySuccess && isSupabaseConfigured()) {
         await supabase.from('api_keys').update({ status: 'valid', error_message: '' }).eq('id', keyId);
+      }
+
+      // b. Simpan mutasi deposit sukses ke Supabase transactions via proxy agar sync remote user tidak nol
+      try {
+        await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'insert',
+            table: 'transactions',
+            data: {
+              user_id: targetUserId,
+              type: 'deposit',
+              amount: rewardAmount,
+              fee: 0,
+              title: 'Setoran API Key (Terverifikasi)',
+              description: `Terverifikasi oleh Admin: ${masked || key.id}`,
+              status: 'success'
+            }
+          })
+        });
+      } catch (txProxyErr) {
+        console.warn('[AdminDataService] Proxy insert tx warning:', txProxyErr.message);
       }
     } catch (err) {
       console.warn('[AdminDataService] Sync approve ke Supabase error:', err.message);
@@ -496,15 +575,37 @@ export class AdminDataService {
     this._set('api_keys', keys);
 
     const rewardAmount = Number(key.rewardAmount) || 3000;
+    const targetUserId = key.userId;
 
-    // Jika sebelumnya pending, batalkan dari saldo pasif
+    // 1. Perbarui daftar api_keys spesifik pengguna (api_keys_{userId})
+    if (targetUserId) {
+      const userKeysKey = `api_keys_${targetUserId}`;
+      const userKeys = this._get(userKeysKey, []);
+      if (Array.isArray(userKeys)) {
+        const uKeyIdx = userKeys.findIndex(k => k.id === keyId || k.keyString === key.keyString);
+        if (uKeyIdx !== -1) {
+          userKeys[uKeyIdx].status = 'invalid';
+          userKeys[uKeyIdx].errorMessage = reason;
+          userKeys[uKeyIdx].rejectedAt = key.rejectedAt;
+        }
+        this._set(userKeysKey, userKeys);
+      }
+    }
+
+    // 2. Jika sebelumnya pending, batalkan dari saldo pasif
     if (wasPending) {
       const currentPassive = Number(this._get('wallet_passive_balance', 0));
       const newPassive = Math.max(0, currentPassive - rewardAmount);
       this._set('wallet_passive_balance', newPassive);
+
+      if (targetUserId) {
+        const uPassKey = `wallet_passive_balance_${targetUserId}`;
+        const uCurrentPassive = Number(this._get(uPassKey, 0));
+        this._set(uPassKey, Math.max(0, uCurrentPassive - rewardAmount));
+      }
     }
 
-    // Update status transaksi terkait jika ada
+    // 3. Update status transaksi terkait jika ada di local storage
     const txs = this.getTransactions();
     const masked = key.keyString && key.keyString.length > 12 
       ? `${key.keyString.slice(0, 9)}...${key.keyString.slice(-4)}`
@@ -524,7 +625,26 @@ export class AdminDataService {
       this._set('transactions', txs);
     }
 
-    // Sinkronkan perubahan status ke database Supabase
+    if (targetUserId) {
+      const userTxKey = `transactions_${targetUserId}`;
+      const userTxs = this._get(userTxKey, []);
+      if (Array.isArray(userTxs)) {
+        const uTxIdx = userTxs.findIndex(t =>
+          t.type === 'deposit' &&
+          t.status === 'pending' &&
+          (t.description?.includes(masked) || t.description?.includes(key.id))
+        );
+        if (uTxIdx !== -1) {
+          userTxs[uTxIdx].status = 'failed';
+          userTxs[uTxIdx].title = 'Setoran API Key Ditolak';
+          userTxs[uTxIdx].description = `Ditolak Admin: ${reason}`;
+          userTxs[uTxIdx].processedAt = new Date().toISOString();
+          this._set(userTxKey, userTxs);
+        }
+      }
+    }
+
+    // 4. Sinkronkan perubahan status ke database Supabase
     try {
       let proxySuccess = false;
       try {

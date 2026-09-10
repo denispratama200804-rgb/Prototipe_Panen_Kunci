@@ -175,6 +175,34 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
+                  if (action === 'get_transactions' || (action === 'select' && table === 'transactions')) {
+                    if (adminSupabase) {
+                      let query = adminSupabase
+                        .from('transactions')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+
+                      const targetUserId = parsed.userId || parsed.user_id;
+                      if (targetUserId) {
+                        query = query.eq('user_id', targetUserId);
+                      }
+
+                      const { data: txs, error } = await query;
+
+                      if (error) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: error.message }));
+                      } else {
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({ success: true, data: txs || [] }));
+                      }
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                    }
+                    return;
+                  }
+
                   if (action === 'insert' && table === 'users') {
                     const { data: inserted, error } = await adminSupabase
                       .from('users')
@@ -211,6 +239,39 @@ export default defineConfig(({ mode }) => {
                       inserted = retry.data;
                       error = retry.error;
                     }
+
+                    if (error) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: error.message }));
+                    } else {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true, data: inserted }));
+                    }
+                    return;
+                  }
+
+                  if (action === 'insert' && table === 'transactions') {
+                    const txPayload = {
+                      user_id: data.user_id || data.userId,
+                      type: data.type || 'deposit',
+                      amount: Number(data.amount || 0),
+                      fee: Number(data.fee || 0),
+                      title: data.title || 'Transaksi',
+                      description: data.description || '',
+                      status: data.status || 'pending',
+                      method: data.method || '',
+                      recipient: data.recipient || ''
+                    };
+
+                    if (data.id && data.id.includes('-')) {
+                      txPayload.id = data.id;
+                    }
+
+                    const { data: inserted, error } = await adminSupabase
+                      .from('transactions')
+                      .insert(txPayload)
+                      .select()
+                      .single();
 
                     if (error) {
                       res.statusCode = 400;
@@ -263,6 +324,24 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
+                  if (action === 'update' && table === 'transactions' && id) {
+                    const { data: updated, error } = await adminSupabase
+                      .from('transactions')
+                      .update(data)
+                      .eq('id', id)
+                      .select()
+                      .single();
+
+                    if (error) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: error.message }));
+                    } else {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true, data: updated }));
+                    }
+                    return;
+                  }
+
                   if (action === 'delete' && table === 'users' && id) {
                     const { error } = await adminSupabase
                       .from('users')
@@ -282,6 +361,22 @@ export default defineConfig(({ mode }) => {
                   if (action === 'delete' && table === 'api_keys' && id) {
                     const { error } = await adminSupabase
                       .from('api_keys')
+                      .delete()
+                      .eq('id', id);
+
+                    if (error) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: error.message }));
+                    } else {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true }));
+                    }
+                    return;
+                  }
+
+                  if (action === 'delete' && table === 'transactions' && id) {
+                    const { error } = await adminSupabase
+                      .from('transactions')
                       .delete()
                       .eq('id', id);
 

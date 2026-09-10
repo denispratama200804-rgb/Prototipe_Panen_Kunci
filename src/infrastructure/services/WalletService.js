@@ -121,37 +121,122 @@ export class WalletService {
     const passiveKey = `wallet_passive_balance_${userId}`;
     const lifetimeKey = `lifetime_earnings_${userId}`;
     const txKey = `transactions_${userId}`;
+    const userKeysKey = `api_keys_${userId}`;
+
+    // Ambil daftar key pengguna sebagai referensi nilai riil
+    const savedUserKeys = this._storage.get(userKeysKey) || [];
+    const globalKeys = (this._storage.get('api_keys') || []).filter(k => k.userId === userId);
+    const combinedKeys = savedUserKeys.length > 0 ? savedUserKeys : globalKeys;
+
+    const validKeys = combinedKeys.filter(k => k.status === 'valid');
+    const pendingKeys = combinedKeys.filter(k => k.status === 'pending');
+
+    const expectedActiveDeposit = validKeys.reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
+    const expectedPassiveDeposit = pendingKeys.reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
 
     const savedBalance = this._storage.get(balanceKey);
-    this._balance = (savedBalance !== null && !isNaN(Number(savedBalance))) ? Number(savedBalance) : 0;
+    const rawSavedBal = (savedBalance !== null && !isNaN(Number(savedBalance))) ? Number(savedBalance) : null;
 
     const savedPassive = this._storage.get(passiveKey);
-    if (savedPassive !== null && !isNaN(Number(savedPassive))) {
-      this._passiveBalance = Number(savedPassive);
-    } else {
-      const keysKey = `api_keys_${userId}`;
-      const savedKeys = this._storage.get(keysKey) || [];
-      this._passiveBalance = savedKeys
-        .filter(k => k.status === 'pending')
-        .reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
-    }
+    const rawSavedPassive = (savedPassive !== null && !isNaN(Number(savedPassive))) ? Number(savedPassive) : null;
 
     const savedLifetime = this._storage.get(lifetimeKey);
-    this._lifetimeEarnings = (savedLifetime !== null && !isNaN(Number(savedLifetime))) ? Number(savedLifetime) : 0;
+    const rawSavedLifetime = (savedLifetime !== null && !isNaN(Number(savedLifetime))) ? Number(savedLifetime) : null;
 
     const savedTx = this._storage.get(txKey);
+    let loadedTxs = [];
     if (savedTx && Array.isArray(savedTx)) {
-      // Pastikan hanya transaksi milik user aktif yang dimuat
-      this._transactions = savedTx
+      loadedTxs = savedTx
         .filter(t => t.userId === userId || !t.userId)
         .map(t => new Transaction(t));
-    } else {
-      // Akun baru default bersih (tanpa transaksi dummy)
-      this._transactions = [];
     }
+
+    // Hitung total penarikan aktif
+    const totalWithdrawals = loadedTxs
+      .filter(t => t.type === 'withdrawal' && (t.status === 'success' || t.status === 'pending'))
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+    // Saldo aktif adalah akumulasi deposit valid dikurangi penarikan, atau nilai tersimpan jika lebih tinggi
+    const calculatedActive = Math.max(0, expectedActiveDeposit - totalWithdrawals);
+    this._balance = rawSavedBal !== null ? Math.max(rawSavedBal, calculatedActive) : calculatedActive;
+
+    // Saldo pasif bersumber dari key pending
+    this._passiveBalance = rawSavedPassive !== null ? rawSavedPassive : expectedPassiveDeposit;
+    if (pendingKeys.length === 0 && this._passiveBalance > 0 && validKeys.length > 0) {
+      // Jika semua key sudah valid, saldo pasif harus 0
+      this._passiveBalance = 0;
+    }
+
+    // Lifetime earnings
+    this._lifetimeEarnings = rawSavedLifetime !== null ? Math.max(rawSavedLifetime, expectedActiveDeposit) : expectedActiveDeposit;
+    this._transactions = loadedTxs;
+
+    // Pastikan jika ada key valid/pending yang belum ada di riwayat mutasi transaksi, tambahkan ke transaksi
+    this._ensureDepositTransactions(combinedKeys);
 
     // Sync remote transactions dari Supabase
     this._syncFromRemote();
+  }
+
+  /**
+   * Memastikan setiap API Key valid/pending memiliki rekaman transaksi mutasi deposit
+   * @param {Array} userKeys
+   * @private
+   */
+  _ensureDepositTransactions(userKeys) {
+    const userId = this._getUserId();
+    if (!userId || !Array.isArray(userKeys) || userKeys.length === 0) return;
+
+    let hasNewTx = false;
+
+    userKeys.forEach(k => {
+      if (k.status !== 'valid' && k.status !== 'pending') return;
+
+      const masked = k.keyString && k.keyString.length > 12
+        ? `${k.keyString.slice(0, 9)}...${k.keyString.slice(-4)}`
+        : (k.keyString || '');
+
+      const existing = this._transactions.find(t =>
+        t.type === 'deposit' &&
+        (t.description?.includes(masked) || t.description?.includes(k.id) || (k.keyString && t.description?.includes(k.keyString)))
+      );
+
+      const isVerified = k.status === 'valid';
+      const reward = Number(k.rewardAmount) || 3000;
+
+      if (!existing) {
+        const newTx = new Transaction({
+          id: 'tx_' + Math.random().toString(36).substring(2, 9),
+          userId,
+          type: 'deposit',
+          amount: reward,
+          title: isVerified ? 'Setoran API Key (Terverifikasi)' : 'Setoran API Key',
+          description: isVerified ? `Terverifikasi oleh Admin: ${masked}` : `Menunggu verifikasi admin: ${masked}`,
+          status: isVerified ? 'success' : 'pending',
+          createdAt: k.createdAt || new Date().toISOString()
+        });
+
+        this._transactions.unshift(newTx);
+        hasNewTx = true;
+
+        if (this._transactionRepository) {
+          this._transactionRepository.create(newTx).catch(() => {});
+        }
+      } else if (isVerified && existing.status === 'pending') {
+        existing.status = 'success';
+        existing.title = 'Setoran API Key (Terverifikasi)';
+        existing.description = `Terverifikasi oleh Admin: ${masked}`;
+        hasNewTx = true;
+
+        if (this._transactionRepository && existing.id && existing.id.includes('-')) {
+          this._transactionRepository.updateStatus(existing.id, 'success').catch(() => {});
+        }
+      }
+    });
+
+    if (hasNewTx) {
+      this._persist();
+    }
   }
 
   async _syncFromRemote() {
@@ -161,10 +246,21 @@ export class WalletService {
     try {
       // Filter transaksi HANYA untuk pengguna yang sedang aktif
       const remoteTxs = await this._transactionRepository.getAll(userId);
-      if (remoteTxs) {
+
+      // Ambil daftar key pengguna terkini
+      const userKeysKey = `api_keys_${userId}`;
+      const savedUserKeys = this._storage.get(userKeysKey) || [];
+      const globalKeys = (this._storage.get('api_keys') || []).filter(k => k.userId === userId);
+      const combinedKeys = savedUserKeys.length > 0 ? savedUserKeys : globalKeys;
+
+      const validKeys = combinedKeys.filter(k => k.status === 'valid');
+      const pendingKeys = combinedKeys.filter(k => k.status === 'pending');
+      const expectedActive = validKeys.reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
+      const expectedPassive = pendingKeys.reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
+
+      if (Array.isArray(remoteTxs) && remoteTxs.length > 0) {
         this._transactions = remoteTxs;
 
-        // Hitung ulang saldo riil dari riwayat transaksi Supabase
         let calculatedLifetime = 0;
         let calculatedBalance = 0;
         let calculatedPassive = 0;
@@ -185,17 +281,29 @@ export class WalletService {
           }
         });
 
-        this._balance = Math.max(0, calculatedBalance);
-        this._passiveBalance = calculatedPassive;
-        this._lifetimeEarnings = calculatedLifetime;
-        this._persist();
+        // Selaraskan dengan data key agar tidak ada saldo yang hilang akibat selisih sinkronisasi
+        this._balance = Math.max(0, calculatedBalance, expectedActive);
+        this._passiveBalance = pendingKeys.length > 0 ? Math.max(calculatedPassive, expectedPassive) : 0;
+        this._lifetimeEarnings = Math.max(calculatedLifetime, expectedActive);
+      } else {
+        // Jika remoteTxs belum ada/kosong di database, gunakan perhitungan authoritative dari daftar key user!
+        const totalWithdrawals = this._transactions
+          .filter(t => t.type === 'withdrawal' && (t.status === 'success' || t.status === 'pending'))
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
-          balance: this._balance,
-          passiveBalance: this._passiveBalance,
-          lifetime: this._lifetimeEarnings
-        });
+        this._balance = Math.max(0, expectedActive - totalWithdrawals);
+        this._passiveBalance = expectedPassive;
+        this._lifetimeEarnings = expectedActive;
       }
+
+      this._ensureDepositTransactions(combinedKeys);
+      this._persist();
+
+      this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+        balance: this._balance,
+        passiveBalance: this._passiveBalance,
+        lifetime: this._lifetimeEarnings
+      });
     } catch (err) {
       console.warn('[WalletService] Remote tx sync fallback to local cache:', err.message);
     }

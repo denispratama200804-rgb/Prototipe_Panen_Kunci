@@ -146,6 +146,27 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: keys });
     }
 
+    // 2c. Ambil data transaksi (Riwayat transaksi user & admin)
+    if (action === 'get_transactions' || (action === 'select' && table === 'transactions')) {
+      let query = adminSupabase
+        .from('transactions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const targetUserId = body.userId || body.user_id;
+      if (targetUserId) {
+        query = query.eq('user_id', targetUserId);
+      }
+
+      const { data: txs, error } = await query;
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+
+      return res.status(200).json({ success: true, data: txs || [] });
+    }
+
     // 3. Pembuatan tautan pemulihan kata sandi (Recovery Link)
     if (action === 'generate_recovery_link' && data?.email) {
       const host = req.headers['x-forwarded-host'] || req.headers.host || '';
@@ -171,7 +192,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 4. Insert record pengguna / API Key (bypass RLS)
+    // 4. Insert record pengguna / API Key / Transaksi (bypass RLS)
     if (action === 'insert' && table === 'users' && data) {
       const { data: inserted, error } = await adminSupabase
         .from('users')
@@ -212,7 +233,36 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: inserted });
     }
 
-    // 5. Update record pengguna / API Key (bypass RLS)
+    if (action === 'insert' && table === 'transactions' && data) {
+      const txPayload = {
+        user_id: data.user_id || data.userId,
+        type: data.type || 'deposit',
+        amount: Number(data.amount || 0),
+        fee: Number(data.fee || 0),
+        title: data.title || 'Transaksi',
+        description: data.description || '',
+        status: data.status || 'pending',
+        method: data.method || '',
+        recipient: data.recipient || ''
+      };
+
+      if (data.id && data.id.includes('-')) {
+        txPayload.id = data.id;
+      }
+
+      const { data: inserted, error } = await adminSupabase
+        .from('transactions')
+        .insert(txPayload)
+        .select()
+        .single();
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+      return res.status(200).json({ success: true, data: inserted });
+    }
+
+    // 5. Update record pengguna / API Key / Transaksi (bypass RLS)
     if (action === 'update' && table === 'users' && id) {
       const { data: updated, error } = await adminSupabase
         .from('users')
@@ -246,7 +296,21 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: updated });
     }
 
-    // 6. Hapus record pengguna / API Key (bypass RLS)
+    if (action === 'update' && table === 'transactions' && id) {
+      const { data: updated, error } = await adminSupabase
+        .from('transactions')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+      return res.status(200).json({ success: true, data: updated });
+    }
+
+    // 6. Hapus record pengguna / API Key / Transaksi (bypass RLS)
     if (action === 'delete' && table === 'users' && id) {
       const { error } = await adminSupabase
         .from('users')
@@ -262,6 +326,18 @@ export default async function handler(req, res) {
     if (action === 'delete' && table === 'api_keys' && id) {
       const { error } = await adminSupabase
         .from('api_keys')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'delete' && table === 'transactions' && id) {
+      const { error } = await adminSupabase
+        .from('transactions')
         .delete()
         .eq('id', id);
 

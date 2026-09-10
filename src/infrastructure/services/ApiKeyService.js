@@ -30,6 +30,17 @@ export class ApiKeyService {
       this._loadKeys();
       this._syncFromRemote();
     });
+
+    // Cross-tab synchronization via storage event (saat Admin memverifikasi key di admin panel)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e) => {
+        if (e.key && (e.key.includes('api_keys') || e.key.includes('wallet_balance'))) {
+          this._loadKeys();
+          this._syncFromRemote();
+          this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});
+        }
+      });
+    }
   }
 
   /**
@@ -52,15 +63,37 @@ export class ApiKeyService {
 
     const keysKey = `api_keys_${userId}`;
     const saved = this._storage.get(keysKey);
+    const globalKeys = (this._storage.get('api_keys') || []).filter(k => k.userId === userId);
 
-    if (saved && Array.isArray(saved)) {
-      this._keys = saved
-        .filter(k => k.userId === userId || !k.userId)
-        .map(k => new ApiKey(k));
-    } else {
-      // Akun baru default 0 key (bersih tanpa dummy)
-      this._keys = [];
+    let baseList = [];
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      baseList = saved;
+    } else if (globalKeys.length > 0) {
+      baseList = globalKeys;
     }
+
+    // Gabungkan dan perbarui status jika ada key yang sudah diverifikasi di global list
+    const keyMap = new Map();
+    baseList.forEach(k => {
+      const id = k.id || k.keyString;
+      keyMap.set(id, k);
+    });
+
+    globalKeys.forEach(gk => {
+      const id = gk.id || gk.keyString;
+      if (keyMap.has(id)) {
+        const existing = keyMap.get(id);
+        // Jika global list sudah valid, adopsi status valid
+        if (gk.status === 'valid' && existing.status !== 'valid') {
+          existing.status = 'valid';
+          delete existing.errorMessage;
+        }
+      } else {
+        keyMap.set(id, gk);
+      }
+    });
+
+    this._keys = Array.from(keyMap.values()).map(k => new ApiKey(k));
 
     // Sync dari remote Supabase jika repositori tersedia
     this._syncFromRemote();
@@ -73,9 +106,10 @@ export class ApiKeyService {
     try {
       // Filter key HANYA untuk pengguna yang sedang aktif
       const remoteKeys = await this._apiKeyRepository.getAll(userId);
-      if (remoteKeys) {
+      if (remoteKeys && Array.isArray(remoteKeys) && remoteKeys.length > 0) {
         this._keys = remoteKeys;
         this._persist();
+        this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});
       }
     } catch (err) {
       console.warn('[ApiKeyService] Remote sync fallback to cache:', err.message);
@@ -87,7 +121,12 @@ export class ApiKeyService {
     if (userId) {
       this._storage.set(`api_keys_${userId}`, this._keys.map(k => k.toJSON()));
     }
-    this._storage.set('api_keys', this._keys.map(k => k.toJSON()));
+
+    // Sinkronkan ke daftar global api_keys
+    const currentGlobal = this._storage.get('api_keys') || [];
+    const otherUsersKeys = currentGlobal.filter(k => k.userId !== userId);
+    const updatedGlobal = [...otherUsersKeys, ...this._keys.map(k => k.toJSON())];
+    this._storage.set('api_keys', updatedGlobal);
   }
 
   /**
