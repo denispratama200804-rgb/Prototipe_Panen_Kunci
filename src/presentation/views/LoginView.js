@@ -1,4 +1,5 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
+import { googleClientId } from '../../infrastructure/supabase/supabaseClient.js';
 
 /**
  * LoginView
@@ -177,7 +178,8 @@ export class LoginView extends IComponent {
     });
 
     // Login via Google OAuth
-    googleBtn?.addEventListener('click', async () => {
+    googleBtn?.addEventListener('click', async (e) => {
+      e.preventDefault();
       googleBtn.disabled = true;
       googleBtn.classList.add('opacity-75', 'cursor-not-allowed');
       if (googleTxt) googleTxt.textContent = 'Menghubungkan ke Google...';

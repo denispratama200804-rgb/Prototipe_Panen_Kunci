@@ -1,4 +1,5 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
+import { googleClientId } from '../../infrastructure/supabase/supabaseClient.js';
 
 /**
  * RegisterView
@@ -258,7 +259,9 @@ export class RegisterView extends IComponent {
     // Register via Google OAuth
     const googleBtn = container.querySelector('#btnGoogleRegister');
     const googleTxt = container.querySelector('#txtGoogleRegister');
-    googleBtn?.addEventListener('click', async () => {
+
+    googleBtn?.addEventListener('click', async (e) => {
+      e.preventDefault();
       googleBtn.disabled = true;
       googleBtn.classList.add('opacity-75', 'cursor-not-allowed');
       if (googleTxt) googleTxt.textContent = 'Menghubungkan ke Google...';

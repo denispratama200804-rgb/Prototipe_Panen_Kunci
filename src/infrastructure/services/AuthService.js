@@ -1,6 +1,6 @@
 import { User } from '../../domain/models/User.js';
 import { AppEvents } from '../../core/events/EventBus.js';
-import { supabase, isSupabaseConfigured, googleClientId } from '../supabase/supabaseClient.js';
+import { supabase, isSupabaseConfigured, googleClientId, appBaseUrl } from '../supabase/supabaseClient.js';
 
 /**
  * AuthService
@@ -544,7 +544,8 @@ export class AuthService {
     }
 
     try {
-      const redirectUrl = window.location.origin + window.location.pathname;
+      // Selalu gunakan URL production Vercel agar redirect dari Google/Supabase tidak ke IP lokal
+      const redirectUrl = appBaseUrl || (window.location.origin + window.location.pathname);
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -562,6 +563,10 @@ export class AuthService {
           success: false,
           message: error.message || 'Gagal memulai autentikasi Google.'
         };
+      }
+
+      if (data?.url) {
+        window.location.href = data.url;
       }
 
       return {

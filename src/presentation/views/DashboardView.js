@@ -148,9 +148,9 @@ export class DashboardView extends IComponent {
             </div>
           </div>
 
-          <!-- Download App Button (Hanya tampil jika belum didownload) -->
+          <!-- Download App Button (Hanya tampil di HP & belum didownload) -->
           ${!isDownloaded ? `
-            <div id="dashboard-download-container" class="pt-1 transition-all duration-300">
+            <div id="dashboard-download-container" class="pt-1 transition-all duration-300 md:hidden">
               <button type="button" id="btn-dashboard-download" class="w-full bg-primary text-on-primary rounded-2xl py-3.5 px-5 flex items-center justify-center gap-2.5 shadow-md shadow-primary/20 hover:bg-primary-container transition-all active:scale-95 font-label-md text-sm font-bold group cursor-pointer">
                 <span class="material-symbols-outlined text-[20px] group-hover:translate-y-0.5 transition-transform">download</span>
                 <span>Download Aplikasi Panen Kunci</span>

@@ -27,6 +27,27 @@ export class Router {
    */
   init() {
     window.addEventListener('hashchange', this._onHashChange);
+
+    // PWA Startup Redirect:
+    // Jika aplikasi dibuka sebagai PWA standalone (sudah diinstall di HP) dan user
+    // membuka di halaman root (/), arahkan langsung ke halaman yang tepat.
+    const isPwaStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                            window.navigator.standalone === true;
+    const isAtRoot = !window.location.hash || window.location.hash === '#' || window.location.hash === '#/';
+    const hasOAuthToken = window.location.hash.includes('access_token=') || window.location.search.includes('code=');
+
+    if (isPwaStandalone && isAtRoot && !hasOAuthToken) {
+      if (this._container.has('AuthService')) {
+        const authService = this._container.resolve('AuthService');
+        if (authService.isAuthenticated()) {
+          window.location.hash = '/dashboard';
+        } else {
+          window.location.hash = '/login';
+        }
+        return; // _onHashChange akan dipanggil otomatis oleh hashchange event
+      }
+    }
+
     this._onHashChange();
   }
 
