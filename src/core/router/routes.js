@@ -7,6 +7,7 @@ import { SetorApiKeyView } from '../../presentation/views/SetorApiKeyView.js';
 import { TarikSaldoView } from '../../presentation/views/TarikSaldoView.js';
 import { HistoryView } from '../../presentation/views/HistoryView.js';
 import { ProfileView } from '../../presentation/views/ProfileView.js';
+import { ResetPasswordView } from '../../presentation/views/ResetPasswordView.js';
 
 /**
  * Routes Configuration
@@ -33,6 +34,12 @@ export const routes = [
     title: 'Daftar Akun Baru',
     requiresAuth: false,
     guestOnly: false
+  },
+  {
+    path: '/reset-password',
+    viewClass: ResetPasswordView,
+    title: 'Atur Kata Sandi Baru',
+    requiresAuth: false
   },
   {
     path: '/dashboard',

@@ -197,20 +197,102 @@ export class LoginView extends IComponent {
     forgotBtn?.addEventListener('click', () => {
       this._notification.showModal({
         title: 'Reset Kata Sandi',
-        message: 'Masukkan email akun Supabase Anda untuk menerima tautan reset kata sandi:',
+        message: 'Masukkan email akun Panen Kunci Anda untuk menerima tautan atur ulang kata sandi:',
         html: `
-          <input type="email" id="resetEmail" class="w-full bg-bg-subtle text-sm p-3 rounded-xl border border-outline-variant/50 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="nama@email.com" value="${emailInput.value}" />
+          <div class="flex flex-col gap-1.5 mt-1">
+            <input
+              type="email"
+              id="resetEmail"
+              class="w-full bg-bg-subtle text-text-heading text-sm p-3.5 rounded-xl border border-outline-variant/50 focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-outline/60"
+              placeholder="nama@email.com"
+              value="${emailInput?.value || ''}"
+              autocomplete="email"
+            />
+            <p class="text-[11px] text-text-body/70 mt-0.5">Tautan pemulihan akan dikirimkan langsung ke kotak masuk email Anda.</p>
+          </div>
         `,
         type: 'info',
         confirmText: 'Kirim Link Reset',
         showCancel: true,
-        onConfirm: async () => {
+        autoClose: false,
+        onConfirm: async ({ close, confirmBtn }) => {
           const resetEmail = document.getElementById('resetEmail')?.value?.trim();
           if (!resetEmail) {
             this._notification.error('Alamat email wajib diisi.');
-            return;
+            return false;
           }
-          this._notification.info('Permintaan reset kata sandi telah diproses.');
+
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(resetEmail)) {
+            this._notification.error('Format alamat email tidak valid.');
+            return false;
+          }
+
+          const origContent = confirmBtn.innerHTML;
+          confirmBtn.disabled = true;
+          confirmBtn.classList.add('opacity-75', 'cursor-not-allowed');
+          confirmBtn.innerHTML = `
+            <span class="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <span>Mengirim...</span>
+          `;
+
+          try {
+            const res = await this._authService.sendPasswordResetEmail(resetEmail);
+
+            if (res.success) {
+              close();
+              if (res.isDirectLink && res.actionLink) {
+                this._notification.showModal({
+                  title: 'Tautan Reset Instan Siap!',
+                  message: 'Batas kuota email bawaan Supabase (3 email/jam) sedang aktif di proyek Anda. Anda dapat langsung menggunakan tautan pemulihan instan di bawah ini:',
+                  html: `
+                    <div class="flex flex-col gap-3 mt-2 text-left">
+                      <div class="p-3 bg-bg-subtle rounded-xl border border-outline-variant/40 text-[11px] font-mono break-all text-text-body select-all max-h-24 overflow-y-auto">
+                        ${res.actionLink}
+                      </div>
+                      <div class="flex gap-2 mt-1">
+                        <button type="button" id="btnCopyResetLogin" class="flex-1 py-2.5 px-3 bg-surface-container hover:bg-surface-container-high text-xs font-bold rounded-xl text-text-heading flex items-center justify-center gap-1.5 transition-colors">
+                          <span class="material-symbols-outlined text-[16px]">content_copy</span>
+                          <span>Salin Tautan</span>
+                        </button>
+                        <a href="${res.actionLink}" class="flex-1 py-2.5 px-3 bg-primary text-on-primary hover:bg-primary-container text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 text-center transition-colors">
+                          <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                          <span>Buka Sekarang</span>
+                        </a>
+                      </div>
+                    </div>
+                  `,
+                  type: 'info',
+                  confirmText: 'Tutup'
+                });
+                setTimeout(() => {
+                  document.getElementById('btnCopyResetLogin')?.addEventListener('click', () => {
+                    navigator.clipboard.writeText(res.actionLink);
+                    this._notification.success('Tautan reset kata sandi berhasil disalin!');
+                  });
+                }, 100);
+              } else {
+                this._notification.showModal({
+                  title: 'Tautan Terkirim!',
+                  message: res.message,
+                  type: 'success',
+                  confirmText: 'Mengerti'
+                });
+              }
+            } else {
+              confirmBtn.disabled = false;
+              confirmBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+              confirmBtn.innerHTML = origContent;
+              this._notification.error(res.message || 'Gagal mengirim email reset kata sandi.');
+              return false;
+            }
+          } catch (err) {
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+            confirmBtn.innerHTML = origContent;
+            this._notification.error('Terjadi kesalahan: ' + err.message);
+            return false;
+          }
         }
       });
     });

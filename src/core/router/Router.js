@@ -75,13 +75,18 @@ export class Router {
   async _onHashChange() {
     const rawHash = window.location.hash.slice(1) || '/';
 
-    // Jika URL memuat token callback OAuth dari Supabase (#access_token=... atau #error=...),
-    // biarkan Supabase SDK dan AuthService memproses autentikasi sebelum merender rute
-    if (rawHash.includes('access_token=') || rawHash.includes('refresh_token=') || rawHash.startsWith('error=')) {
+    // Jika URL memuat token recovery reset kata sandi, biarkan rute /reset-password diproses
+    const isRecovery = rawHash.includes('type=recovery') || window.location.search.includes('type=recovery');
+
+    // Jika URL memuat token callback OAuth biasa (Google dsb), biarkan Supabase SDK memprosesnya
+    if (!isRecovery && (rawHash.includes('access_token=') || rawHash.includes('refresh_token=') || rawHash.startsWith('error='))) {
       return;
     }
 
-    const [path] = rawHash.split('?');
+    let [path] = rawHash.split('?');
+    if (isRecovery && path !== '/reset-password') {
+      path = '/reset-password';
+    }
     
     // Jika user membuka hash #/admin atau #/admin_panel di aplikasi utama, periksa hak akses admin
     if (path === '/admin' || path === '/admin_panel') {

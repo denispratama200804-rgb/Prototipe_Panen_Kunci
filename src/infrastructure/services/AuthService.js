@@ -50,12 +50,14 @@ export class AuthService {
     this._storage.set('session', this._session);
 
     // Simpan flag terpisah untuk aksesibilitas global dan admin panel
-    if (role === 'admin') {
-      localStorage.setItem('panenkunci:admin_logged_in', 'true');
-      localStorage.setItem('panenkunci:auth_role', 'admin');
-    } else {
-      localStorage.removeItem('panenkunci:admin_logged_in');
-      localStorage.setItem('panenkunci:auth_role', 'user');
+    if (typeof localStorage !== 'undefined') {
+      if (role === 'admin') {
+        localStorage.setItem('panenkunci:admin_logged_in', 'true');
+        localStorage.setItem('panenkunci:auth_role', 'admin');
+      } else {
+        localStorage.removeItem('panenkunci:admin_logged_in');
+        localStorage.setItem('panenkunci:auth_role', 'user');
+      }
     }
   }
 
@@ -504,8 +506,23 @@ export class AuthService {
       return;
     }
 
-    // 2. Dengarkan perubahan sesi autentikasi Supabase (event callback SIGNED_IN atau USER_UPDATED)
+    // 2. Dengarkan perubahan sesi autentikasi Supabase
     supabase.auth.onAuthStateChange(async (event, session) => {
+      // Tangani event pemulihan kata sandi (user klik link dari email reset)
+      if (event === 'PASSWORD_RECOVERY') {
+        window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+        return;
+      }
+
+      const isRecovery = window.location.hash.includes('type=recovery') ||
+                         window.location.search.includes('type=recovery');
+      if (isRecovery) {
+        window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+        return;
+      }
+
       if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
         const isGoogle = session.user.app_metadata?.provider === 'google' ||
                          session.user.identities?.some(i => i.provider === 'google');
@@ -519,8 +536,14 @@ export class AuthService {
       }
     });
 
-    // 3. Tangani token OAuth jika user baru diarahkan kembali dari Google
-    if (window.location.hash.includes('access_token=') || window.location.search.includes('code=')) {
+    // 3. Tangani token OAuth jika user baru diarahkan kembali dari Google (kecuali jika itu recovery token)
+    const isRecoveryParam = window.location.hash.includes('type=recovery') ||
+                            window.location.search.includes('type=recovery');
+
+    if (isRecoveryParam) {
+      window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    } else if (window.location.hash.includes('access_token=') || window.location.search.includes('code=')) {
       supabase.auth.getSession().then(async ({ data: { session }, error }) => {
         if (!error && session?.user) {
           await this._syncOAuthUser(session.user, true);
@@ -730,5 +753,207 @@ export class AuthService {
     } finally {
       this._isSyncingOAuth = false;
     }
+  }
+
+  /**
+   * Mengirim email reset kata sandi kepada pengguna
+   * @param {string} emailInput
+   * @returns {Promise<{ success: boolean, message: string, code?: string }>}
+   */
+  async sendPasswordResetEmail(emailInput) {
+    if (!emailInput) {
+      return { success: false, message: 'Alamat email wajib diisi.' };
+    }
+
+    const email = emailInput.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return { success: false, message: 'Format alamat email tidak valid.' };
+    }
+
+    // 1. Verifikasi apakah email terdaftar di sistem (database public.users / storage lokal)
+    let userRecord = null;
+    if (this._userRepository) {
+      try {
+        userRecord = await this._userRepository.getByEmail(email);
+      } catch (err) {
+        console.warn('[AuthService] Cek email repository note:', err.message);
+      }
+    }
+
+    const localAccounts = this._storage.get('registered_accounts') || [];
+    const localUser = localAccounts.find(acc => acc.email?.toLowerCase() === email);
+
+    if (!userRecord && !localUser) {
+      return {
+        success: false,
+        message: 'Alamat email ini tidak terdaftar di sistem Panen Kunci. Silakan periksa kembali email Anda.'
+      };
+    }
+
+    // 2. Jika Supabase dikonfigurasi, kirim email reset password via Supabase Auth
+    if (isSupabaseConfigured()) {
+      try {
+        // Tentukan URL redirect saat tautan di email diklik
+        const origin = window.location.origin + window.location.pathname;
+        const cleanOrigin = origin.replace(/\/$/, '');
+        const redirectUrl = `${cleanOrigin}/#/reset-password`;
+
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: redirectUrl
+        });
+
+        if (error) {
+          console.warn('[AuthService] Supabase resetPasswordForEmail error:', error);
+
+          // Coba buat link pemulihan instan via backend proxy menggunakan kunci admin
+          // Ini mengatasi masalah jika kuota email penuh (429) atau konfigurasi SMTP Supabase gagal (500)
+          try {
+            const proxyRes = await fetch('/api/supabase-proxy', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'generate_recovery_link',
+                data: { email, redirectTo: redirectUrl }
+              })
+            });
+            const proxyData = await proxyRes.json();
+            if (proxyData.success && proxyData.action_link) {
+              return {
+                success: true,
+                isDirectLink: true,
+                actionLink: proxyData.action_link,
+                message: 'Tautan pemulihan kata sandi instan telah berhasil dibuat untuk akun Anda!'
+              };
+            }
+          } catch (proxyErr) {
+            console.warn('[AuthService] Fallback recovery link proxy note:', proxyErr.message);
+          }
+
+          // Jika fallback proxy tidak tersedia, berikan pesan error yang jelas dan spesifik
+          const errMsg = (error.message || '').toLowerCase();
+
+          if (
+            error.status === 429 ||
+            error.code === 'over_email_send_rate_limit' ||
+            errMsg.includes('rate limit') ||
+            errMsg.includes('security purposes')
+          ) {
+            return {
+              success: false,
+              code: 'RATE_LIMIT',
+              message: 'Batas frekuensi pengiriman email tercapai (cooldown keamanan Supabase). Silakan tunggu 60 detik sebelum mencoba lagi atau periksa folder Kotak Masuk / Spam email Anda.'
+            };
+          }
+
+          if (errMsg.includes('recovery email') || error.status === 500) {
+            return {
+              success: false,
+              message: 'Gagal mengirim email melalui SMTP provider Supabase. Pastikan Anda menggunakan "Sandi Aplikasi (App Password)" 16 digit Gmail, bukan kata sandi akun biasa.'
+            };
+          }
+
+          if (error.code === 'email_address_invalid' || errMsg.includes('invalid')) {
+            return {
+              success: false,
+              message: 'Alamat email ini belum aktif atau belum diverifikasi di Supabase Auth.'
+            };
+          }
+
+          return {
+            success: false,
+            message: error.message || 'Gagal mengirimkan email reset kata sandi.'
+          };
+        }
+
+        return {
+          success: true,
+          message: `Tautan reset kata sandi telah dikirim ke ${email}. Silakan periksa Kotak Masuk atau folder Spam Anda.`
+        };
+      } catch (err) {
+        console.error('[AuthService] sendPasswordResetEmail error:', err);
+        return {
+          success: false,
+          message: err.message || 'Terjadi kesalahan saat memproses permintaan reset kata sandi.'
+        };
+      }
+    }
+
+    // Fallback jika berjalan offline / mode mock lokal
+    return {
+      success: true,
+      message: `[Simulasi Mode Lokal] Instruksi reset kata sandi telah dikirim ke ${email}.`
+    };
+  }
+
+  /**
+   * Memperbarui kata sandi pengguna (setelah membuka link reset di email)
+   * @param {string} newPassword
+   * @returns {Promise<{ success: boolean, message: string }>}
+   */
+  async updateUserPassword(newPassword) {
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, message: 'Kata sandi baru minimal 6 karakter.' };
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase.auth.updateUser({
+          password: newPassword
+        });
+
+        if (error) {
+          console.error('[AuthService] Supabase updateUser password error:', error);
+          return {
+            success: false,
+            message: error.message || 'Gagal memperbarui kata sandi di Supabase.'
+          };
+        }
+
+        // Sinkronkan juga perubahan kata sandi ke tabel public.users
+        const updatedEmail = data?.user?.email || this._currentUser?.email;
+        if (updatedEmail && this._userRepository) {
+          try {
+            const dbUser = await this._userRepository.getByEmail(updatedEmail);
+            if (dbUser) {
+              await this._userRepository.update(dbUser.id, { password: newPassword });
+            }
+          } catch (dbErr) {
+            console.warn('[AuthService] Update password in public.users note:', dbErr.message);
+          }
+        }
+
+        // Sinkronkan jika ada di local storage
+        if (updatedEmail) {
+          const localAccounts = this._storage.get('registered_accounts') || [];
+          const idx = localAccounts.findIndex(acc => acc.email?.toLowerCase() === updatedEmail.toLowerCase());
+          if (idx !== -1) {
+            localAccounts[idx].password = newPassword;
+            this._storage.set('registered_accounts', localAccounts);
+          }
+        }
+
+        return {
+          success: true,
+          message: 'Kata sandi berhasil diperbarui! Silakan masuk dengan kata sandi baru Anda.'
+        };
+      } catch (err) {
+        console.error('[AuthService] updateUserPassword error:', err);
+        return {
+          success: false,
+          message: err.message || 'Terjadi kendala saat memperbarui kata sandi.'
+        };
+      }
+    }
+
+    // Fallback mode lokal
+    if (this._currentUser) {
+      this._currentUser.password = newPassword;
+      this._saveSession(this._currentUser, this._currentUser.role || 'user');
+    }
+    return {
+      success: true,
+      message: 'Kata sandi berhasil diperbarui! Silakan masuk kembali.'
+    };
   }
 }

@@ -7,21 +7,25 @@ import { createClient } from '@supabase/supabase-js';
  * Mendukung pembacaan kredensial baik dengan prefix VITE_ maupun NEXT_PUBLIC_.
  */
 
-const rawUrl = (import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
-const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
+const env = (typeof import.meta !== 'undefined' && import.meta && import.meta.env) ? import.meta.env : (typeof process !== 'undefined' && process.env ? process.env : {});
+
+const rawUrl = (env.VITE_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL || '').trim();
+const rawKey = (env.VITE_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || '').trim();
 
 export const supabaseUrl = rawUrl;
 export const supabaseAnonKey = rawKey;
 export const googleClientId = (
-  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-  import.meta.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+  env.VITE_GOOGLE_CLIENT_ID ||
+  env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+  env.GOOGLE_CLIENT_ID ||
   ''
 ).trim();
 
 // URL production aplikasi — digunakan agar redirect OAuth Google selalu ke Vercel, bukan IP lokal
 export const appBaseUrl = (
-  import.meta.env.VITE_APP_URL ||
-  import.meta.env.NEXT_PUBLIC_APP_URL ||
+  env.VITE_APP_URL ||
+  env.NEXT_PUBLIC_APP_URL ||
+  env.APP_URL ||
   ''
 ).trim().replace(/\/$/, ''); // hilangkan trailing slash
 

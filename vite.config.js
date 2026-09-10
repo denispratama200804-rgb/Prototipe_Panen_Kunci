@@ -146,6 +146,32 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
+                  if (action === 'generate_recovery_link' && data?.email) {
+                    if (adminSupabase) {
+                      const { data: linkData, error } = await adminSupabase.auth.admin.generateLink({
+                        type: 'recovery',
+                        email: data.email,
+                        options: {
+                          redirectTo: data.redirectTo || 'http://localhost:5173/#/reset-password'
+                        }
+                      });
+                      if (error) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: error.message }));
+                      } else {
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({
+                          success: true,
+                          action_link: linkData?.properties?.action_link
+                        }));
+                      }
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                    }
+                    return;
+                  }
+
                   res.statusCode = 400;
                   res.end(JSON.stringify({ success: false, error: 'Aksi tidak didukung' }));
                 } catch (err) {

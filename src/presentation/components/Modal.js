@@ -123,14 +123,23 @@ export class ModalComponent {
     const confirmBtn = modalWrapper.querySelector('.modal-confirm-btn');
     const cancelBtn = modalWrapper.querySelector('.modal-cancel-btn');
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
+      if (typeof onConfirm === 'function') {
+        const result = await onConfirm({
+          close: () => this.close(),
+          modal: modalWrapper,
+          confirmBtn
+        });
+        if (result === false || options.autoClose === false) {
+          return;
+        }
+      }
       this.close();
-      if (typeof onConfirm === 'function') onConfirm();
     };
 
     const handleCancel = () => {
-      this.close();
       if (typeof onCancel === 'function') onCancel();
+      this.close();
     };
 
     backdrop.addEventListener('click', handleCancel);
