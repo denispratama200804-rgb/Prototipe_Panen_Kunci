@@ -43,6 +43,44 @@ export default defineConfig(({ mode }) => {
             if (req.method === 'GET') {
               try {
                 if (adminSupabase) {
+                  const url = req.url || '';
+                  if (url.includes('type=api_keys')) {
+                    const { data: rawKeys, error } = await adminSupabase
+                      .from('api_keys')
+                      .select('*, users:user_id(id, name, email)')
+                      .order('created_at', { ascending: false });
+
+                    if (error) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: error.message }));
+                    } else {
+                      const keys = (rawKeys || []).map(row => {
+                        let domainStatus = row.status;
+                        let errorMessage = row.error_message || '';
+                        if (errorMessage.startsWith('__PENDING__')) {
+                          domainStatus = 'pending';
+                          errorMessage = errorMessage.replace('__PENDING__', '');
+                        }
+                        return {
+                          id: row.id,
+                          keyString: row.key_string,
+                          userId: row.user_id,
+                          userName: row.users?.name || 'Pengguna',
+                          userEmail: row.users?.email || '-',
+                          status: domainStatus,
+                          rewardAmount: Number(row.reward_amount) || 3000,
+                          credits: Number(row.credits) || 80,
+                          errorMessage: errorMessage,
+                          createdAt: row.created_at,
+                          source: 'supabase'
+                        };
+                      });
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true, data: keys }));
+                    }
+                    return;
+                  }
+
                   const { data: users, error } = await adminSupabase
                     .from('users')
                     .select('*')
@@ -95,12 +133,84 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
+                  if (action === 'get_api_keys' || (action === 'select' && table === 'api_keys')) {
+                    if (adminSupabase) {
+                      const { data: rawKeys, error } = await adminSupabase
+                        .from('api_keys')
+                        .select('*, users:user_id(id, name, email)')
+                        .order('created_at', { ascending: false });
+
+                      if (error) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: error.message }));
+                      } else {
+                        const keys = (rawKeys || []).map(row => {
+                          let domainStatus = row.status;
+                          let errorMessage = row.error_message || '';
+                          if (errorMessage.startsWith('__PENDING__')) {
+                            domainStatus = 'pending';
+                            errorMessage = errorMessage.replace('__PENDING__', '');
+                          }
+                          return {
+                            id: row.id,
+                            keyString: row.key_string,
+                            userId: row.user_id,
+                            userName: row.users?.name || 'Pengguna',
+                            userEmail: row.users?.email || '-',
+                            status: domainStatus,
+                            rewardAmount: Number(row.reward_amount) || 3000,
+                            credits: Number(row.credits) || 80,
+                            errorMessage: errorMessage,
+                            createdAt: row.created_at,
+                            source: 'supabase'
+                          };
+                        });
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({ success: true, data: keys }));
+                      }
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                    }
+                    return;
+                  }
+
                   if (action === 'insert' && table === 'users') {
                     const { data: inserted, error } = await adminSupabase
                       .from('users')
                       .insert(data)
                       .select()
                       .single();
+
+                    if (error) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: error.message }));
+                    } else {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true, data: inserted }));
+                    }
+                    return;
+                  }
+
+                  if (action === 'insert' && table === 'api_keys') {
+                    let insertPayload = { ...data };
+                    let { data: inserted, error } = await adminSupabase
+                      .from('api_keys')
+                      .insert(insertPayload)
+                      .select('*, users:user_id(id, name, email)')
+                      .single();
+
+                    if (error && error.message && error.message.includes('api_keys_status_check') && insertPayload.status === 'pending') {
+                      insertPayload.status = 'valid';
+                      insertPayload.error_message = '__PENDING__' + (insertPayload.error_message || '');
+                      const retry = await adminSupabase
+                        .from('api_keys')
+                        .insert(insertPayload)
+                        .select('*, users:user_id(id, name, email)')
+                        .single();
+                      inserted = retry.data;
+                      error = retry.error;
+                    }
 
                     if (error) {
                       res.statusCode = 400;
@@ -130,9 +240,48 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
+                  if (action === 'update' && table === 'api_keys' && id) {
+                    let updatePayload = { ...data };
+                    if (updatePayload.status === 'valid' && updatePayload.error_message && updatePayload.error_message.includes('__PENDING__')) {
+                      updatePayload.error_message = updatePayload.error_message.replace('__PENDING__', '');
+                    }
+
+                    let { data: updated, error } = await adminSupabase
+                      .from('api_keys')
+                      .update(updatePayload)
+                      .eq('id', id)
+                      .select('*, users:user_id(id, name, email)')
+                      .single();
+
+                    if (error) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: error.message }));
+                    } else {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true, data: updated }));
+                    }
+                    return;
+                  }
+
                   if (action === 'delete' && table === 'users' && id) {
                     const { error } = await adminSupabase
                       .from('users')
+                      .delete()
+                      .eq('id', id);
+
+                    if (error) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: error.message }));
+                    } else {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true }));
+                    }
+                    return;
+                  }
+
+                  if (action === 'delete' && table === 'api_keys' && id) {
+                    const { error } = await adminSupabase
+                      .from('api_keys')
                       .delete()
                       .eq('id', id);
 

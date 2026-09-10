@@ -10,8 +10,10 @@ export class AdminDataService {
   constructor(prefix = 'panenkunci:') {
     this.prefix = prefix;
     this._cleanDummyUsers();
+    this._cleanDummyKeys();
     // Auto-sync awal dari Supabase di background
     this.fetchUsersFromSupabase().catch(() => {});
+    this.fetchApiKeysFromSupabase().catch(() => {});
   }
 
   /**
@@ -39,6 +41,28 @@ export class AdminDataService {
       }
     } catch (e) {
       console.warn('[AdminDataService] _cleanDummyUsers warning:', e);
+    }
+  }
+
+  /**
+   * Membersihkan data mock dummy API Key lama jika sudah ada key asli dari Supabase
+   */
+  _cleanDummyKeys() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const raw = localStorage.getItem(`${this.prefix}api_keys`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          // Hapus key sample pending buatan (key_p01, key_p02)
+          const filtered = parsed.filter(k => k && k.id !== 'key_p01' && k.id !== 'key_p02');
+          if (filtered.length !== parsed.length) {
+            localStorage.setItem(`${this.prefix}api_keys`, JSON.stringify(filtered));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[AdminDataService] _cleanDummyKeys warning:', e);
     }
   }
 
@@ -154,64 +178,193 @@ export class AdminDataService {
   }
 
   /**
+   * Mengambil dan menyinkronkan data API Key langsung dari database Supabase
+   * @returns {Promise<Array>}
+   */
+  async fetchApiKeysFromSupabase() {
+    try {
+      let remoteKeys = null;
+
+      // 1. Ambil dari server proxy (menggunakan service role key admin)
+      try {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get_api_keys', table: 'api_keys' })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            remoteKeys = json.data;
+          }
+        }
+      } catch (proxyErr) {
+        console.warn('[AdminDataService] POST proxy api_keys warning:', proxyErr.message);
+      }
+
+      // 2. Fallback GET jika POST gagal
+      if (!remoteKeys) {
+        try {
+          const res = await fetch('/api/supabase-proxy?type=api_keys');
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data)) {
+              remoteKeys = json.data;
+            }
+          }
+        } catch (getErr) {
+          console.warn('[AdminDataService] GET proxy api_keys warning:', getErr.message);
+        }
+      }
+
+      // 3. Fallback client-side langsung ke Supabase
+      if (!remoteKeys && isSupabaseConfigured()) {
+        try {
+          const { data, error } = await supabase
+            .from('api_keys')
+            .select('*, users:user_id(id, name, email)')
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            remoteKeys = data.map(row => {
+              let domainStatus = row.status;
+              let errorMessage = row.error_message || '';
+              if (errorMessage.startsWith('__PENDING__')) {
+                domainStatus = 'pending';
+                errorMessage = errorMessage.replace('__PENDING__', '');
+              }
+              return {
+                id: row.id,
+                keyString: row.key_string,
+                userId: row.user_id,
+                userName: row.users?.name || 'Pengguna',
+                userEmail: row.users?.email || '-',
+                status: domainStatus,
+                rewardAmount: Number(row.reward_amount) || 3000,
+                credits: Number(row.credits) || 80,
+                errorMessage: errorMessage,
+                createdAt: row.created_at,
+                source: 'supabase'
+              };
+            });
+          }
+        } catch (clientErr) {
+          console.warn('[AdminDataService] Direct Supabase query api_keys warning:', clientErr.message);
+        }
+      }
+
+      if (remoteKeys && Array.isArray(remoteKeys)) {
+        const users = this.getUsers();
+        const userMap = {};
+        users.forEach(u => {
+          if (u.id) userMap[u.id] = u;
+        });
+
+        const mappedKeys = remoteKeys.map(k => {
+          const matchedUser = userMap[k.userId];
+          return {
+            id: k.id,
+            keyString: k.keyString || k.key_string,
+            userId: k.userId || k.user_id,
+            userName: k.userName || matchedUser?.name || 'Pengguna',
+            userEmail: k.userEmail || matchedUser?.email || '-',
+            status: k.status,
+            rewardAmount: Number(k.rewardAmount ?? k.reward_amount ?? 3000),
+            credits: Number(k.credits ?? 80),
+            errorMessage: k.errorMessage || k.error_message || '',
+            createdAt: k.createdAt || k.created_at || new Date().toISOString(),
+            source: 'supabase'
+          };
+        });
+
+        this._set('api_keys', mappedKeys);
+        return mappedKeys;
+      }
+
+      return this.getApiKeys();
+    } catch (err) {
+      console.warn('[AdminDataService] fetchApiKeysFromSupabase error:', err.message);
+      return this.getApiKeys();
+    }
+  }
+
+  /**
    * Mengambil semua API Key dengan filter dan pencarian
    */
   getApiKeys({ status = 'all', search = '' } = {}) {
     let keys = this._get('api_keys', []);
 
-    // Jika belum ada data di storage, inisialisasi default mock
-    if (!Array.isArray(keys) || keys.length === 0) {
-      keys = this._getInitialApiKeys();
-      this._set('api_keys', keys);
+    // Jika belum ada data sama sekali di storage
+    if (!Array.isArray(keys)) {
+      keys = [];
     }
 
-    // Pastikan data Kunci Pasif (pending) tersedia untuk pengujian fitur filter
-    if (Array.isArray(keys) && keys.length > 0 && !keys.some(k => k.status === 'pending')) {
-      const now = Date.now();
-      const samplePending = [
-        {
-          id: 'key_p01',
-          keyString: 'sk-kie-p4ss1v3k3y778899aabbcc01',
-          userId: 'usr_ahmad_03',
-          status: 'pending',
-          rewardAmount: 3000,
-          credits: 80,
-          createdAt: new Date(now - 1800000).toISOString()
-        },
-        {
-          id: 'key_p02',
-          keyString: 'sk-kie-p4ss1v3d3w1001122334455',
-          userId: 'usr_dewi_04',
-          status: 'pending',
-          rewardAmount: 3000,
-          credits: 80,
-          createdAt: new Date(now - 900000).toISOString()
-        }
-      ];
-      keys = [...samplePending, ...keys];
-      this._set('api_keys', keys);
-    }
+    // Cocokkan data pemilik dengan daftar pengguna terkini
+    const users = this._get('all_users', []);
+    const userMap = {};
+    users.forEach(u => {
+      if (u.id) userMap[u.id] = u;
+    });
 
-    return keys.filter(item => {
+    return keys.map(item => {
+      const u = userMap[item.userId];
+      if (u) {
+        if (!item.userName || item.userName === 'Pengguna') item.userName = u.name;
+        if (!item.userEmail || item.userEmail === '-') item.userEmail = u.email;
+      }
+      return item;
+    }).filter(item => {
       const matchStatus = status === 'all' || item.status === status;
       const q = search.toLowerCase();
       const matchSearch = !search ||
         (item.keyString && item.keyString.toLowerCase().includes(q)) ||
         (item.id && item.id.toLowerCase().includes(q)) ||
-        (item.userId && item.userId.toLowerCase().includes(q));
+        (item.userId && item.userId.toLowerCase().includes(q)) ||
+        (item.userName && item.userName.toLowerCase().includes(q)) ||
+        (item.userEmail && item.userEmail.toLowerCase().includes(q));
       return matchStatus && matchSearch;
     });
   }
 
   /**
-   * Perbarui status API Key (misal: 'valid', 'invalid', 'used')
+   * Perbarui status API Key (misal: 'valid', 'invalid', 'used') dan sinkronkan ke Supabase
    */
-  updateApiKeyStatus(id, newStatus) {
+  async updateApiKeyStatus(id, newStatus) {
     const keys = this.getApiKeys();
     const idx = keys.findIndex(k => k.id === id);
     if (idx !== -1) {
       keys[idx].status = newStatus;
       this._set('api_keys', keys);
+
+      // Sinkronkan ke Supabase
+      try {
+        let proxySuccess = false;
+        try {
+          const proxyRes = await fetch('/api/supabase-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update',
+              table: 'api_keys',
+              id,
+              data: { status: newStatus }
+            })
+          });
+          if (proxyRes.ok) {
+            const resJson = await proxyRes.json();
+            if (resJson.success) proxySuccess = true;
+          }
+        } catch (pe) {
+          console.warn('[AdminDataService] Proxy update status warning:', pe.message);
+        }
+
+        if (!proxySuccess && isSupabaseConfigured()) {
+          await supabase.from('api_keys').update({ status: newStatus }).eq('id', id);
+        }
+      } catch (err) {
+        console.warn('[AdminDataService] Sync update status ke Supabase error:', err.message);
+      }
+
       return true;
     }
     return false;
@@ -219,9 +372,10 @@ export class AdminDataService {
 
   /**
    * Setujui / Verifikasi API Key dari user
-   * Mengubah status key menjadi 'valid', memindahkan reward dari Saldo Pasif ke Saldo Aktif
+   * Mengubah status key menjadi 'valid', memindahkan reward dari Saldo Pasif ke Saldo Aktif,
+   * dan menyinkronkan status ke Supabase.
    */
-  approveApiKey(keyId) {
+  async approveApiKey(keyId) {
     const keys = this.getApiKeys();
     const key = keys.find(k => k.id === keyId);
     if (!key) {
@@ -250,6 +404,16 @@ export class AdminDataService {
     const currentLifetime = Number(this._get('lifetime_earnings', 0));
     this._set('lifetime_earnings', currentLifetime + rewardAmount);
 
+    // Update saldo spesifik pengguna di all_users jika cocok
+    const users = this._get('all_users', []);
+    const uIdx = users.findIndex(u => u.id === key.userId);
+    if (uIdx !== -1) {
+      const userBal = Number(users[uIdx].balance || 0);
+      users[uIdx].balance = userBal + rewardAmount;
+      users[uIdx].customBalance = users[uIdx].balance;
+      this._set('all_users', users);
+    }
+
     // Update transaksi terkait
     const txs = this.getTransactions();
     const masked = key.keyString && key.keyString.length > 12 
@@ -270,7 +434,7 @@ export class AdminDataService {
     } else {
       txs.unshift({
         id: 'tx_' + Math.random().toString(36).substring(2, 9),
-        userId: key.userId || 'usr_budi_01',
+        userId: key.userId || 'usr_current',
         type: 'deposit',
         amount: rewardAmount,
         title: 'Setoran API Key (Terverifikasi)',
@@ -281,14 +445,44 @@ export class AdminDataService {
     }
     this._set('transactions', txs);
 
+    // Sinkronkan perubahan status ke database Supabase
+    try {
+      let proxySuccess = false;
+      try {
+        const proxyRes = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update',
+            table: 'api_keys',
+            id: keyId,
+            data: { status: 'valid', error_message: '' }
+          })
+        });
+        if (proxyRes.ok) {
+          const resJson = await proxyRes.json();
+          if (resJson.success) proxySuccess = true;
+        }
+      } catch (pe) {
+        console.warn('[AdminDataService] Proxy approve warning:', pe.message);
+      }
+
+      if (!proxySuccess && isSupabaseConfigured()) {
+        await supabase.from('api_keys').update({ status: 'valid', error_message: '' }).eq('id', keyId);
+      }
+    } catch (err) {
+      console.warn('[AdminDataService] Sync approve ke Supabase error:', err.message);
+    }
+
     return { success: true, key, rewardAmount, newActive, newPassive };
   }
 
   /**
    * Tolak API Key dari user
-   * Mengubah status key menjadi 'invalid', membatalkan reward dari Saldo Pasif
+   * Mengubah status key menjadi 'invalid', membatalkan reward dari Saldo Pasif,
+   * dan menyinkronkan ke Supabase.
    */
-  rejectApiKey(keyId, reason = 'Kunci API tidak valid atau ditolak oleh Admin') {
+  async rejectApiKey(keyId, reason = 'Kunci API tidak valid atau ditolak oleh Admin') {
     const keys = this.getApiKeys();
     const key = keys.find(k => k.id === keyId);
     if (!key) {
@@ -330,16 +524,70 @@ export class AdminDataService {
       this._set('transactions', txs);
     }
 
+    // Sinkronkan perubahan status ke database Supabase
+    try {
+      let proxySuccess = false;
+      try {
+        const proxyRes = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update',
+            table: 'api_keys',
+            id: keyId,
+            data: { status: 'invalid', error_message: reason }
+          })
+        });
+        if (proxyRes.ok) {
+          const resJson = await proxyRes.json();
+          if (resJson.success) proxySuccess = true;
+        }
+      } catch (pe) {
+        console.warn('[AdminDataService] Proxy reject warning:', pe.message);
+      }
+
+      if (!proxySuccess && isSupabaseConfigured()) {
+        await supabase.from('api_keys').update({ status: 'invalid', error_message: reason }).eq('id', keyId);
+      }
+    } catch (err) {
+      console.warn('[AdminDataService] Sync reject ke Supabase error:', err.message);
+    }
+
     return { success: true, key, reason };
   }
 
   /**
-   * Hapus API Key
+   * Hapus API Key dari penyimpanan lokal dan Supabase
    */
-  deleteApiKey(id) {
+  async deleteApiKey(id) {
     const keys = this.getApiKeys();
     const updated = keys.filter(k => k.id !== id);
     this._set('api_keys', updated);
+
+    // Sinkronkan penghapusan ke Supabase
+    try {
+      let proxySuccess = false;
+      try {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', table: 'api_keys', id })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) proxySuccess = true;
+        }
+      } catch (pe) {
+        console.warn('[AdminDataService] Proxy delete api_key warning:', pe.message);
+      }
+
+      if (!proxySuccess && isSupabaseConfigured()) {
+        await supabase.from('api_keys').delete().eq('id', id);
+      }
+    } catch (err) {
+      console.warn('[AdminDataService] Sync delete api_key ke Supabase error:', err.message);
+    }
+
     return true;
   }
 

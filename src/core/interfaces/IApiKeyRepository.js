@@ -30,4 +30,23 @@ export class IApiKeyRepository {
   async create(apiKey) {
     throw new Error('Method create() must be implemented');
   }
+
+  /**
+   * Memperbarui data API Key
+   * @param {string} id
+   * @param {Object} updates
+   * @returns {Promise<import('../../domain/models/ApiKey.js').ApiKey>}
+   */
+  async update(id, updates) {
+    throw new Error('Method update() must be implemented');
+  }
+
+  /**
+   * Menghapus API Key
+   * @param {string} id
+   * @returns {Promise<boolean>}
+   */
+  async delete(id) {
+    throw new Error('Method delete() must be implemented');
+  }
 }

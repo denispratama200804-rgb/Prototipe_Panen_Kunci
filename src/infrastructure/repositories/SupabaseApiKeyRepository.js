@@ -20,11 +20,44 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
    * @returns {Promise<ApiKey[]>}
    */
   async getAll(userId) {
+    // 1. Coba via server proxy (menggunakan service role key untuk bypass RLS)
+    try {
+      if (typeof fetch !== 'undefined') {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get_api_keys', table: 'api_keys' })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            let list = json.data;
+            if (userId) list = list.filter(k => k.userId === userId || k.user_id === userId);
+            return list.map(item => {
+              const k = new ApiKey({
+                id: item.id,
+                userId: item.userId || item.user_id,
+                keyString: item.keyString || item.key_string,
+                status: item.status,
+                rewardAmount: Number(item.rewardAmount ?? item.reward_amount ?? 3000),
+                credits: Number(item.credits ?? 80),
+                errorMessage: item.errorMessage || item.error_message || '',
+                createdAt: item.createdAt || item.created_at
+              });
+              k.userName = item.userName || 'Pengguna';
+              k.userEmail = item.userEmail || '-';
+              return k;
+            });
+          }
+        }
+      }
+    } catch (_) {}
+
     if (!isSupabaseConfigured()) return [];
 
     let query = supabase
       .from(this.tableName)
-      .select('*')
+      .select('*, users:user_id(id, name, email)')
       .order('created_at', { ascending: false });
 
     if (userId) {
@@ -38,7 +71,7 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
       throw new Error(error.message);
     }
 
-    return (data || []).map(this._toDomain);
+    return (data || []).map(this._toDomain.bind(this));
   }
 
   /**
@@ -51,7 +84,7 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
 
     const { data, error } = await supabase
       .from(this.tableName)
-      .select('*')
+      .select('*, users:user_id(id, name, email)')
       .eq('key_string', keyString)
       .maybeSingle();
 
@@ -64,17 +97,31 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
   }
 
   /**
-   * Menyimpan API Key baru ke database
+   * Menyimpan API Key baru ke database dengan penanganan status pending dan validasi UUID
    * @param {Object} apiKey
    * @returns {Promise<ApiKey>}
    */
   async create(apiKey) {
-    if (!isSupabaseConfigured()) {
-      throw new Error('Supabase belum dikonfigurasikan di .env');
+    // Pastikan user_id berupa UUID valid untuk memenuhi foreign key ke public.users
+    let validUserId = apiKey.userId;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validUserId);
+
+    if (!isUuid) {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user?.id) {
+          validUserId = authData.user.id;
+        } else {
+          const { data: sampleUser } = await supabase.from('users').select('id').limit(1).maybeSingle();
+          if (sampleUser?.id) {
+            validUserId = sampleUser.id;
+          }
+        }
+      } catch (_) {}
     }
 
     const payload = {
-      user_id: apiKey.userId,
+      user_id: validUserId,
       key_string: apiKey.keyString,
       status: apiKey.status || 'valid',
       reward_amount: apiKey.rewardAmount ?? 3000,
@@ -86,11 +133,49 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
       payload.id = apiKey.id;
     }
 
-    const { data, error } = await supabase
+    // 1. Coba via server proxy (menggunakan service role key untuk bypass RLS)
+    try {
+      if (typeof fetch !== 'undefined') {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'insert', table: 'api_keys', data: payload })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            return this._toDomain(json.data);
+          }
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('[SupabaseApiKeyRepository] Proxy insert fallback:', proxyErr.message);
+    }
+
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase belum dikonfigurasikan di .env');
+    }
+
+    let { data, error } = await supabase
       .from(this.tableName)
       .insert(payload)
-      .select()
+      .select('*, users:user_id(id, name, email)')
       .single();
+
+    // Kompatibilitas check constraint jika skema Supabase belum dimigrasi (hanya valid/invalid)
+    if (error && error.message && error.message.includes('api_keys_status_check') && payload.status === 'pending') {
+      payload.status = 'valid';
+      payload.error_message = '__PENDING__' + (payload.error_message || '');
+
+      const retry = await supabase
+        .from(this.tableName)
+        .insert(payload)
+        .select('*, users:user_id(id, name, email)')
+        .single();
+
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('[SupabaseApiKeyRepository] create error:', error.message);
@@ -101,21 +186,122 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
   }
 
   /**
+   * Memperbarui data API Key (misal: verifikasi admin atau penolakan)
+   * @param {string} id
+   * @param {Object} updates
+   * @returns {Promise<ApiKey>}
+   */
+  async update(id, updates) {
+    if (!id) return null;
+
+    let payload = { ...updates };
+    if (payload.status === 'valid' && payload.error_message && payload.error_message.includes('__PENDING__')) {
+      payload.error_message = payload.error_message.replace('__PENDING__', '');
+    }
+
+    // 1. Coba via server proxy (bypass RLS)
+    try {
+      if (typeof fetch !== 'undefined') {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update', table: 'api_keys', id, data: payload })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            return this._toDomain(json.data);
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (!isSupabaseConfigured()) return null;
+
+    const { data, error } = await supabase
+      .from(this.tableName)
+      .update(payload)
+      .eq('id', id)
+      .select('*, users:user_id(id, name, email)')
+      .single();
+
+    if (error) {
+      console.error('[SupabaseApiKeyRepository] update error:', error.message);
+      throw new Error(error.message);
+    }
+
+    return data ? this._toDomain(data) : null;
+  }
+
+  /**
+   * Menghapus API Key dari Supabase
+   * @param {string} id
+   * @returns {Promise<boolean>}
+   */
+  async delete(id) {
+    if (!id) return false;
+
+    // 1. Coba via server proxy (bypass RLS)
+    try {
+      if (typeof fetch !== 'undefined') {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', table: 'api_keys', id })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) return true;
+        }
+      }
+    } catch (_) {}
+
+    if (!isSupabaseConfigured()) return false;
+
+    const { error } = await supabase
+      .from(this.tableName)
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('[SupabaseApiKeyRepository] delete error:', error.message);
+      throw new Error(error.message);
+    }
+
+    return true;
+  }
+
+  /**
    * Memetakan baris database snake_case ke domain model ApiKey
    * @param {Object} row
    * @returns {ApiKey}
    * @private
    */
   _toDomain(row) {
-    return new ApiKey({
+    let domainStatus = row.status;
+    let errorMessage = row.error_message || '';
+    if (errorMessage.startsWith('__PENDING__')) {
+      domainStatus = 'pending';
+      errorMessage = errorMessage.replace('__PENDING__', '');
+    }
+
+    const apiKey = new ApiKey({
       id: row.id,
       userId: row.user_id,
       keyString: row.key_string,
-      status: row.status,
+      status: domainStatus,
       rewardAmount: Number(row.reward_amount),
       credits: Number(row.credits),
-      errorMessage: row.error_message || '',
+      errorMessage: errorMessage,
       createdAt: row.created_at
     });
+
+    // Tempelkan informasi pengguna jika query relasi tersedia
+    if (row.users) {
+      apiKey.userName = row.users.name || 'Pengguna';
+      apiKey.userEmail = row.users.email || '-';
+    }
+
+    return apiKey;
   }
 }

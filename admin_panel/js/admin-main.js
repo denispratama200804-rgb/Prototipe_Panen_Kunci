@@ -96,6 +96,13 @@ class AdminApp {
       }
     }).catch(e => console.warn('Supabase users auto-sync:', e));
 
+    // Auto-sync data API Key dari Supabase di background
+    adminDataService.fetchApiKeysFromSupabase().then(() => {
+      if (this.currentTab === 'apikeys' || this.currentTab === 'dashboard') {
+        this.refreshCurrentView(false);
+      }
+    }).catch(e => console.warn('Supabase api_keys auto-sync:', e));
+
     this._renderLayout();
     this._mountView(this.currentTab);
 

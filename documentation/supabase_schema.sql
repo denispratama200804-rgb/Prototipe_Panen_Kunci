@@ -64,18 +64,22 @@ CREATE TABLE IF NOT EXISTS public.api_keys (
   id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID          NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   key_string      TEXT          NOT NULL UNIQUE,
-  status          TEXT          NOT NULL DEFAULT 'valid'
-                                  CHECK (status IN ('valid', 'invalid')),
+  status          TEXT          NOT NULL DEFAULT 'pending'
+                                  CHECK (status IN ('pending', 'valid', 'invalid', 'used')),
   reward_amount   INTEGER       NOT NULL DEFAULT 3000,
   credits         INTEGER       NOT NULL DEFAULT 80,
   error_message   TEXT          DEFAULT '',
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
+-- Query migrasi jika tabel api_keys sudah dibuat sebelumnya (memperbarui check constraint status):
+ALTER TABLE public.api_keys DROP CONSTRAINT IF EXISTS api_keys_status_check;
+ALTER TABLE public.api_keys ADD CONSTRAINT api_keys_status_check CHECK (status IN ('pending', 'valid', 'invalid', 'used'));
+
 COMMENT ON TABLE  public.api_keys                IS 'API Key yang disetorkan pengguna untuk mendapatkan reward';
 COMMENT ON COLUMN public.api_keys.user_id        IS 'FK ke tabel users';
 COMMENT ON COLUMN public.api_keys.key_string     IS 'String API Key — enkripsi sebelum store di production!';
-COMMENT ON COLUMN public.api_keys.status         IS 'valid = lolos verifikasi, invalid = ditolak';
+COMMENT ON COLUMN public.api_keys.status         IS 'pending = menunggu verifikasi admin, valid = disetujui, invalid = ditolak, used = telah diproses/dijual';
 COMMENT ON COLUMN public.api_keys.reward_amount  IS 'Nominal reward Rupiah yang dikreditkan ke dompet pengguna';
 COMMENT ON COLUMN public.api_keys.credits        IS 'Sisa kredit Kie.ai saat validasi (minimal 80 untuk diterima)';
 

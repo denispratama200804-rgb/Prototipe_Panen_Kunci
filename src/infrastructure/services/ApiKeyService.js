@@ -207,11 +207,15 @@ export class ApiKeyService {
 
     // Simpan ke Supabase jika repositori aktif
     if (this._apiKeyRepository) {
-      this._apiKeyRepository.create(newApiKey)
-        .then(saved => {
-          if (saved && saved.id) newApiKey.id = saved.id;
-        })
-        .catch(err => console.warn('[ApiKeyService] Supabase create key fallback:', err.message));
+      try {
+        const saved = await this._apiKeyRepository.create(newApiKey);
+        if (saved && saved.id) {
+          newApiKey.id = saved.id;
+          this._persist();
+        }
+      } catch (err) {
+        console.warn('[ApiKeyService] Supabase create key fallback:', err.message);
+      }
     }
 
     // 5. Kreditkan saldo ke dompet pengguna sebagai Saldo Pasif

@@ -30,6 +30,42 @@ export default async function handler(req, res) {
     }
 
     try {
+      const url = req.url || '';
+      if (url.includes('type=api_keys')) {
+        const { data: rawKeys, error } = await adminSupabase
+          .from('api_keys')
+          .select('*, users:user_id(id, name, email)')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          return res.status(400).json({ success: false, error: error.message });
+        }
+
+        const keys = (rawKeys || []).map(row => {
+          let domainStatus = row.status;
+          let errorMessage = row.error_message || '';
+          if (errorMessage.startsWith('__PENDING__')) {
+            domainStatus = 'pending';
+            errorMessage = errorMessage.replace('__PENDING__', '');
+          }
+          return {
+            id: row.id,
+            keyString: row.key_string,
+            userId: row.user_id,
+            userName: row.users?.name || 'Pengguna',
+            userEmail: row.users?.email || '-',
+            status: domainStatus,
+            rewardAmount: Number(row.reward_amount) || 3000,
+            credits: Number(row.credits) || 80,
+            errorMessage: errorMessage,
+            createdAt: row.created_at,
+            source: 'supabase'
+          };
+        });
+
+        return res.status(200).json({ success: true, data: keys });
+      }
+
       const { data: users, error } = await adminSupabase
         .from('users')
         .select('*')
@@ -74,6 +110,42 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: users });
     }
 
+    // 2b. Ambil data seluruh API Key (Gudang API Key Admin Panel) dengan relasi pengguna
+    if (action === 'get_api_keys' || (action === 'select' && table === 'api_keys')) {
+      const { data: rawKeys, error } = await adminSupabase
+        .from('api_keys')
+        .select('*, users:user_id(id, name, email)')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+
+      const keys = (rawKeys || []).map(row => {
+        let domainStatus = row.status;
+        let errorMessage = row.error_message || '';
+        if (errorMessage.startsWith('__PENDING__')) {
+          domainStatus = 'pending';
+          errorMessage = errorMessage.replace('__PENDING__', '');
+        }
+        return {
+          id: row.id,
+          keyString: row.key_string,
+          userId: row.user_id,
+          userName: row.users?.name || 'Pengguna',
+          userEmail: row.users?.email || '-',
+          status: domainStatus,
+          rewardAmount: Number(row.reward_amount) || 3000,
+          credits: Number(row.credits) || 80,
+          errorMessage: errorMessage,
+          createdAt: row.created_at,
+          source: 'supabase'
+        };
+      });
+
+      return res.status(200).json({ success: true, data: keys });
+    }
+
     // 3. Pembuatan tautan pemulihan kata sandi (Recovery Link)
     if (action === 'generate_recovery_link' && data?.email) {
       const host = req.headers['x-forwarded-host'] || req.headers.host || '';
@@ -99,7 +171,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 4. Insert record pengguna (bypass RLS)
+    // 4. Insert record pengguna / API Key (bypass RLS)
     if (action === 'insert' && table === 'users' && data) {
       const { data: inserted, error } = await adminSupabase
         .from('users')
@@ -113,7 +185,34 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: inserted });
     }
 
-    // 5. Update record pengguna (bypass RLS - verifikasi KYC, update profil, role)
+    if (action === 'insert' && table === 'api_keys' && data) {
+      let insertPayload = { ...data };
+      let { data: inserted, error } = await adminSupabase
+        .from('api_keys')
+        .insert(insertPayload)
+        .select('*, users:user_id(id, name, email)')
+        .single();
+
+      // Kompatibilitas jika check constraint di Supabase belum dimigrasi (hanya izinkan valid/invalid)
+      if (error && error.message && error.message.includes('api_keys_status_check') && insertPayload.status === 'pending') {
+        insertPayload.status = 'valid';
+        insertPayload.error_message = '__PENDING__' + (insertPayload.error_message || '');
+        const retry = await adminSupabase
+          .from('api_keys')
+          .insert(insertPayload)
+          .select('*, users:user_id(id, name, email)')
+          .single();
+        inserted = retry.data;
+        error = retry.error;
+      }
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+      return res.status(200).json({ success: true, data: inserted });
+    }
+
+    // 5. Update record pengguna / API Key (bypass RLS)
     if (action === 'update' && table === 'users' && id) {
       const { data: updated, error } = await adminSupabase
         .from('users')
@@ -128,10 +227,41 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: updated });
     }
 
-    // 6. Hapus record pengguna (bypass RLS)
+    if (action === 'update' && table === 'api_keys' && id) {
+      let updatePayload = { ...data };
+      if (updatePayload.status === 'valid' && updatePayload.error_message && updatePayload.error_message.includes('__PENDING__')) {
+        updatePayload.error_message = updatePayload.error_message.replace('__PENDING__', '');
+      }
+
+      let { data: updated, error } = await adminSupabase
+        .from('api_keys')
+        .update(updatePayload)
+        .eq('id', id)
+        .select('*, users:user_id(id, name, email)')
+        .single();
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+      return res.status(200).json({ success: true, data: updated });
+    }
+
+    // 6. Hapus record pengguna / API Key (bypass RLS)
     if (action === 'delete' && table === 'users' && id) {
       const { error } = await adminSupabase
         .from('users')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'delete' && table === 'api_keys' && id) {
+      const { error } = await adminSupabase
+        .from('api_keys')
         .delete()
         .eq('id', id);
 

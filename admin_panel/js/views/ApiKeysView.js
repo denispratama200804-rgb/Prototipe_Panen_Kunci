@@ -12,6 +12,8 @@ export class ApiKeysView {
     this.currentFilter = 'all';
     this.searchQuery = '';
     this.revealedKeys = new Set();
+    this.hasSynced = false;
+    this.isSyncing = false;
   }
 
   destroy() {
@@ -28,12 +30,13 @@ export class ApiKeysView {
       keys = keys.filter(k => k.status === 'pending');
     }
 
-    // Search Query (API Key String, User ID, ID Kunci, Email)
+    // Search Query (API Key String, User ID, ID Kunci, Email, Nama Pengguna)
     if (this.searchQuery && this.searchQuery.trim() !== '') {
       const q = this.searchQuery.toLowerCase().trim();
       keys = keys.filter(k =>
         (k.keyString && k.keyString.toLowerCase().includes(q)) ||
         (k.userId && k.userId.toLowerCase().includes(q)) ||
+        (k.userName && k.userName.toLowerCase().includes(q)) ||
         (k.id && k.id.toLowerCase().includes(q)) ||
         (k.userEmail && k.userEmail.toLowerCase().includes(q))
       );
@@ -254,9 +257,23 @@ export class ApiKeysView {
               }
             </div>
 
-            <!-- Right: Status Database -->
-            <div class="text-[11px] text-slate-500 font-mono hidden sm:block">
-              Total Database: ${allKeys.length} Kunci
+            <!-- Right: Status Database & Tombol Sinkronkan Supabase -->
+            <div class="flex items-center gap-2.5">
+              <button
+                type="button"
+                id="btn-sync-supabase-keys"
+                title="Sinkronkan data API Key langsung dari database Supabase"
+                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                  this.isSyncing ? 'opacity-70 cursor-not-allowed' : ''
+                }"
+                ${this.isSyncing ? 'disabled' : ''}
+              >
+                <span class="material-symbols-outlined text-sm ${this.isSyncing ? 'animate-spin text-emerald-400' : ''}">sync</span>
+                <span>${this.isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Supabase'}</span>
+              </button>
+              <div class="text-[11px] text-slate-500 font-mono hidden sm:block">
+                Total: ${allKeys.length} Kunci
+              </div>
             </div>
           </div>
         </div>
@@ -438,8 +455,9 @@ export class ApiKeysView {
                         }
                       </td>
                       <td>
-                        <div class="font-mono text-xs text-indigo-300 font-medium">${k.userId || 'usr_budi_01'}</div>
-                        <div class="text-[10px] text-slate-500">${k.id}</div>
+                        <div class="font-bold text-xs text-white">${k.userName || 'Pengguna'}</div>
+                        <div class="font-mono text-[11px] text-indigo-300 font-medium truncate max-w-[180px]" title="${k.userEmail || k.userId || ''}">${k.userEmail || k.userId || '-'}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">ID: ${k.id}</div>
                       </td>
                       <td>
                         ${statusBadge}
@@ -464,7 +482,7 @@ export class ApiKeysView {
                               data-action="approve-key"
                               data-id="${k.id}"
                               title="Setujui API Key & Cairkan ke Saldo Aktif"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 transition-all shadow-sm"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 transition-all shadow-sm cursor-pointer"
                             >
                               <span class="material-symbols-outlined text-xs">check_circle</span>
                               <span>Setujui</span>
@@ -474,7 +492,7 @@ export class ApiKeysView {
                               data-action="reject-key"
                               data-id="${k.id}"
                               title="Tolak API Key & Batalkan Saldo Pasif"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1 transition-all"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 border border-rose-500/30 flex items-center gap-1 transition-all cursor-pointer"
                             >
                               <span class="material-symbols-outlined text-xs">cancel</span>
                               <span>Tolak</span>
@@ -488,7 +506,7 @@ export class ApiKeysView {
                               data-id="${k.id}"
                               data-status="used"
                               title="Tandai Sudah Digunakan / Dijual"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 transition-all"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 text-blue-300 border border-blue-500/30 transition-all cursor-pointer"
                             >
                               Tandai Used
                             </button>
@@ -501,7 +519,7 @@ export class ApiKeysView {
                               data-id="${k.id}"
                               data-status="valid"
                               title="Kembalikan ke Valid"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer"
                             >
                               Reset Valid
                             </button>
@@ -513,7 +531,7 @@ export class ApiKeysView {
                             data-action="delete-key"
                             data-id="${k.id}"
                             title="Hapus Kunci dari Database"
-                            class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                            class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-colors cursor-pointer"
                           >
                             <span class="material-symbols-outlined text-sm">delete</span>
                           </button>
@@ -533,6 +551,27 @@ export class ApiKeysView {
   }
 
   bindEvents(container, refreshCallback) {
+    // Sinkronkan data API Key otomatis saat pertama kali dibuka
+    if (!this.hasSynced) {
+      this.hasSynced = true;
+      this.dataService.fetchApiKeysFromSupabase().then(() => {
+        refreshCallback();
+      });
+    }
+
+    // Tombol Sinkronkan Supabase
+    const syncBtn = container.querySelector('#btn-sync-supabase-keys');
+    if (syncBtn) {
+      syncBtn.addEventListener('click', async () => {
+        this.isSyncing = true;
+        refreshCallback();
+        const keys = await this.dataService.fetchApiKeysFromSupabase();
+        this.isSyncing = false;
+        this.toast.success(`Berhasil menyinkronkan ${keys.length} API Key dari database Supabase!`, 'Supabase Terhubung');
+        refreshCallback();
+      });
+    }
+
     // Filter Kunci Pasif / Kunci Aktif / Semua Kunci
     container.querySelectorAll('[data-filter]').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -623,22 +662,24 @@ export class ApiKeysView {
 
     // Set Status (e.g. used)
     container.querySelectorAll('[data-action="set-status"]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
         const st = btn.getAttribute('data-status');
-        this.dataService.updateApiKeyStatus(id, st);
-        this.toast.info(`Status API Key #${id} diubah menjadi "${st}"`, 'Status Diperbarui');
+        btn.disabled = true;
+        await this.dataService.updateApiKeyStatus(id, st);
+        this.toast.info(`Status API Key diubah menjadi "${st}"`, 'Status Diperbarui');
         refreshCallback();
       });
     });
 
     // Delete Key
     container.querySelectorAll('[data-action="delete-key"]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
-        if (confirm(`Yakin ingin menghapus API Key #${id}?`)) {
-          this.dataService.deleteApiKey(id);
-          this.toast.warning(`API Key #${id} telah dihapus dari database.`, 'Dihapus');
+        if (confirm(`Yakin ingin menghapus API Key ini dari database?`)) {
+          btn.disabled = true;
+          await this.dataService.deleteApiKey(id);
+          this.toast.warning(`API Key telah dihapus dari database.`, 'Dihapus');
           refreshCallback();
         }
       });
@@ -646,30 +687,36 @@ export class ApiKeysView {
 
     // Approve Key (Verifikasi & Cairkan ke Saldo Aktif)
     container.querySelectorAll('[data-action="approve-key"]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
-        const res = this.dataService.approveApiKey(id);
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">progress_activity</span><span>Memproses...</span>';
+        const res = await this.dataService.approveApiKey(id);
         if (res.success) {
-          this.toast.success(`API Key #${id} berhasil disetujui! Saldo Rp ${res.rewardAmount.toLocaleString('id-ID')} telah dicairkan ke Saldo Aktif.`, 'Key Terverifikasi');
+          this.toast.success(`API Key berhasil disetujui! Saldo Rp ${res.rewardAmount.toLocaleString('id-ID')} telah dicairkan ke Saldo Aktif.`, 'Key Terverifikasi');
           refreshCallback();
         } else {
           this.toast.error(res.message || 'Gagal memverifikasi API Key', 'Gagal');
+          refreshCallback();
         }
       });
     });
 
     // Reject Key (Tolak & Batalkan Saldo Pasif)
     container.querySelectorAll('[data-action="reject-key"]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
         const reason = prompt('Masukkan alasan penolakan API Key:', 'Kunci tidak aktif / kuota tidak valid');
         if (reason !== null) {
-          const res = this.dataService.rejectApiKey(id, reason.trim() || 'Ditolak oleh Admin');
+          btn.disabled = true;
+          btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">progress_activity</span><span>Memproses...</span>';
+          const res = await this.dataService.rejectApiKey(id, reason.trim() || 'Ditolak oleh Admin');
           if (res.success) {
-            this.toast.warning(`API Key #${id} ditolak dan Saldo Pasif telah dibatalkan.`, 'Key Ditolak');
+            this.toast.warning(`API Key ditolak dan Saldo Pasif telah dibatalkan.`, 'Key Ditolak');
             refreshCallback();
           } else {
             this.toast.error(res.message || 'Gagal menolak API Key', 'Gagal');
+            refreshCallback();
           }
         }
       });
