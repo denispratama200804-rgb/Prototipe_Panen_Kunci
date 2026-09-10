@@ -13,11 +13,36 @@ export default async function handler(req, res) {
   // Pastikan header CORS dan Content-Type terpasang
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // 1. Tangani permintaan GET (Sinkronisasi cepat daftar seluruh pengguna untuk Admin Panel)
+  if (req.method === 'GET') {
+    if (!adminSupabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'SUPABASE_SERVICE_ROLE_KEY belum dikonfigurasikan di Environment Variables server Vercel.'
+      });
+    }
+
+    try {
+      const { data: users, error } = await adminSupabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+
+      return res.status(200).json({ success: true, data: users });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
   }
 
   if (req.method !== 'POST') {
@@ -35,7 +60,21 @@ export default async function handler(req, res) {
       });
     }
 
-    // 1. Pembuatan tautan pemulihan kata sandi (Recovery Link)
+    // 2. Ambil data seluruh pengguna (Kelola Pengguna Admin Panel)
+    if (action === 'get_users' || (action === 'select' && table === 'users')) {
+      const { data: users, error } = await adminSupabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+
+      return res.status(200).json({ success: true, data: users });
+    }
+
+    // 3. Pembuatan tautan pemulihan kata sandi (Recovery Link)
     if (action === 'generate_recovery_link' && data?.email) {
       const host = req.headers['x-forwarded-host'] || req.headers.host || '';
       const proto = req.headers['x-forwarded-proto'] || 'https';
@@ -60,7 +99,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. Insert record pengguna (bypass RLS)
+    // 4. Insert record pengguna (bypass RLS)
     if (action === 'insert' && table === 'users' && data) {
       const { data: inserted, error } = await adminSupabase
         .from('users')
@@ -74,7 +113,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: inserted });
     }
 
-    // 3. Update record pengguna (bypass RLS)
+    // 5. Update record pengguna (bypass RLS - verifikasi KYC, update profil, role)
     if (action === 'update' && table === 'users' && id) {
       const { data: updated, error } = await adminSupabase
         .from('users')
@@ -89,7 +128,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: updated });
     }
 
-    // 4. Hapus record pengguna (bypass RLS)
+    // 6. Hapus record pengguna (bypass RLS)
     if (action === 'delete' && table === 'users' && id) {
       const { error } = await adminSupabase
         .from('users')

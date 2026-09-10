@@ -1,3 +1,5 @@
+import { supabase, isSupabaseConfigured } from '../../../src/infrastructure/supabase/supabaseClient.js';
+
 /**
  * AdminDataService
  * Mengelola interaksi langsung dengan localStorage aplikasi Panen Kunci ('panenkunci:*')
@@ -554,24 +556,44 @@ export class AdminDataService {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'get_users', table: 'users' })
         });
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-          remoteUsers = json.data;
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            remoteUsers = json.data;
+          }
         }
       } catch (proxyErr) {
         console.warn('[AdminDataService] POST proxy warning:', proxyErr.message);
       }
 
-      // 2. Fallback jika POST gagal
+      // 2. Fallback jika POST gagal (coba GET)
       if (!remoteUsers) {
         try {
           const res = await fetch('/api/supabase-proxy');
-          const json = await res.json();
-          if (json.success && Array.isArray(json.data)) {
-            remoteUsers = json.data;
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data)) {
+              remoteUsers = json.data;
+            }
           }
         } catch (getErr) {
           console.warn('[AdminDataService] GET proxy warning:', getErr.message);
+        }
+      }
+
+      // 3. Fallback client-side langsung ke Supabase jika proxy offline/gagal
+      if (!remoteUsers && isSupabaseConfigured()) {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            remoteUsers = data;
+          }
+        } catch (clientErr) {
+          console.warn('[AdminDataService] Direct Supabase query warning:', clientErr.message);
         }
       }
 
@@ -681,11 +703,24 @@ export class AdminDataService {
         if (updateData.role !== undefined) payload.role = updateData.role;
 
         if (Object.keys(payload).length > 0) {
-          await fetch('/api/supabase-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'update', table: 'users', id: userId, data: payload })
-          });
+          let proxySuccess = false;
+          try {
+            const proxyRes = await fetch('/api/supabase-proxy', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'update', table: 'users', id: userId, data: payload })
+            });
+            if (proxyRes.ok) {
+              const resJson = await proxyRes.json();
+              if (resJson.success) proxySuccess = true;
+            }
+          } catch (pe) {
+            console.warn('[AdminDataService] Proxy update warning:', pe.message);
+          }
+
+          if (!proxySuccess && isSupabaseConfigured()) {
+            await supabase.from('users').update(payload).eq('id', userId);
+          }
         }
       } catch (err) {
         console.warn('[AdminDataService] Sync update ke Supabase warning:', err.message);
@@ -711,11 +746,24 @@ export class AdminDataService {
     this._set('all_users', users);
 
     try {
-      await fetch('/api/supabase-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete', table: 'users', id: userId })
-      });
+      let proxySuccess = false;
+      try {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', table: 'users', id: userId })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) proxySuccess = true;
+        }
+      } catch (pe) {
+        console.warn('[AdminDataService] Proxy delete warning:', pe.message);
+      }
+
+      if (!proxySuccess && isSupabaseConfigured()) {
+        await supabase.from('users').delete().eq('id', userId);
+      }
       return true;
     } catch (err) {
       console.warn('[AdminDataService] Delete user Supabase warning:', err.message);
