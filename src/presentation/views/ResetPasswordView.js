@@ -139,11 +139,15 @@ export class ResetPasswordView extends IComponent {
 
     // Periksa status sesi aktif pemulihan
     if (isSupabaseConfigured()) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session && !this._authService.isAuthenticated()) {
-          sessionNotice?.classList.remove('hidden');
-        }
-      }).catch(() => {});
+      setTimeout(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session && !this._authService.isAuthenticated()) {
+            sessionNotice?.classList.remove('hidden');
+          } else {
+            sessionNotice?.classList.add('hidden');
+          }
+        }).catch(() => {});
+      }, 500);
     }
 
     // Toggle lihat kata sandi

@@ -23,6 +23,7 @@ export class AuthService {
     this._userRepository = userRepository;
     this._currentUser = null;
     this._isSyncingOAuth = false;
+    this._isPasswordRecovery = false;
 
     this._session = null;
     this._loadSession();
@@ -487,6 +488,37 @@ export class AuthService {
   _initSupabaseOAuthListener() {
     if (!isSupabaseConfigured()) return;
 
+    // 0. Deteksi jika tautan membawa token pemulihan kata sandi (baik format standar Supabase maupun double-hash)
+    const rawHash = window.location.hash || '';
+    const rawSearch = window.location.search || '';
+
+    const isRecoveryToken = rawHash.includes('type=recovery') ||
+                            rawSearch.includes('type=recovery') ||
+                            (rawHash.includes('access_token=') && rawHash.includes('/reset-password'));
+
+    if (isRecoveryToken) {
+      this._isPasswordRecovery = true;
+
+      // Ekstrak access_token dan refresh_token dari hash jika ada (mengatasi bug double hash dari fragment)
+      if (rawHash.includes('access_token=')) {
+        const accessMatch = rawHash.match(/access_token=([^&]+)/);
+        const refreshMatch = rawHash.match(/refresh_token=([^&]+)/);
+        if (accessMatch && refreshMatch) {
+          const accessToken = decodeURIComponent(accessMatch[1]);
+          const refreshToken = decodeURIComponent(refreshMatch[1]);
+          supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          }).catch(err => {
+            console.warn('[AuthService] setSession recovery note:', err.message);
+          });
+        }
+      }
+
+      window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    }
+
     // 1. Tangani jika callback URL membawa parameter error dari Google OAuth
     const hash = window.location.hash || '';
     const search = window.location.search || '';
@@ -510,20 +542,29 @@ export class AuthService {
     supabase.auth.onAuthStateChange(async (event, session) => {
       // Tangani event pemulihan kata sandi (user klik link dari email reset)
       if (event === 'PASSWORD_RECOVERY') {
+        this._isPasswordRecovery = true;
         window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
         window.dispatchEvent(new HashChangeEvent('hashchange'));
         return;
       }
 
+      if (this._isPasswordRecovery) {
+        return; // Jangan biarkan OAuth sync atau navigasi lain menginterupsi alur pemulihan kata sandi
+      }
+
       const isRecovery = window.location.hash.includes('type=recovery') ||
-                         window.location.search.includes('type=recovery');
+                         window.location.search.includes('type=recovery') ||
+                         window.location.hash.startsWith('#/reset-password');
       if (isRecovery) {
+        this._isPasswordRecovery = true;
         window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
         window.dispatchEvent(new HashChangeEvent('hashchange'));
         return;
       }
 
       if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
+        if (this._isPasswordRecovery) return;
+
         const isGoogle = session.user.app_metadata?.provider === 'google' ||
                          session.user.identities?.some(i => i.provider === 'google');
         const hasOAuthParam = window.location.hash.includes('access_token') ||
@@ -537,20 +578,23 @@ export class AuthService {
     });
 
     // 3. Tangani token OAuth jika user baru diarahkan kembali dari Google (kecuali jika itu recovery token)
-    const isRecoveryParam = window.location.hash.includes('type=recovery') ||
-                            window.location.search.includes('type=recovery');
+    if (!this._isPasswordRecovery) {
+      const isRecoveryParam = window.location.hash.includes('type=recovery') ||
+                              window.location.search.includes('type=recovery');
 
-    if (isRecoveryParam) {
-      window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-    } else if (window.location.hash.includes('access_token=') || window.location.search.includes('code=')) {
-      supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-        if (!error && session?.user) {
-          await this._syncOAuthUser(session.user, true);
-        }
-      }).catch(err => {
-        console.warn('[AuthService] getSession OAuth error:', err);
-      });
+      if (isRecoveryParam) {
+        this._isPasswordRecovery = true;
+        window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      } else if (window.location.hash.includes('access_token=') || window.location.search.includes('code=')) {
+        supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+          if (!error && session?.user && !this._isPasswordRecovery) {
+            await this._syncOAuthUser(session.user, true);
+          }
+        }).catch(err => {
+          console.warn('[AuthService] getSession OAuth error:', err);
+        });
+      }
     }
   }
 
@@ -646,7 +690,7 @@ export class AuthService {
    * @private
    */
   async _syncOAuthUser(authUser, isFreshLogin = false) {
-    if (!authUser || !authUser.email || this._isSyncingOAuth) return;
+    if (!authUser || !authUser.email || this._isSyncingOAuth || this._isPasswordRecovery) return;
     this._isSyncingOAuth = true;
 
     try {
@@ -817,14 +861,19 @@ export class AuthService {
                 data: { email, redirectTo: redirectUrl }
               })
             });
-            const proxyData = await proxyRes.json();
-            if (proxyData.success && proxyData.action_link) {
-              return {
-                success: true,
-                isDirectLink: true,
-                actionLink: proxyData.action_link,
-                message: 'Tautan pemulihan kata sandi instan telah berhasil dibuat untuk akun Anda!'
-              };
+            if (proxyRes.ok) {
+              const proxyData = await proxyRes.json();
+              if (proxyData.success && proxyData.action_link) {
+                return {
+                  success: true,
+                  isDirectLink: true,
+                  actionLink: proxyData.action_link,
+                  message: 'Tautan pemulihan kata sandi instan telah berhasil dibuat untuk akun Anda!'
+                };
+              }
+            } else {
+              const proxyErrJson = await proxyRes.json().catch(() => null);
+              console.warn('[AuthService] Fallback recovery proxy status:', proxyRes.status, proxyErrJson);
             }
           } catch (proxyErr) {
             console.warn('[AuthService] Fallback recovery link proxy note:', proxyErr.message);
@@ -931,6 +980,13 @@ export class AuthService {
             localAccounts[idx].password = newPassword;
             this._storage.set('registered_accounts', localAccounts);
           }
+        }
+
+        this._isPasswordRecovery = false;
+        try {
+          await this.logout();
+        } catch (logoutErr) {
+          console.warn('[AuthService] Logout after reset note:', logoutErr);
         }
 
         return {

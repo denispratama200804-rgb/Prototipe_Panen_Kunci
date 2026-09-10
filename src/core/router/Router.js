@@ -76,7 +76,10 @@ export class Router {
     const rawHash = window.location.hash.slice(1) || '/';
 
     // Jika URL memuat token recovery reset kata sandi, biarkan rute /reset-password diproses
-    const isRecovery = rawHash.includes('type=recovery') || window.location.search.includes('type=recovery');
+    const isRecovery = rawHash.includes('type=recovery') ||
+                       window.location.search.includes('type=recovery') ||
+                       rawHash.startsWith('/reset-password') ||
+                       rawHash === '/reset-password';
 
     // Jika URL memuat token callback OAuth biasa (Google dsb), biarkan Supabase SDK memprosesnya
     if (!isRecovery && (rawHash.includes('access_token=') || rawHash.includes('refresh_token=') || rawHash.startsWith('error='))) {
