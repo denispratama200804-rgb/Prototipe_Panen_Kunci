@@ -1,14 +1,20 @@
+import { supabase, isSupabaseConfigured } from '../supabase/supabaseClient.js';
+
 /**
  * ChatService
  * Mengelola pesan obrolan real-time antara Pengguna dan Admin
- * Mendukung persistensi localStorage, multi-tab sync via BroadcastChannel, dan auto-reply bot.
+ * Mendukung persistensi ganda (localStorage + Cloud Supabase via Serverless Proxy),
+ * pembersihan data dummy otomatis, real-time polling 3 detik, dan multi-tab sync.
  */
 export class ChatService {
   constructor(prefix = 'panenkunci:') {
     this.prefix = prefix;
     this.storageKey = `${prefix}live_chats`;
     this._listeners = {};
+    this._cleanDummyChats();
     this._initSync();
+    // Sinkronisasi awal dari Supabase di background
+    this.syncFromRemote().catch(() => {});
   }
 
   on(event, callback) {
@@ -29,7 +35,33 @@ export class ChatService {
     }
   }
 
+  /**
+   * Membersihkan data tiruan dummy (Budi Santoso & Siti Rahma demo chats)
+   */
+  _cleanDummyChats() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const raw = localStorage.getItem(this.storageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter(m =>
+          m &&
+          m.userId !== 'usr_budi_live' &&
+          m.userId !== 'usr_siti_live' &&
+          !String(m.id || '').startsWith('msg_demo_')
+        );
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(this.storageKey, JSON.stringify(cleaned));
+        }
+      }
+    } catch (e) {
+      console.warn('[ChatService] _cleanDummyChats warning:', e);
+    }
+  }
+
   _initSync() {
+    // 1. BroadcastChannel untuk sinkronisasi instan antar-tab pada peramban yang sama
     if (typeof BroadcastChannel !== 'undefined') {
       try {
         this._channel = new BroadcastChannel('panenkunci_chat_channel');
@@ -46,12 +78,46 @@ export class ChatService {
       }
     }
 
+    // 2. Storage event listener
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', (e) => {
         if (e.key === this.storageKey) {
           this.emit('storage_updated', this._getRawChats());
         }
       });
+
+      // 3. Sinkronisasi saat window/tab kembali aktif
+      window.addEventListener('focus', () => {
+        this.syncFromRemote().catch(() => {});
+      });
+
+      // 4. Background Polling berkala (setiap 3 detik saat tab aktif)
+      this._pollTimer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          this.syncFromRemote().catch(() => {});
+        }
+      }, 3000);
+    }
+
+    // 5. Supabase Realtime channel jika dikonfigurasi
+    this._setupRealtimeSubscription();
+  }
+
+  _setupRealtimeSubscription() {
+    if (!isSupabaseConfigured() || !supabase) return;
+    try {
+      this._realtimeChannel = supabase
+        .channel(`pk_live_chats_${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'live_chat_messages' },
+          () => {
+            this.syncFromRemote().catch(() => {});
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('[ChatService] Realtime subscription error:', err);
     }
   }
 
@@ -85,6 +151,8 @@ export class ChatService {
 
   _getRawChats() {
     try {
+      if (typeof localStorage === 'undefined') return [];
+      this._cleanDummyChats();
       const data = localStorage.getItem(this.storageKey);
       if (!data) return [];
       const parsed = JSON.parse(data);
@@ -97,6 +165,7 @@ export class ChatService {
 
   _saveRawChats(chats) {
     try {
+      if (typeof localStorage === 'undefined') return;
       const cleaned = this._deduplicateChats(chats);
       localStorage.setItem(this.storageKey, JSON.stringify(cleaned));
     } catch (e) {
@@ -113,6 +182,67 @@ export class ChatService {
       minute: '2-digit',
       hour12: true
     }).format(date);
+  }
+
+  /**
+   * Sinkronisasi pesan obrolan dari Supabase / Serverless Proxy
+   */
+  async syncFromRemote(targetUserId = null) {
+    try {
+      const url = targetUserId
+        ? `/api/supabase-proxy?type=live_chats&userId=${encodeURIComponent(targetUserId)}`
+        : `/api/supabase-proxy?type=live_chats`;
+
+      const res = await fetch(url);
+      if (!res.ok) return this._getRawChats();
+
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const remoteChats = json.data;
+        const localChats = this._getRawChats();
+        const localMap = new Map();
+
+        localChats.forEach(m => {
+          if (m && m.id) localMap.set(m.id, m);
+        });
+
+        let hasNew = false;
+        remoteChats.forEach(r => {
+          if (!r || !r.id) return;
+          const existing = localMap.get(r.id);
+          if (!existing) {
+            localMap.set(r.id, r);
+            hasNew = true;
+          } else {
+            // Sinkronkan status read jika di cloud sudah terbaca
+            if (r.readByAdmin && !existing.readByAdmin) {
+              existing.readByAdmin = true;
+              hasNew = true;
+            }
+            if (r.readByUser && !existing.readByUser) {
+              existing.readByUser = true;
+              hasNew = true;
+            }
+          }
+        });
+
+        if (hasNew || localChats.length !== localMap.size) {
+          const merged = Array.from(localMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+          this._saveRawChats(merged);
+          this.emit('storage_updated', merged);
+
+          // Notifikasi pesan baru jika ada
+          const latest = merged[merged.length - 1];
+          if (latest && hasNew) {
+            this.emit('message_received', latest);
+          }
+          return merged;
+        }
+      }
+    } catch (err) {
+      // Offline fallback
+    }
+    return this._getRawChats();
   }
 
   /**
@@ -134,19 +264,33 @@ export class ChatService {
         userEmail: 'support@panenkunci.id',
         sender: 'admin',
         text: 'Halo! Selamat datang di Pusat Bantuan Resmi Panen Kunci. Ada yang bisa kami bantu terkait akun, penyetoran API Key, atau penarikan saldo Anda?',
-        timestamp: Date.now() - 60000,
-        timeStr: this._formatTime(new Date(Date.now() - 60000)),
+        timestamp: Date.now() - 30000,
+        timeStr: this._formatTime(new Date(Date.now() - 30000)),
         readByAdmin: true,
         readByUser: false
       };
       chats.push(initialAdminMsg);
       this._saveRawChats(chats);
       userMessages = [initialAdminMsg];
+
+      // Kirim sambutan ke cloud agar terekam juga di database
+      fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_live_chat',
+          message: initialAdminMsg
+        })
+      }).catch(() => {});
     }
 
     return userMessages.sort((a, b) => a.timestamp - b.timestamp);
   }
 
+  /**
+   * Kirim pesan baru (baik dari user maupun admin).
+   * Langsung update UI lokal (instant) dan kirim ke Supabase di background.
+   */
   sendMessage({ userId, userName, userAvatar, userEmail, sender = 'user', text }) {
     if (!userId || !text || !text.trim()) return null;
 
@@ -185,10 +329,10 @@ export class ChatService {
     chats.push(message);
     this._saveRawChats(chats);
 
-    // Notifikasi listener lokal
+    // Notifikasi listener lokal secara instan
     this.emit('message_received', message);
 
-    // Broadcast ke tab lain
+    // Broadcast ke tab lain di browser lokal
     if (this._channel) {
       try {
         this._channel.postMessage({ type: 'NEW_MESSAGE', message });
@@ -196,6 +340,18 @@ export class ChatService {
         console.warn('Broadcast error:', err);
       }
     }
+
+    // Kirim pesan ke Cloud Supabase via Serverless Proxy
+    fetch('/api/supabase-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'send_live_chat',
+        message: message
+      })
+    }).catch(err => {
+      console.warn('[ChatService] Gagal mengirim pesan ke server:', err);
+    });
 
     return message;
   }
@@ -228,80 +384,34 @@ export class ChatService {
           this._channel.postMessage({ type: 'MESSAGES_READ', userId, reader });
         } catch (e) {}
       }
+
+      // Sinkronkan status read ke Supabase
+      fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'mark_chat_read',
+          userId,
+          reader
+        })
+      }).catch(() => {});
     }
   }
 
   /**
    * Ambil semua percakapan yang dikelompokkan per pengguna (untuk Admin Panel)
+   * Mengabaikan user dummy dan menampilkan user nyata.
    */
-  getAllConversations() {
+  getAllConversations(registeredUsers = []) {
+    this._cleanDummyChats();
     let chats = this._getRawChats();
-
-    // Jika belum ada chat, auto-inisialisasi dengan user aktif saat ini atau seed demo percakapan
-    if (chats.length === 0) {
-      try {
-        const rawAuth = localStorage.getItem(`${this.prefix}auth_user`);
-        if (rawAuth) {
-          const authUser = JSON.parse(rawAuth);
-          if (authUser && authUser.id) {
-            this.getMessages(authUser.id);
-            chats = this._getRawChats();
-          }
-        }
-      } catch (e) {}
-
-      // Jika masih kosong, sediakan percakapan awal agar admin panel tidak kosong melompong
-      if (chats.length === 0) {
-        const now = Date.now();
-        const demoChats = [
-          {
-            id: 'msg_demo_1',
-            userId: 'usr_budi_live',
-            userName: 'Budi Santoso',
-            userAvatar: '',
-            userEmail: 'budi.santoso@gmail.com',
-            sender: 'user',
-            text: 'Halo admin, penarikan saldo saya ke rekening BCA sedang menunggu persetujuan. Kira-kira kapan diproses ya?',
-            timestamp: now - 3600000,
-            timeStr: this._formatTime(new Date(now - 3600000)),
-            readByAdmin: false,
-            readByUser: true
-          },
-          {
-            id: 'msg_demo_2',
-            userId: 'usr_siti_live',
-            userName: 'Siti Rahma',
-            userAvatar: '',
-            userEmail: 'siti.rahma@yahoo.com',
-            sender: 'user',
-            text: 'Selamat siang min, saya baru setor 5 API Key OpenAI. Mau tanya status verifikasinya.',
-            timestamp: now - 1800000,
-            timeStr: this._formatTime(new Date(now - 1800000)),
-            readByAdmin: true,
-            readByUser: true
-          },
-          {
-            id: 'msg_demo_3',
-            userId: 'usr_siti_live',
-            userName: 'Admin Panen Kunci',
-            userAvatar: '/Logo_PK.jpg',
-            userEmail: 'support@panenkunci.id',
-            sender: 'admin',
-            text: 'Halo kak Siti, sedang diverifikasi otomatis oleh sistem kami ya. Mohon ditunggu beberapa menit.',
-            timestamp: now - 900000,
-            timeStr: this._formatTime(new Date(now - 900000)),
-            readByAdmin: true,
-            readByUser: true
-          }
-        ];
-        chats = demoChats;
-        this._saveRawChats(chats);
-      }
-    }
-
     const groups = {};
 
     chats.forEach(m => {
+      if (!m || !m.userId) return;
+      // Filter mutlak user dummy
+      if (m.userId === 'usr_budi_live' || m.userId === 'usr_siti_live') return;
+
       if (!groups[m.userId]) {
         groups[m.userId] = {
           userId: m.userId,
@@ -314,7 +424,7 @@ export class ChatService {
         };
       }
 
-      // Update info nama/email jika tersedia dari pesan terbaru
+      // Update metadata user jika ada dari pesan
       if (m.sender === 'user') {
         if (m.userName) groups[m.userId].userName = m.userName;
         if (m.userAvatar) groups[m.userId].userAvatar = m.userAvatar;
@@ -326,6 +436,18 @@ export class ChatService {
         groups[m.userId].unreadCount++;
       }
     });
+
+    // Jika diberikan daftar user terdaftar (dari AdminDataService / Supabase), lengkapi info profil
+    if (Array.isArray(registeredUsers) && registeredUsers.length > 0) {
+      registeredUsers.forEach(u => {
+        if (!u || !u.id || u.role === 'admin' || u.role === 'system_config') return;
+        if (groups[u.id]) {
+          if (u.name) groups[u.id].userName = u.name;
+          if (u.email) groups[u.id].userEmail = u.email;
+          if (u.avatar) groups[u.id].userAvatar = u.avatar;
+        }
+      });
+    }
 
     // Urutkan percakapan berdasarkan waktu pesan terakhir
     const list = Object.values(groups).map(conv => {
@@ -346,7 +468,7 @@ export class ChatService {
    */
   getUnreadCountForAdmin() {
     const chats = this._getRawChats();
-    return chats.filter(m => m.sender === 'user' && !m.readByAdmin).length;
+    return chats.filter(m => m.sender === 'user' && !m.readByAdmin && m.userId !== 'usr_budi_live' && m.userId !== 'usr_siti_live').length;
   }
 
   /**

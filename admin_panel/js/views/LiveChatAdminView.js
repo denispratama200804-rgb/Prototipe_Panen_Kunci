@@ -17,8 +17,13 @@ export class LiveChatAdminView {
     this._unsubscribers = [];
   }
 
+  _getAllConversations() {
+    const registeredUsers = this.adminDataService ? this.adminDataService.getAllUsers() : [];
+    return this.chatService.getAllConversations(registeredUsers);
+  }
+
   render() {
-    const conversations = this.chatService.getAllConversations();
+    const conversations = this._getAllConversations();
     
     // Default pilih user pertama jika belum ada yang dipilih
     if (!this.selectedUserId && conversations.length > 0) {
@@ -377,7 +382,7 @@ export class LiveChatAdminView {
       this.searchQuery = e.target.value.trim();
       const convList = container.querySelector('#admin-conv-list');
       if (convList) {
-        convList.innerHTML = this._renderConversationList(this.chatService.getAllConversations());
+        convList.innerHTML = this._renderConversationList(this._getAllConversations());
         this._bindConvItems(container);
       }
     });
@@ -395,12 +400,32 @@ export class LiveChatAdminView {
     const stream = container.querySelector('#admin-messages-stream');
     this._scrollToBottom(stream);
 
+    // Sinkronisasi remote chats dari Supabase saat layar dibuka
+    this.chatService.syncFromRemote().then(() => {
+      const convList = container.querySelector('#admin-conv-list');
+      if (convList) {
+        convList.innerHTML = this._renderConversationList(this._getAllConversations());
+        this._bindConvItems(container);
+      }
+      if (this.selectedUserId) {
+        const streamEl = container.querySelector('#admin-messages-stream');
+        if (streamEl) {
+          const conv = this._getAllConversations().find(c => c.userId === this.selectedUserId);
+          const messages = this.chatService.getMessages(this.selectedUserId);
+          if (conv) {
+            streamEl.innerHTML = this._renderAdminMessageBubbles(messages, conv);
+            this._scrollToBottom(streamEl);
+          }
+        }
+      }
+    }).catch(() => {});
+
     // Listen to real-time incoming messages
     const unsubMsg = this.chatService.on('message_received', (msg) => {
       // Re-render conversation list item
       const convList = container.querySelector('#admin-conv-list');
       if (convList) {
-        convList.innerHTML = this._renderConversationList(this.chatService.getAllConversations());
+        convList.innerHTML = this._renderConversationList(this._getAllConversations());
         this._bindConvItems(container);
       }
 
@@ -409,7 +434,7 @@ export class LiveChatAdminView {
         this.chatService.markAsRead(this.selectedUserId, 'admin');
         const streamEl = container.querySelector('#admin-messages-stream');
         if (streamEl) {
-          const conv = this.chatService.getAllConversations().find(c => c.userId === this.selectedUserId);
+          const conv = this._getAllConversations().find(c => c.userId === this.selectedUserId);
           const messages = this.chatService.getMessages(this.selectedUserId);
           streamEl.innerHTML = this._renderAdminMessageBubbles(messages, conv || { userName: 'Pengguna' });
           this._scrollToBottom(streamEl);
@@ -421,6 +446,27 @@ export class LiveChatAdminView {
       }
     });
     this._unsubscribers.push(unsubMsg);
+
+    // Listen to storage update (sync dari cloud / multi-tab)
+    const unsubStorage = this.chatService.on('storage_updated', () => {
+      const convList = container.querySelector('#admin-conv-list');
+      if (convList) {
+        convList.innerHTML = this._renderConversationList(this._getAllConversations());
+        this._bindConvItems(container);
+      }
+      if (this.selectedUserId) {
+        const streamEl = container.querySelector('#admin-messages-stream');
+        if (streamEl) {
+          const conv = this._getAllConversations().find(c => c.userId === this.selectedUserId);
+          const messages = this.chatService.getMessages(this.selectedUserId);
+          if (conv) {
+            streamEl.innerHTML = this._renderAdminMessageBubbles(messages, conv);
+            this._scrollToBottom(streamEl);
+          }
+        }
+      }
+    });
+    this._unsubscribers.push(unsubStorage);
   }
 
   _bindConvItems(container) {
@@ -438,7 +484,7 @@ export class LiveChatAdminView {
         // Re-render active workspace
         const activePane = container.querySelector('#admin-chat-active-pane');
         const convList = container.querySelector('#admin-conv-list');
-        const conv = this.chatService.getAllConversations().find(c => c.userId === userId);
+        const conv = this._getAllConversations().find(c => c.userId === userId);
         const messages = this.chatService.getMessages(userId);
 
         if (activePane && conv) {
@@ -449,7 +495,7 @@ export class LiveChatAdminView {
         }
 
         if (convList) {
-          convList.innerHTML = this._renderConversationList(this.chatService.getAllConversations());
+          convList.innerHTML = this._renderConversationList(this._getAllConversations());
           this._bindConvItems(container);
         }
 
@@ -499,18 +545,33 @@ export class LiveChatAdminView {
       });
     });
 
-    // Refresh button
-    refreshBtn?.addEventListener('click', () => {
-      if (this.selectedUserId) {
-        const conv = this.chatService.getAllConversations().find(c => c.userId === this.selectedUserId);
-        const messages = this.chatService.getMessages(this.selectedUserId);
-        if (stream && conv) {
-          stream.innerHTML = this._renderAdminMessageBubbles(messages, conv);
-          this._scrollToBottom(stream);
+    // Refresh button dengan remote cloud fetch
+    refreshBtn?.addEventListener('click', async () => {
+      refreshBtn.disabled = true;
+      refreshBtn.classList.add('animate-spin');
+      try {
+        await this.chatService.syncFromRemote(this.selectedUserId);
+        if (this.selectedUserId) {
+          const conv = this._getAllConversations().find(c => c.userId === this.selectedUserId);
+          const messages = this.chatService.getMessages(this.selectedUserId);
+          if (stream && conv) {
+            stream.innerHTML = this._renderAdminMessageBubbles(messages, conv);
+            this._scrollToBottom(stream);
+          }
+        }
+        const convList = container.querySelector('#admin-conv-list');
+        if (convList) {
+          convList.innerHTML = this._renderConversationList(this._getAllConversations());
+          this._bindConvItems(container);
         }
         if (this.toast) {
-          this.toast.success('Percakapan diperbarui', 'Sinkronisasi');
+          this.toast.success('Percakapan disinkronkan dengan server', 'Sinkronisasi Cloud');
         }
+      } finally {
+        setTimeout(() => {
+          refreshBtn.disabled = false;
+          refreshBtn.classList.remove('animate-spin');
+        }, 400);
       }
     });
 
@@ -537,7 +598,7 @@ export class LiveChatAdminView {
 
         if (sent) {
           chatInput.value = '';
-          const conv = this.chatService.getAllConversations().find(c => c.userId === this.selectedUserId);
+          const conv = this._getAllConversations().find(c => c.userId === this.selectedUserId);
           const messages = this.chatService.getMessages(this.selectedUserId);
           if (stream && conv) {
             stream.innerHTML = this._renderAdminMessageBubbles(messages, conv);
@@ -546,7 +607,7 @@ export class LiveChatAdminView {
 
           const convList = container.querySelector('#admin-conv-list');
           if (convList) {
-            convList.innerHTML = this._renderConversationList(this.chatService.getAllConversations());
+            convList.innerHTML = this._renderConversationList(this._getAllConversations());
             this._bindConvItems(container);
           }
         }

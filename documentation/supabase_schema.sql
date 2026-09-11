@@ -118,6 +118,31 @@ COMMENT ON COLUMN public.transactions.recipient    IS 'Nomor rekening atau HP tu
 
 
 -- ============================================================
+-- 4. TABEL: live_chat_messages
+--    Menyimpan riwayat pesan obrolan langsung Pengguna & Admin.
+--    Referensi: src/infrastructure/services/ChatService.js
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.live_chat_messages (
+  id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID          NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  user_name       TEXT          DEFAULT '',
+  user_avatar     TEXT          DEFAULT '',
+  user_email      TEXT          DEFAULT '',
+  sender          TEXT          NOT NULL CHECK (sender IN ('user', 'admin')),
+  text            TEXT          NOT NULL,
+  time_str        TEXT          DEFAULT '',
+  read_by_admin   BOOLEAN       NOT NULL DEFAULT FALSE,
+  read_by_user    BOOLEAN       NOT NULL DEFAULT FALSE,
+  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE  public.live_chat_messages              IS 'Obrolan langsung (Live Chat) antara Pengguna dan Admin';
+COMMENT ON COLUMN public.live_chat_messages.user_id      IS 'FK ke tabel users';
+COMMENT ON COLUMN public.live_chat_messages.sender       IS 'user = pengguna, admin = admin';
+COMMENT ON COLUMN public.live_chat_messages.text         IS 'Isi pesan chat';
+
+
+-- ============================================================
 -- INDEXES
 -- Mempercepat query yang paling sering dipakai
 -- ============================================================
@@ -144,6 +169,12 @@ CREATE INDEX IF NOT EXISTS idx_transactions_status
 
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at
   ON public.transactions(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_live_chat_user_id
+  ON public.live_chat_messages(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_live_chat_created_at
+  ON public.live_chat_messages(created_at ASC);
 
 
 -- ============================================================
@@ -234,6 +265,30 @@ CREATE POLICY "transactions: allow insert"
   ON public.transactions
   FOR INSERT
   TO anon, authenticated
+  WITH CHECK (true);
+
+
+-- ── RLS: tabel LIVE_CHAT_MESSAGES ────────────────────────────
+
+ALTER TABLE public.live_chat_messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "live_chat_messages: allow select"
+  ON public.live_chat_messages
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "live_chat_messages: allow insert"
+  ON public.live_chat_messages
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "live_chat_messages: allow update"
+  ON public.live_chat_messages
+  FOR UPDATE
+  TO anon, authenticated
+  USING (true)
   WITH CHECK (true);
 
 

@@ -14,6 +14,158 @@ export default defineConfig(({ mode }) => {
     })
     : null;
 
+  const CHAT_STORE_ID = '00000000-0000-0000-0000-000000000002';
+
+  async function getLiveChatsFromSupabase(targetUserId = null) {
+    if (!adminSupabase) return [];
+    try {
+      let query = adminSupabase
+        .from('live_chat_messages')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (targetUserId) {
+        query = query.eq('user_id', targetUserId);
+      }
+      const { data, error } = await query;
+      if (!error && Array.isArray(data)) {
+        return data.map(row => ({
+          id: row.id,
+          userId: row.user_id,
+          userName: row.user_name || 'Pengguna',
+          userAvatar: row.user_avatar || '',
+          userEmail: row.user_email || '',
+          sender: row.sender,
+          text: row.text,
+          timestamp: new Date(row.created_at).getTime(),
+          timeStr: row.time_str || '',
+          readByAdmin: Boolean(row.read_by_admin),
+          readByUser: Boolean(row.read_by_user)
+        }));
+      }
+    } catch (_) {}
+
+    try {
+      const { data: storeRow } = await adminSupabase
+        .from('users')
+        .select('avatar')
+        .eq('id', CHAT_STORE_ID)
+        .maybeSingle();
+
+      if (storeRow && storeRow.avatar) {
+        const parsed = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+        if (Array.isArray(parsed)) {
+          if (targetUserId) {
+            return parsed.filter(m => m.userId === targetUserId);
+          }
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  async function saveLiveChatToSupabase(message) {
+    if (!adminSupabase || !message || !message.userId || !message.text) return message;
+    try {
+      const rowPayload = {
+        user_id: message.userId,
+        user_name: message.userName || '',
+        user_avatar: message.userAvatar || '',
+        user_email: message.userEmail || '',
+        sender: message.sender || 'user',
+        text: message.text || '',
+        time_str: message.timeStr || '',
+        read_by_admin: message.readByAdmin ?? (message.sender === 'admin'),
+        read_by_user: message.readByUser ?? (message.sender === 'user'),
+        created_at: new Date(message.timestamp || Date.now()).toISOString()
+      };
+      if (message.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.id)) {
+        rowPayload.id = message.id;
+      }
+      await adminSupabase.from('live_chat_messages').insert(rowPayload);
+    } catch (_) {}
+
+    try {
+      const { data: storeRow } = await adminSupabase
+        .from('users')
+        .select('avatar')
+        .eq('id', CHAT_STORE_ID)
+        .maybeSingle();
+
+      let list = [];
+      if (storeRow && storeRow.avatar) {
+        try {
+          const parsed = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+          if (Array.isArray(parsed)) list = parsed;
+        } catch (_) {}
+      }
+
+      const exists = list.some(m => m.id === message.id || (m.userId === message.userId && m.sender === message.sender && m.text === message.text && Math.abs(m.timestamp - message.timestamp) < 2000));
+      if (!exists) {
+        list.push(message);
+        if (list.length > 500) {
+          list = list.slice(list.length - 500);
+        }
+        await adminSupabase.from('users').upsert({
+          id: CHAT_STORE_ID,
+          name: 'Live Chat Store',
+          email: 'live_chat_store@panenkunci.internal',
+          role: 'system_config',
+          avatar: JSON.stringify(list),
+          is_verified: true,
+          updated_at: new Date().toISOString()
+        });
+      }
+    } catch (_) {}
+    return message;
+  }
+
+  async function markLiveChatsReadInSupabase(userId, reader = 'user') {
+    if (!adminSupabase || !userId) return false;
+    try {
+      const updateObj = reader === 'admin' ? { read_by_admin: true } : { read_by_user: true };
+      await adminSupabase.from('live_chat_messages').update(updateObj).eq('user_id', userId);
+    } catch (_) {}
+
+    try {
+      const { data: storeRow } = await adminSupabase
+        .from('users')
+        .select('avatar')
+        .eq('id', CHAT_STORE_ID)
+        .maybeSingle();
+
+      if (storeRow && storeRow.avatar) {
+        let list = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+        if (Array.isArray(list)) {
+          let changed = false;
+          list.forEach(m => {
+            if (m.userId === userId) {
+              if (reader === 'admin' && !m.readByAdmin) {
+                m.readByAdmin = true;
+                changed = true;
+              } else if (reader === 'user' && !m.readByUser) {
+                m.readByUser = true;
+                changed = true;
+              }
+            }
+          });
+          if (changed) {
+            await adminSupabase.from('users').upsert({
+              id: CHAT_STORE_ID,
+              name: 'Live Chat Store',
+              email: 'live_chat_store@panenkunci.internal',
+              role: 'system_config',
+              avatar: JSON.stringify(list),
+              is_verified: true,
+              updated_at: new Date().toISOString()
+            });
+          }
+        }
+      }
+    } catch (_) {}
+    return true;
+  }
+
   return {
     root: './',
     publicDir: 'public',
@@ -44,6 +196,18 @@ export default defineConfig(({ mode }) => {
               try {
                 if (adminSupabase) {
                   const url = req.url || '';
+                  if (url.includes('type=live_chats')) {
+                    let targetUserId = null;
+                    try {
+                      const parsedUrl = new URL(url, 'http://localhost');
+                      targetUserId = parsedUrl.searchParams.get('userId');
+                    } catch (_) {}
+                    const chats = await getLiveChatsFromSupabase(targetUserId);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true, data: chats }));
+                    return;
+                  }
+
                   if (url.includes('type=api_keys')) {
                     const { data: rawKeys, error } = await adminSupabase
                       .from('api_keys')
@@ -113,7 +277,7 @@ export default defineConfig(({ mode }) => {
                     res.statusCode = 400;
                     res.end(JSON.stringify({ success: false, error: error.message }));
                   } else {
-                    const cleanUsers = (users || []).filter(u => u.role !== 'system_config' && !u.email?.includes('system_config'));
+                    const cleanUsers = (users || []).filter(u => u.role !== 'system_config' && !u.email?.includes('system_config') && !u.email?.includes('panenkunci.internal'));
                     res.statusCode = 200;
                     res.end(JSON.stringify({ success: true, data: cleanUsers }));
                   }
@@ -135,6 +299,27 @@ export default defineConfig(({ mode }) => {
                 try {
                   const parsed = JSON.parse(bodyStr || '{}');
                   const { action, table, data, id } = parsed;
+
+                  if (action === 'get_live_chats') {
+                    const chats = await getLiveChatsFromSupabase(parsed.userId || null);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true, data: chats }));
+                    return;
+                  }
+
+                  if (action === 'send_live_chat' && parsed.message) {
+                    const saved = await saveLiveChatToSupabase(parsed.message);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true, data: saved }));
+                    return;
+                  }
+
+                  if (action === 'mark_chat_read' && parsed.userId) {
+                    await markLiveChatsReadInSupabase(parsed.userId, parsed.reader || 'user');
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true }));
+                    return;
+                  }
 
                   if (action === 'get_system_config') {
                     if (adminSupabase) {

@@ -208,6 +208,23 @@ export class LiveChatView extends IComponent {
     // Tandai pesan sebagai sudah dibaca oleh user
     this._chatService.markAsRead(user.id, 'user');
 
+    // Sinkronisasi data obrolan langsung dari Cloud Supabase saat layar dibuka
+    this._chatService.syncFromRemote(user.id).then(() => {
+      const freshMessages = this._chatService.getMessages(user.id);
+      if (bubbleStream) {
+        bubbleStream.innerHTML = this._renderMessagesHtml(freshMessages, user);
+        this._scrollToBottom(messagesContainer);
+      }
+    }).catch(() => {});
+
+    // Active polling interval untuk menerima balasan admin secara instan (setiap 2.5 detik saat chat terbuka)
+    const chatPollTimer = setInterval(() => {
+      if (window.location.hash.includes('/chat')) {
+        this._chatService.syncFromRemote(user.id).catch(() => {});
+      }
+    }, 2500);
+    this._unsubscribers.push(() => clearInterval(chatPollTimer));
+
     // Auto scroll ke pesan paling bawah
     this._scrollToBottom(messagesContainer);
 
