@@ -603,19 +603,26 @@ export class ApiKeysView {
     const searchBtn = container.querySelector('#btn-search-trigger');
 
     if (searchInput) {
-      // Enter key triggers search
+      let debounceTimer = null;
+      // Enter key triggers immediate search
       searchInput.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
           e.preventDefault();
+          clearTimeout(debounceTimer);
           this.searchQuery = searchInput.value;
           refreshCallback();
         }
       });
-      // If user clears the input, automatically refresh
+      // Live search dengan debounce & instant refresh saat dikosongkan
       searchInput.addEventListener('input', e => {
-        if (e.target.value === '' && this.searchQuery !== '') {
-          this.searchQuery = '';
+        this.searchQuery = e.target.value;
+        clearTimeout(debounceTimer);
+        if (!e.target.value) {
           refreshCallback();
+        } else {
+          debounceTimer = setTimeout(() => {
+            refreshCallback();
+          }, 250);
         }
       });
     }

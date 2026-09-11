@@ -404,12 +404,28 @@ export class UsersView {
       });
     }
 
-    // Search
+    // Search dengan debounce & Enter key agar responsif dan tidak lag saat mengetik
     const searchInput = container.querySelector('#users-search-input');
     if (searchInput) {
+      let debounceTimer = null;
       searchInput.addEventListener('input', e => {
         this.searchQuery = e.target.value;
-        refreshCallback();
+        clearTimeout(debounceTimer);
+        if (!e.target.value) {
+          refreshCallback();
+        } else {
+          debounceTimer = setTimeout(() => {
+            refreshCallback();
+          }, 200);
+        }
+      });
+
+      searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          clearTimeout(debounceTimer);
+          this.searchQuery = searchInput.value;
+          refreshCallback();
+        }
       });
     }
 

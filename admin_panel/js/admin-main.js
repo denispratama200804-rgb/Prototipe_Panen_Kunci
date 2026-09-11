@@ -210,6 +210,20 @@ class AdminApp {
     const viewMount = document.getElementById('admin-view-mount');
     if (!viewMount) return;
 
+    // Simpan status elemen yang sedang fokus (focus & posisi kursor) agar tidak hilang saat re-render
+    const activeEl = document.activeElement;
+    let activeSelector = null;
+    if (activeEl && activeEl !== document.body && viewMount.contains(activeEl)) {
+      if (activeEl.id) {
+        activeSelector = '#' + activeEl.id;
+      } else if (activeEl.name) {
+        activeSelector = `${activeEl.tagName.toLowerCase()}[name="${activeEl.name}"]`;
+      }
+    }
+    const isTextInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+    const selStart = isTextInput ? activeEl.selectionStart : null;
+    const selEnd = isTextInput ? activeEl.selectionEnd : null;
+
     const viewInstance = this.views[tab] || this.views.dashboard;
     this.currentViewInstance = viewInstance;
 
@@ -223,6 +237,21 @@ class AdminApp {
       viewInstance.bindEvents(viewMount, () => {
         this.refreshCurrentView(false, false);
       });
+    }
+
+    // Kembalikan fokus dan posisi kursor pengguna jika sebelumnya sedang mengetik
+    if (activeSelector) {
+      const restoredEl = viewMount.querySelector(activeSelector);
+      if (restoredEl && typeof restoredEl.focus === 'function') {
+        restoredEl.focus();
+        if (isTextInput && selStart !== null && selEnd !== null) {
+          try {
+            restoredEl.setSelectionRange(selStart, selEnd);
+          } catch (e) {
+            // Abaikan tipe input yang tidak mendukung selection range
+          }
+        }
+      }
     }
   }
 
