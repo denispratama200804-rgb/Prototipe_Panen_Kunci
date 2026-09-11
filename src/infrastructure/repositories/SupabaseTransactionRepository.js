@@ -86,16 +86,12 @@ export class SupabaseTransactionRepository extends ITransactionRepository {
 
     const numAmount = Number(tx.amount || 0);
     const numFee = Number(tx.fee || 0);
-    const netPayout = tx.netPayout !== undefined
-      ? Number(tx.netPayout)
-      : (tx.net_payout !== undefined ? Number(tx.net_payout) : Math.max(0, numAmount - numFee));
 
     const payload = {
       user_id: validUserId,
       type: tx.type,
       amount: numAmount,
       fee: numFee,
-      net_payout: netPayout,
       title: tx.title,
       description: tx.description || '',
       status: tx.status || 'pending',
@@ -103,7 +99,9 @@ export class SupabaseTransactionRepository extends ITransactionRepository {
       recipient: tx.recipient || ''
     };
 
-    if (tx.id && tx.id.includes('-')) {
+    // PostgreSQL column id bertipe UUID; hanya kirim id jika valid UUID
+    const isUuidTxId = tx.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tx.id);
+    if (isUuidTxId) {
       payload.id = tx.id;
     }
 

@@ -205,9 +205,19 @@ export class WithdrawalsView {
               <span class="material-symbols-outlined text-base text-amber-500">payments</span>
               <span class="font-bold text-admin-heading text-sm">Daftar Permohonan Penarikan Dana</span>
             </div>
-            <span class="text-[11px] text-admin-muted font-mono admin-sub-card px-2.5 py-0.5 rounded-full border border-admin">
-              ${filtered.length} permohonan
-            </span>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] text-admin-muted font-mono admin-sub-card px-2.5 py-0.5 rounded-full border border-admin">
+                ${filtered.length} permohonan
+              </span>
+              <button
+                type="button"
+                id="btn-refresh-withdrawals"
+                class="admin-nav-btn w-7 h-7 rounded-lg flex items-center justify-center text-admin-muted hover:text-white transition-all cursor-pointer"
+                title="Segarkan data dari Supabase"
+              >
+                <span class="material-symbols-outlined text-base">sync</span>
+              </button>
+            </div>
           </div>
 
           <div class="p-3 sm:p-4 space-y-2.5">
@@ -521,6 +531,29 @@ export class WithdrawalsView {
         refreshCallback();
       });
     });
+
+    // Tombol Refresh Manual Penarikan
+    const refreshBtn = container.querySelector('#btn-refresh-withdrawals');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', async () => {
+        const icon = refreshBtn.querySelector('.material-symbols-outlined');
+        if (icon) icon.classList.add('animate-spin');
+        refreshBtn.disabled = true;
+
+        try {
+          await this.dataService.fetchTransactionsFromSupabase();
+          this.toast.info('Daftar permohonan penarikan berhasil disinkronkan dari database.', 'Data Diperbarui');
+          refreshCallback();
+        } catch (err) {
+          this.toast.error('Gagal menyinkronkan data: ' + err.message);
+        } finally {
+          setTimeout(() => {
+            if (icon) icon.classList.remove('animate-spin');
+            refreshBtn.disabled = false;
+          }, 500);
+        }
+      });
+    }
 
     // Approve (Buka Modal Validasi & Upload Bukti Foto)
     container.querySelectorAll('[data-action="approve-wd"]').forEach(btn => {

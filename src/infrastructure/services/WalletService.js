@@ -614,7 +614,7 @@ export class WalletService {
         });
 
         // Selaraskan dengan data key agar tidak ada saldo yang hilang atau menggelembung
-        this._balance = Math.max(0, calculatedBalance, expectedActive);
+        this._balance = Math.max(0, calculatedBalance);
         this._passiveBalance = expectedPassive;
         this._lifetimeEarnings = Math.max(calculatedLifetime, expectedActive);
       } else {

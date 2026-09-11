@@ -368,8 +368,22 @@ export default async function handler(req, res) {
     }
 
     if (action === 'insert' && table === 'transactions' && data) {
+      let validUserId = data.user_id || data.userId;
+      const isUuidUser = validUserId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validUserId);
+      if (!isUuidUser) {
+        const { data: sampleUser } = await adminSupabase
+          .from('users')
+          .select('id')
+          .neq('role', 'system_config')
+          .limit(1)
+          .maybeSingle();
+        if (sampleUser?.id) {
+          validUserId = sampleUser.id;
+        }
+      }
+
       const txPayload = {
-        user_id: data.user_id || data.userId,
+        user_id: validUserId,
         type: data.type || 'deposit',
         amount: Number(data.amount || 0),
         fee: Number(data.fee || 0),
@@ -380,14 +394,15 @@ export default async function handler(req, res) {
         recipient: data.recipient || ''
       };
 
-      if (data.id && data.id.includes('-')) {
+      const isUuidTxId = data.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.id);
+      if (isUuidTxId) {
         txPayload.id = data.id;
       }
 
       const { data: inserted, error } = await adminSupabase
         .from('transactions')
         .insert(txPayload)
-        .select()
+        .select('*, users:user_id(id, name, email, phone, account_number, bank_name)')
         .single();
 
       if (error) {

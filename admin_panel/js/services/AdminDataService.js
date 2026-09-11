@@ -973,6 +973,8 @@ export class AdminDataService {
       const matchSearch = !search ||
         (t.id && t.id.toLowerCase().includes(q)) ||
         (t.userId && t.userId.toLowerCase().includes(q)) ||
+        (t.userName && t.userName.toLowerCase().includes(q)) ||
+        (t.userEmail && t.userEmail.toLowerCase().includes(q)) ||
         (t.recipient && t.recipient.toLowerCase().includes(q)) ||
         (t.title && t.title.toLowerCase().includes(q));
       return matchType && matchStatus && matchSearch;
