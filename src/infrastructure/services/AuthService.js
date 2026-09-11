@@ -60,6 +60,99 @@ export class AuthService {
         localStorage.setItem('panenkunci:auth_role', 'user');
       }
     }
+
+    if (role !== 'admin' && user && user.id) {
+      this._startPresenceHeartbeat(user.id);
+    }
+  }
+
+  /**
+   * Menjalankan heartbeat status online pengguna ke server
+   * @private
+   */
+  _startPresenceHeartbeat(userId) {
+    this._stopPresenceHeartbeat();
+    if (!userId || String(userId).startsWith('usr_budi') || String(userId).startsWith('00000000-')) return;
+
+    this._activePresenceUserId = userId;
+
+    const sendHeartbeat = () => {
+      try {
+        fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'user_heartbeat',
+            userId: userId
+          })
+        }).catch(() => {});
+
+        if (typeof BroadcastChannel !== 'undefined') {
+          try {
+            const bc = new BroadcastChannel('panenkunci_presence_channel');
+            bc.postMessage({ type: 'USER_ONLINE', userId });
+            bc.close();
+          } catch (_) {}
+        }
+      } catch (_) {}
+    };
+
+    // Kirim langsung saat login
+    sendHeartbeat();
+
+    // Ulangi berkala setiap 20 detik saat tab browser aktif
+    this._presenceTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        sendHeartbeat();
+      }
+    }, 20000);
+
+    // Kirim ulang saat tab fokus kembali & kirim offline saat tab ditutup
+    if (typeof window !== 'undefined' && !this._presenceBoundEvents) {
+      this._presenceBoundEvents = true;
+      window.addEventListener('focus', () => {
+        if (this._activePresenceUserId) sendHeartbeat();
+      });
+      window.addEventListener('beforeunload', () => {
+        this._stopPresenceHeartbeat();
+      });
+    }
+  }
+
+  /**
+   * Menghentikan heartbeat dan menandai status user menjadi offline
+   * @private
+   */
+  _stopPresenceHeartbeat(userId = null) {
+    if (this._presenceTimer) {
+      clearInterval(this._presenceTimer);
+      this._presenceTimer = null;
+    }
+    const targetId = userId || this._activePresenceUserId;
+    if (targetId) {
+      this._activePresenceUserId = null;
+      try {
+        const payload = JSON.stringify({ action: 'user_offline', userId: targetId });
+        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/supabase-proxy', payload);
+        } else {
+          fetch('/api/supabase-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true
+          }).catch(() => {});
+        }
+
+        if (typeof BroadcastChannel !== 'undefined') {
+          try {
+            const bc = new BroadcastChannel('panenkunci_presence_channel');
+            bc.postMessage({ type: 'USER_OFFLINE', userId: targetId });
+            bc.close();
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
   }
 
   /**
@@ -82,6 +175,10 @@ export class AuthService {
         role: this._currentUser.role || 'user',
         loginAt: new Date().toISOString()
       };
+
+      if (this._currentUser.role !== 'admin' && this._currentUser.id) {
+        this._startPresenceHeartbeat(this._currentUser.id);
+      }
 
       // Background sync profil terbaru dari Supabase
       if (this._userRepository && this._currentUser.email) {
@@ -497,6 +594,8 @@ export class AuthService {
    * Logout dan bersihkan seluruh sesi aktif (user & admin)
    */
   async logout() {
+    const oldUserId = this._currentUser ? this._currentUser.id : null;
+    this._stopPresenceHeartbeat(oldUserId);
     this._currentUser = null;
     this._session = null;
     this._storage.remove('current_user');

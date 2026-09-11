@@ -1382,7 +1382,8 @@ export class AdminDataService {
           const acc = (row.account_number || '').trim();
           const phone = (row.phone || '').trim();
           const hasPayment = Boolean(bank && bank !== '-' && ((acc && acc !== '-') || (phone && phone !== '-')));
-          const isVerified = Boolean(row.role === 'admin' || row.is_verified || hasPayment);
+          const lastActive = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+          const isOnline = Boolean(lastActive && (Date.now() - lastActive < 60000));
 
           return {
             id: row.id,
@@ -1394,7 +1395,9 @@ export class AdminDataService {
             accountHolder: row.account_holder || row.name || '-',
             role: row.role || 'user',
             isVerified: isVerified,
+            isOnline: isOnline,
             createdAt: row.created_at || new Date().toISOString(),
+            updatedAt: row.updated_at || null,
             avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : '',
             customBalance: balanceMap[row.id] !== undefined ? balanceMap[row.id] : undefined,
             manualBalance: manualMap[row.id] !== undefined ? manualMap[row.id] : undefined

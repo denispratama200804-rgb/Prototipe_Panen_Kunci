@@ -185,6 +185,21 @@ async function markLiveChatsReadInSupabase(userId, reader = 'user') {
   return true;
 }
 
+async function getOnlineUserIdsFromSupabase() {
+  if (!adminSupabase) return [];
+  try {
+    const sixtySecondsAgo = new Date(Date.now() - 60000).toISOString();
+    const { data, error } = await adminSupabase
+      .from('users')
+      .select('id')
+      .gt('updated_at', sixtySecondsAgo);
+    if (!error && Array.isArray(data)) {
+      return data.map(u => u.id);
+    }
+  } catch (_) {}
+  return [];
+}
+
 export default async function handler(req, res) {
   // Pastikan header CORS dan Content-Type terpasang
   res.setHeader('Content-Type', 'application/json');
@@ -213,8 +228,11 @@ export default async function handler(req, res) {
           const parsedUrl = new URL(url, 'http://localhost');
           targetUserId = parsedUrl.searchParams.get('userId');
         } catch (_) {}
-        const chats = await getLiveChatsFromSupabase(targetUserId);
-        return res.status(200).json({ success: true, data: chats });
+        const [chats, onlineUserIds] = await Promise.all([
+          getLiveChatsFromSupabase(targetUserId),
+          getOnlineUserIdsFromSupabase()
+        ]);
+        return res.status(200).json({ success: true, data: chats, onlineUserIds });
       }
 
       if (url.includes('type=api_keys')) {
@@ -307,8 +325,31 @@ export default async function handler(req, res) {
     // 1a. Live Chat Real-Time Handlers
     if (action === 'get_live_chats') {
       const targetUserId = body.userId || null;
-      const chats = await getLiveChatsFromSupabase(targetUserId);
-      return res.status(200).json({ success: true, data: chats });
+      const [chats, onlineUserIds] = await Promise.all([
+        getLiveChatsFromSupabase(targetUserId),
+        getOnlineUserIdsFromSupabase()
+      ]);
+      return res.status(200).json({ success: true, data: chats, onlineUserIds });
+    }
+
+    if (action === 'user_heartbeat' && body.userId) {
+      try {
+        await adminSupabase
+          .from('users')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', body.userId);
+      } catch (_) {}
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'user_offline' && body.userId) {
+      try {
+        await adminSupabase
+          .from('users')
+          .update({ updated_at: new Date(0).toISOString() })
+          .eq('id', body.userId);
+      } catch (_) {}
+      return res.status(200).json({ success: true });
     }
 
     if (action === 'send_live_chat' && body.message) {

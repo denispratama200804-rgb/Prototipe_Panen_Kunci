@@ -156,7 +156,11 @@ export class LiveChatAdminView {
                 ${(conv.userName || 'PK').substring(0, 2).toUpperCase()}
               </div>
             `}
-            <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-[#080f20]"></span>
+            <!-- Bulatan Status: Hijau jika online / login di app, Abu-abu jika offline / tidak login -->
+            <span 
+              class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${conv.isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-500/80'} ring-2 ring-[#080f20] transition-colors"
+              title="${conv.isOnline ? 'Sedang Login (Online)' : 'Tidak Login (Offline)'}"
+            ></span>
           </div>
 
           <!-- User Info & Last Message -->
@@ -208,14 +212,21 @@ export class LiveChatAdminView {
                 ${(conv.userName || 'PK').substring(0, 2).toUpperCase()}
               </div>
             `}
-            <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-[#0b1329]"></span>
+            <span 
+              class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${conv.isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-500/80'} ring-2 ring-[#0b1329] transition-colors"
+              title="${conv.isOnline ? 'Sedang Login (Online)' : 'Tidak Login (Offline)'}"
+            ></span>
           </div>
 
           <div class="min-w-0">
             <div class="flex items-center gap-2">
               <h3 class="text-sm sm:text-base font-bold text-admin-heading truncate">${conv.userName || 'Pengguna'}</h3>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                Member
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                conv.isOnline 
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' 
+                  : 'bg-slate-500/15 text-slate-400 border border-slate-500/30'
+              }">
+                ${conv.isOnline ? 'Online' : 'Offline'}
               </span>
             </div>
             <p class="text-xs text-slate-400 truncate mt-0.5">${conv.userEmail || conv.userId}</p>
@@ -496,6 +507,34 @@ export class LiveChatAdminView {
       }
     });
     this._unsubscribers.push(unsubStorage);
+
+    // Listen to real-time presence updates (status online/offline pengguna)
+    const unsubPresence = this.chatService.on('presence_updated', () => {
+      const convList = container.querySelector('#admin-conv-list');
+      if (convList) {
+        convList.innerHTML = this._renderConversationList(this._getAllConversations());
+        this._bindConvItems(container);
+      }
+      if (this.selectedUserId) {
+        const conv = this._getAllConversations().find(c => c.userId === this.selectedUserId);
+        if (conv) {
+          const activeHeader = container.querySelector('#admin-chat-active-pane .admin-card-header');
+          if (activeHeader) {
+            const dot = activeHeader.querySelector('.rounded-full.ring-2');
+            if (dot) {
+              dot.className = `absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${conv.isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-500/80'} ring-2 ring-[#0b1329] transition-colors`;
+              dot.title = conv.isOnline ? 'Sedang Login (Online)' : 'Tidak Login (Offline)';
+            }
+            const statusBadge = activeHeader.querySelector('span[class*="text-[10px]"]');
+            if (statusBadge) {
+              statusBadge.className = `px-2 py-0.5 rounded-full text-[10px] font-bold ${conv.isOnline ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-slate-500/15 text-slate-400 border border-slate-500/30'}`;
+              statusBadge.textContent = conv.isOnline ? 'Online' : 'Offline';
+            }
+          }
+        }
+      }
+    });
+    this._unsubscribers.push(unsubPresence);
   }
 
   _bindConvItems(container) {

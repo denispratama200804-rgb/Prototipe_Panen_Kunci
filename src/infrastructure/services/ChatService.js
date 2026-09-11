@@ -11,6 +11,7 @@ export class ChatService {
     this.prefix = prefix;
     this.storageKey = `${prefix}live_chats`;
     this._listeners = {};
+    this._onlineUserIds = new Set();
     this._cleanDummyChats();
     this._initSync();
     // Sinkronisasi awal dari Supabase di background
@@ -73,6 +74,18 @@ export class ChatService {
             this.emit('message_received', data.message);
           } else if (data && data.type === 'MESSAGES_READ') {
             this.emit('read_updated', data);
+          }
+        };
+
+        this._presenceChannel = new BroadcastChannel('panenkunci_presence_channel');
+        this._presenceChannel.onmessage = (event) => {
+          const data = event.data;
+          if (data && data.type === 'USER_ONLINE' && data.userId) {
+            this._onlineUserIds.add(data.userId);
+            this.emit('presence_updated', Array.from(this._onlineUserIds));
+          } else if (data && data.type === 'USER_OFFLINE' && data.userId) {
+            this._onlineUserIds.delete(data.userId);
+            this.emit('presence_updated', Array.from(this._onlineUserIds));
           }
         };
       } catch (err) {
@@ -199,17 +212,23 @@ export class ChatService {
       if (!res.ok) return this._getRawChats();
 
       const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        const remoteChats = json.data.filter(r =>
-          r &&
-          r.userId !== 'usr_budi_live' &&
-          r.userId !== 'usr_siti_live' &&
-          !String(r.id || '').startsWith('msg_demo_') &&
-          r.userEmail !== 'budi.santoso@gmail.com' &&
-          !String(r.text || '').includes('penarikan saldo saya ke rekening BCA')
-        );
-        const localChats = this._getRawChats();
-        const localMap = new Map();
+      if (json.success) {
+        if (Array.isArray(json.onlineUserIds)) {
+          this._onlineUserIds = new Set(json.onlineUserIds);
+          this.emit('presence_updated', Array.from(this._onlineUserIds));
+        }
+
+        if (Array.isArray(json.data)) {
+          const remoteChats = json.data.filter(r =>
+            r &&
+            r.userId !== 'usr_budi_live' &&
+            r.userId !== 'usr_siti_live' &&
+            !String(r.id || '').startsWith('msg_demo_') &&
+            r.userEmail !== 'budi.santoso@gmail.com' &&
+            !String(r.text || '').includes('penarikan saldo saya ke rekening BCA')
+          );
+          const localChats = this._getRawChats();
+          const localMap = new Map();
 
         localChats.forEach(m => {
           if (m && m.id) localMap.set(m.id, m);
@@ -248,10 +267,30 @@ export class ChatService {
           return merged;
         }
       }
-    } catch (err) {
-      // Offline fallback
     }
+  } catch (err) {
+    // Offline fallback
+  }
     return this._getRawChats();
+  }
+
+  /**
+   * Mengecek apakah pengguna sedang online / aktif login di aplikasi
+   * @param {string} userId
+   * @returns {boolean}
+   */
+  isUserOnline(userId) {
+    if (!userId) return false;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const rawCurrent = localStorage.getItem(`${this.prefix}current_user`);
+        if (rawCurrent) {
+          const current = JSON.parse(rawCurrent);
+          if (current && current.id === userId) return true;
+        }
+      }
+    } catch (_) {}
+    return this._onlineUserIds.has(userId);
   }
 
   /**
@@ -470,6 +509,7 @@ export class ChatService {
           if (u.name) groups[u.id].userName = u.name;
           if (u.email) groups[u.id].userEmail = u.email;
           if (u.avatar) groups[u.id].userAvatar = u.avatar;
+          if (u.isOnline) groups[u.id].isOnline = true;
         } else {
           // Pengguna terdaftar nyata yang belum pernah chat tetap muncul di daftar inbox
           groups[u.id] = {
@@ -479,7 +519,8 @@ export class ChatService {
             userEmail: u.email || '',
             messages: [],
             unreadCount: 0,
-            lastMessage: null
+            lastMessage: null,
+            isOnline: Boolean(u.isOnline)
           };
         }
       });
@@ -489,6 +530,7 @@ export class ChatService {
     const list = Object.values(groups).map(conv => {
       conv.messages.sort((a, b) => a.timestamp - b.timestamp);
       conv.lastMessage = conv.messages[conv.messages.length - 1] || null;
+      conv.isOnline = this.isUserOnline(conv.userId) || Boolean(conv.isOnline);
       return conv;
     });
 

@@ -169,6 +169,21 @@ export default defineConfig(({ mode }) => {
     return true;
   }
 
+  async function getOnlineUserIdsFromSupabase() {
+    if (!adminSupabase) return [];
+    try {
+      const sixtySecondsAgo = new Date(Date.now() - 60000).toISOString();
+      const { data, error } = await adminSupabase
+        .from('users')
+        .select('id')
+        .gt('updated_at', sixtySecondsAgo);
+      if (!error && Array.isArray(data)) {
+        return data.map(u => u.id);
+      }
+    } catch (_) {}
+    return [];
+  }
+
   return {
     root: './',
     publicDir: 'public',
@@ -205,9 +220,12 @@ export default defineConfig(({ mode }) => {
                       const parsedUrl = new URL(url, 'http://localhost');
                       targetUserId = parsedUrl.searchParams.get('userId');
                     } catch (_) {}
-                    const chats = await getLiveChatsFromSupabase(targetUserId);
+                    const [chats, onlineUserIds] = await Promise.all([
+                      getLiveChatsFromSupabase(targetUserId),
+                      getOnlineUserIdsFromSupabase()
+                    ]);
                     res.statusCode = 200;
-                    res.end(JSON.stringify({ success: true, data: chats }));
+                    res.end(JSON.stringify({ success: true, data: chats, onlineUserIds }));
                     return;
                   }
 
@@ -304,9 +322,40 @@ export default defineConfig(({ mode }) => {
                   const { action, table, data, id } = parsed;
 
                   if (action === 'get_live_chats') {
-                    const chats = await getLiveChatsFromSupabase(parsed.userId || null);
+                    const [chats, onlineUserIds] = await Promise.all([
+                      getLiveChatsFromSupabase(parsed.userId || null),
+                      getOnlineUserIdsFromSupabase()
+                    ]);
                     res.statusCode = 200;
-                    res.end(JSON.stringify({ success: true, data: chats }));
+                    res.end(JSON.stringify({ success: true, data: chats, onlineUserIds }));
+                    return;
+                  }
+
+                  if (action === 'user_heartbeat' && parsed.userId) {
+                    try {
+                      if (adminSupabase) {
+                        await adminSupabase
+                          .from('users')
+                          .update({ updated_at: new Date().toISOString() })
+                          .eq('id', parsed.userId);
+                      }
+                    } catch (_) {}
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true }));
+                    return;
+                  }
+
+                  if (action === 'user_offline' && parsed.userId) {
+                    try {
+                      if (adminSupabase) {
+                        await adminSupabase
+                          .from('users')
+                          .update({ updated_at: new Date(0).toISOString() })
+                          .eq('id', parsed.userId);
+                      }
+                    } catch (_) {}
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true }));
                     return;
                   }
 
