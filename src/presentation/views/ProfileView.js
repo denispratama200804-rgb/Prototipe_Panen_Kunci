@@ -232,6 +232,27 @@ export class ProfileView extends IComponent {
               Bantuan & Ketentuan
             </h3>
             <div class="bg-surface-card rounded-3xl shadow-sm border border-surface-container overflow-hidden flex flex-col divide-y divide-surface-container">
+              <!-- Live Chat & Hubungi Admin Button -->
+              <button
+                type="button"
+                id="btnLiveChatAdmin"
+                class="w-full flex items-center justify-between p-4 hover:bg-surface-container-low transition-colors text-left group cursor-pointer"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[20px]">support_agent</span>
+                  </div>
+                  <span class="text-xs font-bold text-text-heading group-hover:text-primary transition-colors">Hubungi Admin & Live Chat</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30">
+                    <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+                    <span>Online</span>
+                  </span>
+                  <span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-[20px]">chevron_right</span>
+                </div>
+              </button>
+
               <button
                 type="button"
                 class="btn-info-modal w-full flex items-center justify-between p-4 hover:bg-surface-container-low transition-colors text-left group"
@@ -369,6 +390,7 @@ export class ProfileView extends IComponent {
     const resetPassBtn = container.querySelector('#btnResetPassword');
     const logoutBtn = container.querySelector('#btnLogout');
     const infoBtns = container.querySelectorAll('.btn-info-modal');
+    const liveChatBtn = container.querySelector('#btnLiveChatAdmin');
 
     // Modal Edit Rekening / E-Wallet
     editBankBtn?.addEventListener('click', () => {
@@ -567,6 +589,11 @@ export class ProfileView extends IComponent {
           confirmText: 'Tutup'
         });
       });
+    });
+
+    // Live Chat & Hubungi Admin: Buka langsung layar chat dengan Admin (Foto 2)
+    liveChatBtn?.addEventListener('click', () => {
+      window.location.hash = '/chat';
     });
 
     // Logout handler

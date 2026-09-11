@@ -21,15 +21,6 @@ export class HubDashboardView {
 
     const cards = [
       {
-        id: 'apikeys',
-        title: 'Gudang API Key',
-        desc: 'Kelola stok API Key OpenAI & Kie.ai, uji verifikasi status, dan pantau saldo kredit.',
-        icon: 'vpn_key',
-        squircleClass: 'squircle-blue',
-        badge: pendingKeys > 0 ? `${pendingKeys} Pending` : `${totalKeys} Kunci`,
-        badgeColor: pendingKeys > 0 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-      },
-      {
         id: 'withdrawals',
         title: 'Persetujuan Payout',
         desc: 'Validasi rekening tujuan, unggah bukti transfer m-Banking, dan proses pencairan dana.',
@@ -37,6 +28,15 @@ export class HubDashboardView {
         squircleClass: 'squircle-amber',
         badge: pendingCount > 0 ? `${pendingCount} Antrean` : '0 Antrean',
         badgeColor: pendingCount > 0 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+      },
+      {
+        id: 'apikeys',
+        title: 'Gudang API Key',
+        desc: 'Kelola stok API Key OpenAI & Kie.ai, uji verifikasi status, dan pantau saldo kredit.',
+        icon: 'vpn_key',
+        squircleClass: 'squircle-blue',
+        badge: pendingKeys > 0 ? `${pendingKeys} Pending` : `${totalKeys} Kunci`,
+        badgeColor: pendingKeys > 0 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
       },
       {
         id: 'users',
@@ -52,9 +52,9 @@ export class HubDashboardView {
         title: 'Pengaturan Tarif',
         desc: 'Atur harga beli per kunci, minimum payout, dan konfigurasi persentase fee penarikan.',
         icon: 'tune',
-        squircleClass: 'squircle-emerald',
+        squircleClass: 'squircle-cyan',
         badge: 'Konfigurasi',
-        badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+        badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
       }
     ];
 

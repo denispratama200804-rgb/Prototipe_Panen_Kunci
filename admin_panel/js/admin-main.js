@@ -13,6 +13,8 @@ import { ApiKeysView } from './views/ApiKeysView.js';
 import { WithdrawalsView } from './views/WithdrawalsView.js';
 import { UsersView } from './views/UsersView.js';
 import { SettingsView } from './views/SettingsView.js';
+import { LiveChatAdminView } from './views/LiveChatAdminView.js';
+import { chatService } from '../../src/infrastructure/services/ChatService.js';
 
 class AdminApp {
   constructor() {
@@ -37,13 +39,14 @@ class AdminApp {
       apikeys: new ApiKeysView(adminDataService, toast),
       withdrawals: new WithdrawalsView(adminDataService, toast),
       users: new UsersView(adminDataService, toast),
-      settings: new SettingsView(adminDataService, toast)
+      settings: new SettingsView(adminDataService, toast),
+      chat: new LiveChatAdminView(adminDataService, toast)
     };
   }
 
   _getInitialTab() {
     const hash = window.location.hash.replace('#', '');
-    const validTabs = ['dashboard', 'apikeys', 'withdrawals', 'users', 'settings'];
+    const validTabs = ['dashboard', 'chat', 'apikeys', 'withdrawals', 'users', 'settings'];
     return validTabs.includes(hash) ? hash : 'dashboard';
   }
 
@@ -133,6 +136,18 @@ class AdminApp {
       }
     });
 
+    // Real-time listener: saat ada pesan chat baru dari user
+    chatService.on('message_received', (msg) => {
+      const navbarMount = document.getElementById('admin-navbar-mount');
+      if (navbarMount) {
+        navbarMount.innerHTML = this.navbar.render(this.currentTab, this._getViewTitle(this.currentTab));
+        this.navbar.bindEvents(navbarMount);
+      }
+      if (this.currentTab === 'dashboard') {
+        this.refreshCurrentView(false, false);
+      }
+    });
+
     this._renderLayout();
     this._mountView(this.currentTab);
 
@@ -173,7 +188,7 @@ class AdminApp {
         </div>
 
         <!-- Dynamic Main Content View Area: min-w-0 prevents flex horizontal expansion -->
-        <main class="flex-1 w-full max-w-7xl mx-auto min-w-0 p-3 sm:p-6 md:p-8" id="admin-view-mount">
+        <main class="flex-1 w-full max-w-7xl mx-auto min-w-0 ${this.currentTab === 'chat' ? 'px-2 sm:px-4 py-2' : 'p-3 sm:p-6 md:p-8'}" id="admin-view-mount">
           <!-- View content will be injected here -->
         </main>
       </div>
@@ -205,6 +220,8 @@ class AdminApp {
         return 'Kelola Pengguna & KYC';
       case 'settings':
         return 'Pengaturan Tarif & Sistem';
+      case 'chat':
+        return 'Live Chat & Bantuan Pengguna';
       default:
         return 'Control Center';
     }
@@ -248,6 +265,13 @@ class AdminApp {
   _mountView(tab, withAnimation = true) {
     const viewMount = document.getElementById('admin-view-mount');
     if (!viewMount) return;
+
+    // Sesuaikan padding container agar tampilan live chat pas dengan viewport layar tanpa terpotong
+    if (tab === 'chat') {
+      viewMount.className = 'flex-1 w-full max-w-7xl mx-auto min-w-0 px-2 sm:px-4 py-2';
+    } else {
+      viewMount.className = 'flex-1 w-full max-w-7xl mx-auto min-w-0 p-3 sm:p-6 md:p-8';
+    }
 
     // Simpan status elemen yang sedang fokus (focus & posisi kursor) agar tidak hilang saat re-render
     const activeEl = document.activeElement;

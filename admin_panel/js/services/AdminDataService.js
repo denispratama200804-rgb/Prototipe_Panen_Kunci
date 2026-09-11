@@ -966,7 +966,42 @@ export class AdminDataService {
       this._set('transactions', txs);
     }
 
-    return txs.filter(t => {
+    // Ambil daftar users & session aktif untuk sinkronisasi relasi data pemohon
+    const users = this._get('all_users', []);
+    let authUser = null;
+    try {
+      const rawAuth = localStorage.getItem('panenkunci:auth_user');
+      if (rawAuth) authUser = JSON.parse(rawAuth);
+    } catch (e) {}
+
+    // Perkaya data transaksi dengan data profil pengguna pemohon
+    const enriched = txs.map(t => {
+      const u = (Array.isArray(users) ? users : []).find(user => 
+        (user && user.id && t.userId && user.id === t.userId) || 
+        (user && user.email && t.userEmail && user.email.toLowerCase() === t.userEmail.toLowerCase())
+      ) || (authUser && (authUser.id === t.userId || (authUser.email && t.userEmail === authUser.email)) ? authUser : null);
+
+      const userName = t.userName || u?.name || u?.full_name || (authUser && authUser.id === t.userId ? authUser.name : null) || (t.userId && !t.userId.includes('-') ? t.userId.replace(/^usr_/, '') : 'Pengguna Member');
+      const userEmail = t.userEmail || u?.email || (authUser && authUser.id === t.userId ? authUser.email : '-');
+      const userPhone = t.userPhone || u?.phone || (authUser && authUser.id === t.userId ? authUser.phone : '-');
+      const accountHolder = t.accountHolder || u?.accountHolder || u?.account_holder || (authUser && authUser.id === t.userId ? (authUser.accountHolder || authUser.name) : null) || userName;
+      const userBank = t.userBank || u?.bankName || u?.bank_name || (authUser && authUser.id === t.userId ? authUser.bankName : null) || t.method;
+      const userAccountNumber = t.userAccountNumber || u?.accountNumber || u?.account_number || (authUser && authUser.id === t.userId ? authUser.accountNumber : null) || t.recipient;
+      const kycStatus = Boolean(u?.isVerified || u?.status === 'verified' || (authUser && authUser.id === t.userId && authUser.isVerified));
+
+      return {
+        ...t,
+        userName,
+        userEmail,
+        userPhone,
+        accountHolder,
+        userBank,
+        userAccountNumber,
+        kycStatus
+      };
+    });
+
+    return enriched.filter(t => {
       const matchType = type === 'all' || t.type === type;
       const matchStatus = status === 'all' || t.status === status;
       const q = search.toLowerCase();
@@ -975,6 +1010,7 @@ export class AdminDataService {
         (t.userId && t.userId.toLowerCase().includes(q)) ||
         (t.userName && t.userName.toLowerCase().includes(q)) ||
         (t.userEmail && t.userEmail.toLowerCase().includes(q)) ||
+        (t.accountHolder && t.accountHolder.toLowerCase().includes(q)) ||
         (t.recipient && t.recipient.toLowerCase().includes(q)) ||
         (t.title && t.title.toLowerCase().includes(q));
       return matchType && matchStatus && matchSearch;

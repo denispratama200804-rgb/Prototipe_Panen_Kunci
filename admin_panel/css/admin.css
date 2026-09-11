@@ -232,6 +232,34 @@ input[type="number"] {
   background: rgba(99, 102, 241, 0.75);
 }
 
+/* Dedicated Visible Chat Scrollbar (Ensure messages stream has a visible, easy-to-use scrollbar) */
+.chat-scrollbar {
+  scrollbar-width: thin !important;
+  scrollbar-color: #6366f1 rgba(15, 23, 42, 0.85) !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-scrollbar::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+  display: block !important;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: rgba(10, 17, 35, 0.8) !important;
+  border-radius: 9999px !important;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: #6366f1 !important;
+  border-radius: 9999px !important;
+  border: 1px solid rgba(10, 17, 35, 0.8) !important;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #818cf8 !important;
+}
+
 /* Shimmer & Glow Effects */
 .pulse-glow {
   animation: pulseGlow 2.5s infinite;
@@ -801,3 +829,40 @@ input[type="number"] {
 [data-theme="light"] a[class*="bg-amber-"]:not([class*="/"]) span {
   color: #ffffff !important;
 }
+
+/* ── Live Chat Console Theme Alignment ── */
+[data-theme="light"] .chat-console-card {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .chat-inbox-pane {
+  background-color: #f8fafc !important;
+  border-right-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .chat-stream-bg {
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .chat-user-bubble {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .chat-user-bubble .text-slate-200 {
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .chat-quick-chip {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+[data-theme="light"] .chat-quick-chip:hover {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+

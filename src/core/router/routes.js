@@ -8,6 +8,7 @@ import { TarikSaldoView } from '../../presentation/views/TarikSaldoView.js';
 import { HistoryView } from '../../presentation/views/HistoryView.js';
 import { ProfileView } from '../../presentation/views/ProfileView.js';
 import { ResetPasswordView } from '../../presentation/views/ResetPasswordView.js';
+import { LiveChatView } from '../../presentation/views/LiveChatView.js';
 
 /**
  * Routes Configuration
@@ -75,6 +76,12 @@ export const routes = [
     path: '/profil',
     viewClass: ProfileView,
     title: 'Profil Pengguna',
+    requiresAuth: true
+  },
+  {
+    path: '/chat',
+    viewClass: LiveChatView,
+    title: 'Pusat Bantuan',
     requiresAuth: true
   }
 ];

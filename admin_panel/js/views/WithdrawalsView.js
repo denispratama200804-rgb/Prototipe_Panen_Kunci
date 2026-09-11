@@ -253,9 +253,9 @@ export class WithdrawalsView {
                       const isSuccess = tx.status === 'success';
                       const isExpanded = this.expandedTxIds.has(tx.id);
 
-                      // Inisial avatar huruf (seperti lingkaran 'A' hijau di Foto 2)
-                      const cleanUser = (tx.userId || 'User').replace(/^usr_/, '');
-                      const userInitial = cleanUser.charAt(0).toUpperCase() || 'U';
+                      // Inisial avatar huruf diambil dari Nama Pengguna
+                      const displayName = tx.userName || (tx.userId && !tx.userId.includes('-') ? tx.userId.replace(/^usr_/, '') : 'Member Pengguna');
+                      const userInitial = displayName.charAt(0).toUpperCase() || 'U';
 
                       const dateFormatted = new Date(tx.createdAt).toLocaleString('id-ID', {
                         day: 'numeric',
@@ -292,14 +292,16 @@ export class WithdrawalsView {
                       <span>${userInitial}</span>
                     </div>
 
-                    <!-- Teks: #ID & User, Waktu, dan Badge Pill -->
+                    <!-- Teks: Nama User, #ID, Waktu, dan Badge Pill -->
                     <div class="min-w-0">
-                      <div class="flex items-center gap-1.5 flex-wrap">
-                        <span class="font-mono font-bold text-admin-heading text-xs sm:text-sm tracking-wide">#${tx.id}</span>
-                        <span class="font-semibold text-admin-body text-xs sm:text-sm truncate max-w-[130px] sm:max-w-none">${tx.userId || 'usr_budi_01'}</span>
+                      <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <span class="font-bold text-admin-heading text-xs sm:text-sm tracking-tight">${displayName}</span>
+                        <span class="font-mono text-[10px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/60" title="ID Transaksi: ${tx.id}">#${tx.id.length > 16 ? tx.id.substring(0, 10) + '...' : tx.id}</span>
+                        ${tx.kycStatus ? '<span class="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold uppercase tracking-wider">KYC</span>' : ''}
                       </div>
-                      <div class="text-[11px] text-admin-muted font-mono mt-0.5">
-                        ${dateFormatted}
+                      <div class="text-[11px] text-admin-muted font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        ${tx.userEmail && tx.userEmail !== '-' ? `<span class="text-slate-300">${tx.userEmail}</span><span>•</span>` : ''}
+                        <span>${dateFormatted}</span>
                       </div>
                       <div class="mt-1">
                         <!-- Pill Tag Saldo & Metode -->
@@ -355,23 +357,74 @@ export class WithdrawalsView {
 
                 <!-- Bagian Detail yang Terbuka saat Tanda Panah / Baris Diklik -->
                 <div id="details-${tx.id}" class="${isExpanded ? '' : 'hidden'} px-3 pb-3 sm:px-4 sm:pb-4 border-t border-admin pt-3 space-y-3 view-fade-enter">
-                  <div class="admin-sub-card grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3.5 rounded-xl text-xs">
-                    <!-- Rekening / E-Wallet Penerima -->
-                    <div>
-                      <span class="text-admin-muted block text-[10px] uppercase font-semibold">Tujuan Rekening / E-Wallet:</span>
-                      <div class="flex items-center gap-2 mt-1.5">
-                        <span class="material-symbols-outlined text-base ${methodColor}">${methodIcon}</span>
-                        <div>
-                          <div class="font-bold text-admin-heading">${tx.title || 'Penarikan Saldo'}</div>
-                          <div class="font-mono text-admin-body font-semibold text-xs">${tx.recipient || '-'}</div>
+                  <div class="admin-sub-card grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 sm:p-4 rounded-xl text-xs">
+                    
+                    <!-- 1. DATA PENGGUNA (PEMOHON) -->
+                    <div class="space-y-1.5 border-b md:border-b-0 md:border-r border-slate-800/80 pb-3 md:pb-0 md:pr-3">
+                      <span class="text-admin-muted block text-[10px] uppercase font-bold tracking-wider flex items-center gap-1">
+                        <span class="material-symbols-outlined text-xs text-indigo-400">person</span>
+                        <span>Data Pemohon (User):</span>
+                      </span>
+                      <div class="space-y-1 mt-1">
+                        <div class="flex justify-between text-admin-body gap-1">
+                          <span class="text-admin-muted">Nama:</span>
+                          <span class="font-bold text-admin-heading text-right truncate">${displayName}</span>
+                        </div>
+                        <div class="flex justify-between text-admin-body gap-1">
+                          <span class="text-admin-muted">Email:</span>
+                          <span class="font-mono text-slate-300 text-right truncate text-[11px]">${tx.userEmail || '-'}</span>
+                        </div>
+                        <div class="flex justify-between text-admin-body gap-1">
+                          <span class="text-admin-muted">Nomor HP:</span>
+                          <span class="font-mono text-slate-300 text-right">${tx.userPhone || '-'}</span>
+                        </div>
+                        <div class="flex justify-between text-admin-body gap-1">
+                          <span class="text-admin-muted">User ID:</span>
+                          <span class="font-mono text-[10px] text-slate-400 text-right truncate max-w-[130px]" title="${tx.userId}">${tx.userId || '-'}</span>
+                        </div>
+                        <div class="flex justify-between text-admin-body gap-1 pt-0.5">
+                          <span class="text-admin-muted">Status KYC:</span>
+                          <span class="font-semibold text-[10px] ${tx.kycStatus ? 'text-emerald-400' : 'text-amber-400'}">
+                            ${tx.kycStatus ? '✓ Terverifikasi' : 'Belum Verifikasi'}
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    <!-- Rincian Finansial -->
-                    <div>
-                      <span class="text-admin-muted block text-[10px] uppercase font-semibold">Rincian Finansial:</span>
-                      <div class="mt-1.5 space-y-1">
+                    <!-- 2. REKENING / E-WALLET PENERIMA -->
+                    <div class="space-y-1.5 border-b md:border-b-0 md:border-r border-slate-800/80 pb-3 md:pb-0 md:pr-3">
+                      <span class="text-admin-muted block text-[10px] uppercase font-bold tracking-wider flex items-center gap-1">
+                        <span class="material-symbols-outlined text-xs text-cyan-400">account_balance</span>
+                        <span>Tujuan Rekening / E-Wallet:</span>
+                      </span>
+                      <div class="space-y-1 mt-1">
+                        <div class="flex items-center gap-2 mb-1">
+                          <div class="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-sm ${methodColor}">${methodIcon}</span>
+                          </div>
+                          <div>
+                            <div class="font-bold text-admin-heading">${tx.title || tx.method || 'Penarikan'}</div>
+                            <div class="text-[10px] text-slate-400">${tx.userBank || tx.method}</div>
+                          </div>
+                        </div>
+                        <div class="flex justify-between text-admin-body gap-1">
+                          <span class="text-admin-muted">Nomor Akun:</span>
+                          <span class="font-mono font-bold text-admin-heading text-xs select-all">${tx.recipient || tx.userAccountNumber || '-'}</span>
+                        </div>
+                        <div class="flex justify-between text-admin-body gap-1">
+                          <span class="text-admin-muted">Atas Nama (A.N):</span>
+                          <span class="font-semibold text-emerald-400 text-right truncate">${tx.accountHolder || displayName}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 3. RINCIAN FINANSIAL -->
+                    <div class="space-y-1.5">
+                      <span class="text-admin-muted block text-[10px] uppercase font-bold tracking-wider flex items-center gap-1">
+                        <span class="material-symbols-outlined text-xs text-amber-400">payments</span>
+                        <span>Rincian Finansial:</span>
+                      </span>
+                      <div class="space-y-1 mt-1">
                         <div class="flex justify-between text-admin-body">
                           <span>Nominal Pengajuan:</span>
                           <span class="font-mono font-bold text-admin-heading">Rp ${amount.toLocaleString('id-ID')}</span>
@@ -380,37 +433,38 @@ export class WithdrawalsView {
                           <span>Biaya Admin:</span>
                           <span class="font-mono text-rose-500 font-semibold">-Rp ${fee.toLocaleString('id-ID')}</span>
                         </div>
-                        <div class="flex justify-between text-emerald-500 font-bold border-t border-admin pt-1">
+                        <div class="flex justify-between text-emerald-500 font-bold border-t border-slate-800/80 pt-1">
                           <span>Transfer Bersih:</span>
-                          <span class="font-mono text-sm font-extrabold text-emerald-500 dark:text-emerald-400">Rp ${netPayout.toLocaleString('id-ID')}</span>
+                          <span class="font-mono text-sm font-extrabold text-emerald-400">Rp ${netPayout.toLocaleString('id-ID')}</span>
                         </div>
                       </div>
                     </div>
 
-                    ${
-                      tx.status === 'failed' && (tx.notes || tx.errorMessage)
-                        ? `
-                      <div class="sm:col-span-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px]">
-                        <span class="font-bold">Alasan Penolakan:</span> ${tx.notes || tx.errorMessage}
-                      </div>
-                    `
-                        : ''
-                    }
-
-                    ${
-                      tx.processedAt
-                        ? `
-                      <div class="sm:col-span-2 text-[11px] text-admin-muted flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-xs text-emerald-400">task_alt</span>
-                        <span>Diproses pada: ${new Date(tx.processedAt).toLocaleString('id-ID')}</span>
-                      </div>
-                    `
-                        : ''
-                    }
                   </div>
 
-                  <!-- Tindakan Admin -->
-                  <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  ${
+                    tx.status === 'failed' && (tx.notes || tx.errorMessage)
+                      ? `
+                    <div class="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px]">
+                      <span class="font-bold">Alasan Penolakan:</span> ${tx.notes || tx.errorMessage}
+                    </div>
+                  `
+                      : ''
+                  }
+
+                  ${
+                    tx.processedAt
+                      ? `
+                    <div class="text-[11px] text-admin-muted flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-xs text-emerald-400">task_alt</span>
+                      <span>Diproses pada: ${new Date(tx.processedAt).toLocaleString('id-ID')}</span>
+                    </div>
+                  `
+                      : ''
+                  }
+
+                  <!-- Tindakan Admin (Hanya muncul saat baris dibuka/expanded) -->
+                  <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/60">
                     <div class="text-[11px] text-admin-muted">
                       <span>Status: </span>
                       <strong class="text-admin-heading">${isPending ? 'Menunggu Validasi Admin' : isSuccess ? 'Telah Ditransfer ke User' : 'Ditolak (Saldo di-refund)'}</strong>

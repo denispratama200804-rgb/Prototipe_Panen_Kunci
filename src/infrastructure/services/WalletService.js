@@ -855,7 +855,7 @@ export class WalletService {
    * @param {string} [params.userId]
    * @returns {Promise<{ success: boolean, message: string, transaction?: Transaction, fee?: number, totalReceive?: number }>}
    */
-  async withdraw({ amount, method, accountIdentifier, userId = 'usr_current' }) {
+  async withdraw({ amount, method, accountIdentifier, userId = 'usr_current', userName = '', userEmail = '', userPhone = '', accountHolder = '', bankName = '' }) {
     const numAmount = Number(amount);
 
     // 1. Dapatkan strategi dan hitung biaya admin sesuai pengaturan
@@ -889,6 +889,11 @@ export class WalletService {
     const tx = new Transaction({
       id: result.transactionId || 'tx_' + Math.random().toString(36).substring(2, 9),
       userId,
+      userName,
+      userEmail,
+      userPhone,
+      accountHolder,
+      bankName: bankName || (strategy ? strategy.getLabel() : method),
       type: 'withdrawal',
       amount: numAmount,
       fee,

@@ -222,9 +222,6 @@ export class TarikSaldoView extends IComponent {
                 <span class="material-symbols-outlined text-[22px]">error</span>
                 <span>Rekening / E-Wallet Belum Diatur</span>
               </div>
-              <p class="text-xs text-text-body leading-relaxed">
-                Anda belum melengkapi rekening bank atau e-wallet utama di profil Anda. Sesuai ketentuan keamanan, penarikan saldo hanya dapat diproses ke rekening/e-wallet yang telah Anda simpan di menu profil.
-              </p>
               <a
                 href="#/profil"
                 class="bg-amber-500 text-slate-950 font-bold text-xs py-3 px-4 rounded-2xl text-center shadow hover:bg-amber-400 transition-all flex items-center justify-center gap-1.5"
@@ -672,7 +669,11 @@ export class TarikSaldoView extends IComponent {
             amount,
             method,
             accountIdentifier: account,
-            userId: currentUser ? currentUser.id : 'usr_guest'
+            userId: currentUser ? currentUser.id : 'usr_guest',
+            userName: currentUser ? currentUser.name : (resolved.accountHolder || 'Pengguna'),
+            userEmail: currentUser ? currentUser.email : '',
+            userPhone: currentUser ? currentUser.phone : account,
+            accountHolder: resolved.accountHolder || (currentUser ? currentUser.name : '')
           });
 
           // Tutup popup konfirmasi
@@ -681,7 +682,7 @@ export class TarikSaldoView extends IComponent {
           if (res.success) {
             this._notification.showModal({
               title: 'Permintaan Penarikan Berhasil Diajukan!',
-              message: `Permintaan penarikan dana sebesar <strong class="text-primary font-bold">Rp ${amount.toLocaleString('id-ID')}</strong> ke <strong class="text-text-heading">${methodLabel} (${account})</strong> telah berhasil terkirim ke Admin Panel dan sedang <strong class="text-amber-500 font-bold">menunggu persetujuan admin</strong>.`,
+              message: '<strong class="text-amber-500 font-bold">Menunggu persetujuan admin</strong>',
               html: `
                 <div class="bg-surface-container-low rounded-2xl p-3.5 flex flex-col gap-2 text-xs border border-surface-container mt-2 text-left">
                   <div class="flex justify-between items-center">

@@ -40,9 +40,10 @@ export class BottomNavComponent {
     const path = this._currentPath;
     const isAuth = this._authService.isAuthenticated();
 
-    // Sembunyikan bottom nav di halaman landing, login, register
-    const hiddenRoutes = ['/', '/login', '/register'];
-    if (!isAuth || hiddenRoutes.includes(path)) {
+    // Sembunyikan bottom nav di halaman landing, login, register, dan live chat (/chat)
+    const currentHash = (window.location.hash || '').replace(/^#\/?/, '/').split('?')[0];
+    const hiddenRoutes = ['/', '/login', '/register', '/chat'];
+    if (!isAuth || hiddenRoutes.includes(path) || hiddenRoutes.includes(currentHash) || path.startsWith('/chat')) {
       this._element.classList.add('hidden');
       return;
     } else {

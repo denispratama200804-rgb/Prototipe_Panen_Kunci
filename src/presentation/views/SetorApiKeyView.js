@@ -313,12 +313,10 @@ export class SetorApiKeyView extends IComponent {
         // Segera perbarui daftar riwayat di bawah formulir secara reaktif seketika
         this._updateKeysHistoryUI(container);
 
-        const currentPassive = this._walletService.getPassiveBalance();
-
         // Tampilkan Popup Setor Berhasil Masuk ke Saldo Pasif
         this._notification.showModal({
           title: 'Setoran Masuk ke Saldo Pasif!',
-          message: `API Key valid dan reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.<br><br>Total Saldo Pasif saat ini: <strong class="text-amber-500 font-bold">Rp ${currentPassive.toLocaleString('id-ID')}</strong>.<br><br>Saldo pasif akan <strong>otomatis berubah menjadi Saldo Aktif</strong> seketika setelah Admin memverifikasi API Key Anda tanpa perlu refresh manual.`,
+          message: `API Key valid dan reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.`,
           type: 'success',
           confirmText: 'Kembali ke Dashboard',
           onConfirm: () => {

@@ -57,6 +57,14 @@ export class HeaderComponent {
     const currentHash = (window.location.hash || '').replace(/^#\/?/, '/').split('?')[0];
     const path = (this._currentPath || currentHash || '/').trim();
 
+    // Sembunyikan Header bawaan di halaman /chat agar LiveChatView mengambil alih penuh (Foto 2)
+    if (path === '/chat' || currentHash === '/chat' || path.startsWith('/chat')) {
+      this._element.classList.add('hidden');
+      return;
+    } else {
+      this._element.classList.remove('hidden');
+    }
+
     const isLogin = path === '/login' || path === 'login' || currentHash === '/login' || currentHash === 'login';
     const isRegister = path === '/register' || path === 'register' || currentHash === '/register' || currentHash === 'register';
     const isAuthPage = isLogin || isRegister;

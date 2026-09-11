@@ -1,4 +1,5 @@
 import { themeService } from '../services/ThemeService.js';
+import { chatService } from '../../../src/infrastructure/services/ChatService.js';
 
 /**
  * Navbar Component
@@ -31,6 +32,7 @@ export class Navbar {
   render(currentTab = 'dashboard', title = '') {
     const isDashboard = currentTab === 'dashboard';
     const isDark = themeService.isDark();
+    const unreadChatCount = chatService.getUnreadCountForAdmin();
 
     return `
       <header class="h-14 sm:h-16 admin-navbar px-3 sm:px-8 flex items-center justify-between border-b border-transparent">
@@ -81,8 +83,24 @@ export class Navbar {
           ` : ''}
         </div>
 
-        <!-- Right: Actions (Sync & Theme Toggle & Admin User Dropdown) -->
+        <!-- Right: Actions (Live Chat, Sync & Theme Toggle & Admin User Dropdown) -->
         <div class="flex items-center gap-2 sm:gap-3">
+          <!-- Live Chat Button (Pesan Masuk Pengguna) -->
+          <a
+            href="#chat"
+            data-nav="chat"
+            title="Live Chat Bantuan Pengguna"
+            class="admin-nav-btn relative px-2.5 sm:px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer group ${currentTab === 'chat' ? 'bg-indigo-600/30 text-indigo-400 border border-indigo-500/40' : ''}"
+          >
+            <span class="material-symbols-outlined text-base text-emerald-400 group-hover:scale-110 transition-transform">forum</span>
+            <span class="hidden sm:inline font-medium">Live Chat</span>
+            ${unreadChatCount > 0 ? `
+              <span class="min-w-[17px] h-[17px] px-1 bg-rose-500 text-white font-black text-[10px] rounded-full flex items-center justify-center shadow-sm animate-pulse">
+                ${unreadChatCount}
+              </span>
+            ` : ''}
+          </a>
+
           <!-- Sync Data Button -->
           <button
             type="button"
@@ -178,6 +196,21 @@ export class Navbar {
                 >
                   <span class="material-symbols-outlined text-sm text-emerald-400">tune</span>
                   <span>Pengaturan Tarif</span>
+                </button>
+                <button
+                  type="button"
+                  data-dropdown-nav="chat"
+                  class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center justify-between"
+                >
+                  <div class="flex items-center gap-2.5">
+                    <span class="material-symbols-outlined text-sm text-emerald-400">forum</span>
+                    <span>Live Chat Pengguna</span>
+                  </div>
+                  ${unreadChatCount > 0 ? `
+                    <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white">
+                      ${unreadChatCount} baru
+                    </span>
+                  ` : ''}
                 </button>
               </div>
 
