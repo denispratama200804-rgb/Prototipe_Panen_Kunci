@@ -60,7 +60,7 @@ export class HeaderComponent {
     const isLogin = path === '/login' || path === 'login' || currentHash === '/login' || currentHash === 'login';
     const isRegister = path === '/register' || path === 'register' || currentHash === '/register' || currentHash === 'register';
     const isAuthPage = isLogin || isRegister;
-    const isProfilePage = path === '/profil' || path === 'profil' || currentHash === '/profil' || currentHash === 'profil';
+    const isProfilePage = path === '/profil' || path === 'profil' || currentHash === '/profil' || currentHash === 'profil' || path.startsWith('/profil') || currentHash.startsWith('/profil');
 
     const isAuth = this._authService.isAuthenticated();
     const user = this._authService.getCurrentUser();
@@ -130,7 +130,7 @@ export class HeaderComponent {
             <button
               type="button"
               id="header-notif-btn"
-              class="relative w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-all active:scale-95 cursor-pointer"
+              class="relative w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-all active:scale-95 cursor-pointer ${isProfilePage ? '-mr-1' : ''}"
               title="Notifikasi & Bukti Transfer"
               aria-label="Notifikasi Bukti Transfer"
             >
@@ -163,7 +163,7 @@ export class HeaderComponent {
                   <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${user?.isVerified ? 'bg-secondary' : 'bg-outline'} rounded-full border-2 border-white"></div>
                 </div>
               </a>
-            ` : '<div class="w-8 h-8"></div>'}
+            ` : ''}
           ` : `
             <a href="#/login" class="text-xs font-semibold text-primary hover:underline">Masuk</a>
           `)}
