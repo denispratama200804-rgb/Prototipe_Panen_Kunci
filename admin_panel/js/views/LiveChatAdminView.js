@@ -53,33 +53,33 @@ export class LiveChatAdminView {
       <div class="view-fade-enter max-w-7xl mx-auto w-full">
         
         <!-- Main Chat Console (Flex Layout on Desktop for perfect full-width split, Adaptive on Mobile) -->
-        <div class="chat-console-card admin-card rounded-2xl overflow-hidden w-full max-w-full border border-slate-800/90 shadow-2xl bg-[#0b1329] flex flex-col lg:flex-row gap-0 h-[calc(100dvh-4.6rem)] sm:h-[calc(100vh-5.4rem)] max-h-[calc(100dvh-4.6rem)] sm:max-h-[calc(100vh-5.4rem)]">
+        <div class="chat-console-card admin-card rounded-2xl overflow-hidden w-full max-w-full border border-admin shadow-2xl flex flex-col lg:flex-row gap-0 h-[calc(100dvh-4.6rem)] sm:h-[calc(100vh-5.4rem)] max-h-[calc(100dvh-4.6rem)] sm:max-h-[calc(100vh-5.4rem)]">
           
           <!-- Column 1: Inbox / Daftar Percakapan (Desktop: w-80 xl:w-96 shrink-0 | Mobile: Toggle Inbox) -->
           <div 
             id="admin-chat-inbox-pane" 
-            class="chat-inbox-pane w-full lg:w-80 xl:w-96 shrink-0 ${this.mobileView === 'chat' ? 'hidden lg:flex' : 'flex'} flex-col h-full min-h-0 overflow-hidden border-r border-slate-800/80 bg-[#080f20]/95"
+            class="chat-inbox-pane w-full lg:w-80 xl:w-96 shrink-0 ${this.mobileView === 'chat' ? 'hidden lg:flex' : 'flex'} flex-col h-full min-h-0 overflow-hidden border-r border-admin"
           >
             <!-- Pane Header -->
-            <div class="admin-card-header px-4 py-3 text-xs flex items-center justify-between border-b border-slate-800/80 shrink-0">
+            <div class="admin-card-header px-4 py-3 text-xs flex items-center justify-between border-b border-admin shrink-0">
               <div class="flex items-center gap-2.5">
-                <span class="material-symbols-outlined text-lg text-indigo-400">forum</span>
+                <span class="material-symbols-outlined text-lg text-indigo-500">forum</span>
                 <span class="font-bold text-admin-heading text-sm">Live Chat Pengguna</span>
               </div>
               <div class="flex items-center gap-2">
                 ${totalUnread > 0 ? `
-                  <span class="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded-full font-bold animate-pulse">
+                  <span class="text-[10px] bg-rose-500/20 text-rose-500 dark:text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded-full font-bold animate-pulse">
                     ${totalUnread} Baru
                   </span>
                 ` : ''}
-                <span class="text-[11px] text-slate-300 font-mono bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-700/60">
+                <span class="chat-user-count-badge text-[11px] font-mono px-2.5 py-0.5 rounded-full">
                   ${conversations.length} Pengguna
                 </span>
               </div>
             </div>
 
             <!-- Search Bar -->
-            <div class="p-2.5 sm:p-3 border-b border-slate-800/80 bg-[#070c18]/60 shrink-0">
+            <div class="chat-search-bar-wrap p-2.5 sm:p-3 border-b border-admin shrink-0">
               <div class="relative">
                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base">search</span>
                 <input
@@ -87,13 +87,13 @@ export class LiveChatAdminView {
                   id="admin-chat-search"
                   placeholder="Cari nama, email, atau ID..."
                   value="${this.searchQuery}"
-                  class="w-full pl-9 pr-3 py-2 bg-[#070c18] border border-slate-800/90 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
+                  class="chat-search-input w-full pl-9 pr-3 py-2 rounded-xl text-xs transition-colors"
                 />
               </div>
             </div>
 
             <!-- Conversations Scroll List -->
-            <div id="admin-conv-list" class="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-800/50 chat-scrollbar">
+            <div id="admin-conv-list" class="chat-conv-list flex-1 min-h-0 overflow-y-auto chat-scrollbar">
               ${this._renderConversationList(conversations)}
             </div>
           </div>
@@ -101,7 +101,7 @@ export class LiveChatAdminView {
           <!-- Column 2: Active Chat Workspace (Desktop: flex-1 min-w-0 fills remaining width | Mobile: Toggle Chat) -->
           <div 
             id="admin-chat-active-pane" 
-            class="chat-active-pane flex-1 min-w-0 ${this.mobileView === 'inbox' ? 'hidden lg:flex' : 'flex'} flex-col h-full min-h-0 overflow-hidden bg-[#0b1329] relative"
+            class="chat-active-pane flex-1 min-w-0 ${this.mobileView === 'inbox' ? 'hidden lg:flex' : 'flex'} flex-col h-full min-h-0 overflow-hidden relative"
           >
             ${selectedConv ? this._renderActiveChatWorkspace(selectedConv, messages) : this._renderEmptyState()}
           </div>
@@ -125,7 +125,7 @@ export class LiveChatAdminView {
 
     if (filtered.length === 0) {
       return `
-        <div class="p-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center h-48">
+        <div class="p-8 text-center text-admin-muted text-xs flex flex-col items-center justify-center h-48">
           <span class="material-symbols-outlined text-3xl opacity-40 mb-2">chat_bubble_outline</span>
           <span>Tidak ada percakapan ditemukan</span>
         </div>
@@ -141,16 +141,12 @@ export class LiveChatAdminView {
       return `
         <div
           data-conv-user-id="${conv.userId}"
-          class="conv-item p-3.5 sm:p-4 flex items-start gap-3 cursor-pointer transition-all select-none relative ${
-            isSelected 
-              ? 'bg-[#152244] border-l-4 border-indigo-500 shadow-inner' 
-              : 'hover:bg-slate-800/40'
-          }"
+          class="conv-item p-3.5 sm:p-4 flex items-start gap-3 cursor-pointer transition-all select-none relative ${isSelected ? 'active' : ''}"
         >
           <!-- User Avatar Squircle -->
           <div class="relative shrink-0 mt-0.5">
             ${conv.userAvatar ? `
-              <img src="${conv.userAvatar}" alt="${conv.userName}" class="w-11 h-11 rounded-2xl object-cover border border-slate-700/80" onerror="this.src='/avatar.png'" />
+              <img src="${conv.userAvatar}" alt="${conv.userName}" class="w-11 h-11 rounded-2xl object-cover border border-slate-200 dark:border-slate-700/80" onerror="this.src='/avatar.png'" />
             ` : `
               <div class="w-11 h-11 rounded-2xl bg-indigo-600 text-white font-black flex items-center justify-center text-sm shadow-md border border-indigo-400/20">
                 ${(conv.userName || 'PK').substring(0, 2).toUpperCase()}
@@ -158,7 +154,7 @@ export class LiveChatAdminView {
             `}
             <!-- Bulatan Status: Hijau jika online / login di app, Abu-abu jika offline / tidak login -->
             <span 
-              class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${conv.isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-500/80'} ring-2 ring-[#080f20] transition-colors"
+              class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${conv.isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-400'} ring-2 ring-chat-avatar transition-colors"
               title="${conv.isOnline ? 'Sedang Login (Online)' : 'Tidak Login (Offline)'}"
             ></span>
           </div>
@@ -166,14 +162,14 @@ export class LiveChatAdminView {
           <!-- User Info & Last Message -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between gap-1 mb-1">
-              <h4 class="text-xs sm:text-sm font-bold text-admin-heading truncate ${isSelected ? 'text-white' : ''}">
+              <h4 class="conv-name text-xs sm:text-sm font-bold truncate">
                 ${conv.userName || 'Pengguna'}
               </h4>
-              <span class="text-[11px] text-slate-400 font-mono shrink-0">${lastMsgTime}</span>
+              <span class="conv-time text-[11px] font-mono shrink-0">${lastMsgTime}</span>
             </div>
             
-            <p class="text-xs text-slate-400 truncate leading-tight ${unread > 0 ? 'font-semibold text-white' : ''}">
-              ${conv.lastMessage?.sender === 'admin' ? '<span class="text-indigo-400 font-bold">Anda: </span>' : ''}${lastMsgText}
+            <p class="conv-preview text-xs truncate leading-tight ${unread > 0 ? 'font-bold' : ''}">
+              ${conv.lastMessage?.sender === 'admin' ? '<span class="text-indigo-500 dark:text-indigo-400 font-bold">Anda: </span>' : ''}${lastMsgText}
             </p>
           </div>
 
@@ -191,14 +187,14 @@ export class LiveChatAdminView {
   _renderActiveChatWorkspace(conv, messages) {
     return `
       <!-- Workspace Header -->
-      <div class="admin-card-header px-4 sm:px-6 py-3 border-b border-slate-800/80 flex items-center justify-between gap-2 shrink-0">
+      <div class="admin-card-header px-4 sm:px-6 py-3 border-b border-admin flex items-center justify-between gap-2 shrink-0">
         <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
           
           <!-- Tombol Kembali untuk Tampilan Layar HP / Mobile PWA (Hidden on Desktop) -->
           <button
             type="button"
             id="admin-chat-back-btn"
-            class="lg:hidden w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-700/80 active:scale-90 transition-all cursor-pointer -ml-1 shrink-0"
+            class="lg:hidden w-8 h-8 rounded-xl flex items-center justify-center text-admin-muted hover:text-admin-heading admin-nav-btn active:scale-90 transition-all cursor-pointer -ml-1 shrink-0"
             title="Kembali ke Daftar Percakapan"
           >
             <span class="material-symbols-outlined text-2xl">arrow_back</span>
@@ -206,14 +202,14 @@ export class LiveChatAdminView {
 
           <div class="relative shrink-0">
             ${conv.userAvatar ? `
-              <img src="${conv.userAvatar}" alt="${conv.userName}" class="w-11 h-11 rounded-2xl object-cover border border-slate-700/80" />
+              <img src="${conv.userAvatar}" alt="${conv.userName}" class="w-11 h-11 rounded-2xl object-cover border border-slate-200 dark:border-slate-700/80" />
             ` : `
               <div class="w-11 h-11 rounded-2xl bg-indigo-600 text-white font-black flex items-center justify-center text-sm shadow-md border border-indigo-400/20">
                 ${(conv.userName || 'PK').substring(0, 2).toUpperCase()}
               </div>
             `}
             <span 
-              class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${conv.isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-500/80'} ring-2 ring-[#0b1329] transition-colors"
+              class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${conv.isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-400'} ring-2 ring-chat-header-avatar transition-colors"
               title="${conv.isOnline ? 'Sedang Login (Online)' : 'Tidak Login (Offline)'}"
             ></span>
           </div>
@@ -221,15 +217,13 @@ export class LiveChatAdminView {
           <div class="min-w-0">
             <div class="flex items-center gap-2">
               <h3 class="text-sm sm:text-base font-bold text-admin-heading truncate">${conv.userName || 'Pengguna'}</h3>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                conv.isOnline 
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' 
-                  : 'bg-slate-500/15 text-slate-400 border border-slate-500/30'
+              <span class="chat-status-badge px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                conv.isOnline ? 'online' : 'offline'
               }">
                 ${conv.isOnline ? 'Online' : 'Offline'}
               </span>
             </div>
-            <p class="text-xs text-slate-400 truncate mt-0.5">${conv.userEmail || conv.userId}</p>
+            <p class="text-xs text-admin-muted truncate mt-0.5">${conv.userEmail || conv.userId}</p>
           </div>
         </div>
 
@@ -237,17 +231,17 @@ export class LiveChatAdminView {
           <button
             type="button"
             id="admin-refresh-chat-btn"
-            class="admin-nav-btn px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 text-slate-200 hover:text-white transition-colors cursor-pointer border border-slate-700/80 bg-slate-800/40"
+            class="admin-nav-btn px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
             title="Refresh Percakapan"
           >
-            <span class="material-symbols-outlined text-base text-indigo-400">sync</span>
+            <span class="material-symbols-outlined text-base text-indigo-500">sync</span>
             <span>Segarkan</span>
           </button>
         </div>
       </div>
 
       <!-- Messages Stream Scroll Area: min-h-0 guarantees scrollbar triggers when content overflows -->
-      <div id="admin-messages-stream" class="chat-stream-bg flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5 bg-[#060b18]/60 chat-scrollbar relative">
+      <div id="admin-messages-stream" class="chat-stream-bg flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5 chat-scrollbar relative">
         ${this._renderAdminMessageBubbles(messages, conv)}
       </div>
 
@@ -262,24 +256,24 @@ export class LiveChatAdminView {
       </button>
 
       <!-- Quick Reply Templates Bar -->
-      <div class="px-4 py-2 border-t border-slate-800/80 bg-[#070c18]/80 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 z-10">
-        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">TEMPLATE:</span>
-        <button type="button" class="chat-quick-chip admin-quick-reply px-3 py-1.5 rounded-xl text-xs font-medium bg-[#0a1226] hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-800 hover:border-indigo-500 transition-all whitespace-nowrap active:scale-95 cursor-pointer">
+      <div class="chat-templates-bar px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 z-10">
+        <span class="chat-templates-label text-[11px] font-bold uppercase tracking-wider shrink-0 mr-1">TEMPLATE:</span>
+        <button type="button" class="chat-quick-chip admin-quick-reply px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap active:scale-95 cursor-pointer">
           Halo kak, ada yang bisa kami bantu?
         </button>
-        <button type="button" class="chat-quick-chip admin-quick-reply px-3 py-1.5 rounded-xl text-xs font-medium bg-[#0a1226] hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-800 hover:border-indigo-500 transition-all whitespace-nowrap active:scale-95 cursor-pointer">
+        <button type="button" class="chat-quick-chip admin-quick-reply px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap active:scale-95 cursor-pointer">
           Pencairan dana sedang diproses ya kak.
         </button>
-        <button type="button" class="chat-quick-chip admin-quick-reply px-3 py-1.5 rounded-xl text-xs font-medium bg-[#0a1226] hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-800 hover:border-indigo-500 transition-all whitespace-nowrap active:scale-95 cursor-pointer">
+        <button type="button" class="chat-quick-chip admin-quick-reply px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap active:scale-95 cursor-pointer">
           API Key yang disetor sudah diverifikasi.
         </button>
-        <button type="button" class="chat-quick-chip admin-quick-reply px-3 py-1.5 rounded-xl text-xs font-medium bg-[#0a1226] hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-800 hover:border-indigo-500 transition-all whitespace-nowrap active:scale-95 cursor-pointer">
+        <button type="button" class="chat-quick-chip admin-quick-reply px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap active:scale-95 cursor-pointer">
           Mohon cek rekening tujuan di menu profil ya kak.
         </button>
       </div>
 
       <!-- Admin Reply Input Bar (Always pinned firmly at bottom) -->
-      <div class="p-3 sm:p-4 border-t border-slate-800/80 bg-[#0b1329] shrink-0 z-10 shadow-lg">
+      <div class="chat-input-bar p-3 sm:p-4 shrink-0 z-10 shadow-lg">
         <form id="admin-chat-form" class="flex items-center gap-2 sm:gap-3">
           <div class="relative flex-1">
             <input
@@ -287,7 +281,7 @@ export class LiveChatAdminView {
               id="admin-chat-input"
               autocomplete="off"
               placeholder="Ketik balasan untuk ${conv.userName || 'pengguna'}..."
-              class="w-full bg-[#070c18] text-white text-xs sm:text-sm px-4 py-3 rounded-2xl border border-slate-800/90 focus:border-indigo-500 focus:outline-none placeholder-slate-400 transition-colors"
+              class="chat-reply-input w-full text-xs sm:text-sm px-4 py-3 rounded-2xl transition-colors"
             />
           </div>
 
@@ -307,7 +301,7 @@ export class LiveChatAdminView {
   _renderAdminMessageBubbles(messages, conv) {
     if (!messages || messages.length === 0) {
       return `
-        <div class="p-12 text-center text-slate-400 text-xs">
+        <div class="p-12 text-center text-admin-muted text-xs">
           Belum ada pesan dalam percakapan ini.
         </div>
       `;
@@ -334,20 +328,20 @@ export class LiveChatAdminView {
           </div>
         `;
       } else {
-        // User bubble: on the left with initial green badge on the left side (Persis Foto Referensi)
+        // User bubble: on the left with initial green badge on the left side
         const userInitial = (conv.userName || 'U').charAt(0).toUpperCase();
         return `
           <div class="flex justify-start items-end gap-2.5 w-full animate-fade-in">
-            <div class="w-8 h-8 rounded-xl bg-emerald-950/80 text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0 border border-emerald-500/40">
+            <div class="chat-user-avatar-initial w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold shrink-0">
               ${userInitial}
             </div>
-            <div class="chat-user-bubble bg-[#0c1626] text-slate-100 border border-slate-800/90 px-4 py-3 rounded-2xl rounded-tl-xs max-w-[85%] sm:max-w-2xl shadow-sm flex flex-col">
-              <span class="text-[11px] font-bold text-emerald-400 mb-1 flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <div class="chat-user-bubble px-4 py-3 rounded-2xl rounded-tl-xs max-w-[85%] sm:max-w-2xl shadow-sm flex flex-col">
+              <span class="chat-user-bubble-name text-[11px] font-bold mb-1 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                 ${conv.userName || 'Pengguna'}
               </span>
-              <span class="text-xs sm:text-sm text-slate-200 leading-relaxed break-words select-text">${this._escape(msg.text)}</span>
-              <span class="text-[10px] text-slate-400 font-mono text-right mt-1.5">${msg.timeStr || ''}</span>
+              <span class="chat-user-bubble-text text-xs sm:text-sm leading-relaxed break-words select-text">${this._escape(msg.text)}</span>
+              <span class="chat-user-bubble-time text-[10px] font-mono text-right mt-1.5">${msg.timeStr || ''}</span>
             </div>
           </div>
         `;
@@ -357,8 +351,8 @@ export class LiveChatAdminView {
 
   _renderEmptyState() {
     return `
-      <div class="flex flex-col items-center justify-center h-full p-8 text-center text-slate-400">
-        <div class="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center mb-3">
+      <div class="flex flex-col items-center justify-center h-full p-8 text-center text-admin-muted">
+        <div class="chat-empty-icon-wrap w-14 h-14 rounded-2xl flex items-center justify-center mb-3">
           <span class="material-symbols-outlined text-3xl">chat</span>
         </div>
         <h3 class="text-sm font-bold text-admin-heading mb-1">Pilih Percakapan Pengguna</h3>
@@ -522,12 +516,12 @@ export class LiveChatAdminView {
           if (activeHeader) {
             const dot = activeHeader.querySelector('.rounded-full.ring-2');
             if (dot) {
-              dot.className = `absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${conv.isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-500/80'} ring-2 ring-[#0b1329] transition-colors`;
+              dot.className = `absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${conv.isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-400'} ring-2 ring-chat-header-avatar transition-colors`;
               dot.title = conv.isOnline ? 'Sedang Login (Online)' : 'Tidak Login (Offline)';
             }
-            const statusBadge = activeHeader.querySelector('span[class*="text-[10px]"]');
+            const statusBadge = activeHeader.querySelector('.chat-status-badge');
             if (statusBadge) {
-              statusBadge.className = `px-2 py-0.5 rounded-full text-[10px] font-bold ${conv.isOnline ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-slate-500/15 text-slate-400 border border-slate-500/30'}`;
+              statusBadge.className = `chat-status-badge px-2 py-0.5 rounded-full text-[10px] font-bold ${conv.isOnline ? 'online' : 'offline'}`;
               statusBadge.textContent = conv.isOnline ? 'Online' : 'Offline';
             }
           }
