@@ -468,7 +468,7 @@ export class UsersView {
 
         if (input !== null && !isNaN(Number(input))) {
           const newBal = Number(input);
-          await this.dataService.updateUser(id, { balance: newBal });
+          await this.dataService.updateUser(id, { balance: newBal, manualBalance: newBal });
           this.toast.success(`Saldo ${name} berhasil disesuaikan menjadi Rp ${newBal.toLocaleString('id-ID')}`, 'Saldo Diperbarui');
           refreshCallback();
         }

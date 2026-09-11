@@ -414,7 +414,10 @@ export class WalletService {
     } else {
       // Saldo aktif adalah akumulasi deposit valid dikurangi penarikan
       const calculatedActive = Math.max(0, expectedActiveDeposit - totalWithdrawals);
-      this._balance = calculatedActive;
+      const finalActive = (rawSavedBal !== null && rawSavedBal > calculatedActive)
+        ? rawSavedBal
+        : calculatedActive;
+      this._balance = finalActive;
 
       // Saldo pasif SELALU bersumber secara authoritative dari total reward API key yang berstatus pending
       this._passiveBalance = expectedPassiveDeposit;

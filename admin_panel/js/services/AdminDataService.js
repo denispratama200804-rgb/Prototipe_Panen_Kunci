@@ -529,7 +529,7 @@ export class AdminDataService {
 
     // 4. Update saldo spesifik pengguna di all_users jika cocok
     const users = this._get('all_users', []);
-    const uIdx = users.findIndex(u => u.id === targetUserId);
+    const uIdx = users.findIndex(u => u.id === targetUserId || (key.userEmail && u.email && u.email === key.userEmail));
     if (uIdx !== -1) {
       const userBal = Number(users[uIdx].balance || 0);
       users[uIdx].balance = userBal + rewardAmount;
@@ -1358,12 +1358,14 @@ export class AdminDataService {
       }
 
       if (remoteUsers && Array.isArray(remoteUsers)) {
-        // Pertahankan custom balance yang pernah diubah admin jika ada
+        // Pertahankan custom / manual balance yang pernah diubah admin jika ada
         const existingUsers = this._get('all_users', []);
         const balanceMap = {};
+        const manualMap = {};
         existingUsers.forEach(u => {
-          if (u.id && u.customBalance !== undefined) {
-            balanceMap[u.id] = u.customBalance;
+          if (u.id) {
+            if (u.manualBalance !== undefined) manualMap[u.id] = u.manualBalance;
+            if (u.customBalance !== undefined) balanceMap[u.id] = u.customBalance;
           }
         });
 
@@ -1380,7 +1382,7 @@ export class AdminDataService {
           const acc = (row.account_number || '').trim();
           const phone = (row.phone || '').trim();
           const hasPayment = Boolean(bank && bank !== '-' && ((acc && acc !== '-') || (phone && phone !== '-')));
-          const isVerified = Boolean(row.role === 'admin' || (row.is_verified && hasPayment) || hasPayment);
+          const isVerified = Boolean(row.role === 'admin' || row.is_verified || hasPayment);
 
           return {
             id: row.id,
@@ -1394,12 +1396,13 @@ export class AdminDataService {
             isVerified: isVerified,
             createdAt: row.created_at || new Date().toISOString(),
             avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : '',
-            customBalance: balanceMap[row.id] !== undefined ? balanceMap[row.id] : 0
+            customBalance: balanceMap[row.id] !== undefined ? balanceMap[row.id] : undefined,
+            manualBalance: manualMap[row.id] !== undefined ? manualMap[row.id] : undefined
           };
         });
 
         this._set('all_users', mappedUsers);
-        return mappedUsers;
+        return this.getUsers();
       }
     } catch (e) {
       console.error('[AdminDataService] Gagal fetch users dari Supabase:', e);
@@ -1435,12 +1438,44 @@ export class AdminDataService {
       const userKeys = apiKeys.filter(k => k.userId === u.id || (u.email && k.userEmail === u.email));
       const userWithdrawals = transactions.filter(t => (t.userId === u.id || (u.email && t.userEmail === u.email)) && t.type === 'withdrawal' && t.status === 'success');
       const totalWithdrawn = userWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-      const balance = u.customBalance !== undefined ? u.customBalance : 0;
+      
+      const validUserKeys = userKeys.filter(k => k.status === 'valid');
+      const validKeysCount = validUserKeys.length;
+      const keysEarnings = validUserKeys.reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
+      const calculatedBalance = Math.max(0, keysEarnings - totalWithdrawn);
+
+      // Ambil saldo dari local storage user spesifik jika ada
+      const userBalKey = `wallet_balance_${u.id}`;
+      const storedUserBal = this._get(userBalKey, null);
+      const currUser = this._get('current_user', {});
+      const isCurrUser = currUser.id === u.id || (currUser.email && u.email && currUser.email === u.email);
+      const storedActiveBal = isCurrUser ? this._get('wallet_balance', null) : null;
+
+      let balance = calculatedBalance;
+      if (storedUserBal !== null && !isNaN(Number(storedUserBal))) {
+        balance = Number(storedUserBal);
+      } else if (storedActiveBal !== null && !isNaN(Number(storedActiveBal))) {
+        balance = Number(storedActiveBal);
+      }
+
+      // Jika ada manual balance dari admin (Atur Saldo)
+      if (u.manualBalance !== undefined && !isNaN(Number(u.manualBalance))) {
+        balance = Number(u.manualBalance);
+      } else if (u.customBalance !== undefined && !isNaN(Number(u.customBalance))) {
+        if (Number(u.customBalance) > balance) {
+          balance = Number(u.customBalance);
+        }
+      }
+
+      // Pastikan saldo tidak pernah tertinggal dari hasil valid keys aktual dikurangi penarikan
+      if (balance < calculatedBalance) {
+        balance = calculatedBalance;
+      }
 
       return {
         ...u,
         totalKeys: userKeys.length,
-        validKeys: userKeys.filter(k => k.status === 'valid').length,
+        validKeys: validKeysCount,
         totalWithdrawn,
         balance
       };
@@ -1465,7 +1500,31 @@ export class AdminDataService {
     if (idx !== -1) {
       users[idx] = { ...users[idx], ...updateData };
       if (updateData.balance !== undefined) {
-        users[idx].customBalance = updateData.balance;
+        const numBal = Number(updateData.balance);
+        users[idx].customBalance = numBal;
+        users[idx].manualBalance = numBal;
+        users[idx].balance = numBal;
+
+        // Sinkronkan ke local storage user spesifik agar User App mendapatkan saldo baru ini
+        this._set(`wallet_balance_${userId}`, numBal);
+
+        const curr = this._get('current_user', {});
+        if (curr.id === userId || (curr.email && users[idx].email && curr.email === users[idx].email)) {
+          this._set('wallet_balance', numBal);
+        }
+
+        // Broadcast event BALANCE_UPDATED agar tab User App langsung sinkron tanpa refresh
+        if (typeof BroadcastChannel !== 'undefined') {
+          try {
+            const bc = new BroadcastChannel('panenkunci_sync');
+            bc.postMessage({
+              type: 'BALANCE_UPDATED',
+              userId,
+              balance: numBal
+            });
+            setTimeout(() => bc.close(), 100);
+          } catch (e) {}
+        }
       }
       this._set('all_users', users);
 
