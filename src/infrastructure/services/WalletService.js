@@ -374,6 +374,24 @@ export class WalletService {
     if (savedTx && Array.isArray(savedTx)) {
       loadedTxs = savedTx
         .filter(t => t.userId === userId || !t.userId)
+        .filter(t => {
+          // Hanya izinkan transaksi deposit jika key terkait ada di combinedKeys
+          if (t.type === 'deposit') {
+            return combinedKeys.some(k => {
+              const suffix = (k.keyString && k.keyString.length >= 4) ? k.keyString.slice(-4) : '';
+              const masked = k.keyString && k.keyString.length > 12
+                ? `${k.keyString.slice(0, 9)}...${k.keyString.slice(-4)}`
+                : (k.keyString || '');
+              return (
+                (suffix && t.description?.includes(suffix)) ||
+                (masked && t.description?.includes(masked)) ||
+                (k.keyString && t.description?.includes(k.keyString)) ||
+                (k.id && t.description?.includes(k.id))
+              );
+            });
+          }
+          return true;
+        })
         .map(t => new Transaction(t));
     }
 
@@ -536,19 +554,47 @@ export class WalletService {
         });
 
         // Hapus transaksi duplikat dari Supabase secara otomatis di background
-        if (duplicateIdsToDelete.length > 0 && typeof fetch !== 'undefined') {
-          duplicateIdsToDelete.forEach(dupId => {
-            if (dupId && dupId.includes('-')) {
+        const orphanIdsToDelete = [];
+        const reconciledTxs = [];
+
+        deduplicatedTxs.forEach(tx => {
+          if (tx.type === 'deposit') {
+            const hasMatchingKey = combinedKeys.some(k => {
+              const suffix = (k.keyString && k.keyString.length >= 4) ? k.keyString.slice(-4) : '';
+              const masked = k.keyString && k.keyString.length > 12
+                ? `${k.keyString.slice(0, 9)}...${k.keyString.slice(-4)}`
+                : (k.keyString || '');
+
+              return (
+                (suffix && tx.description?.includes(suffix)) ||
+                (masked && tx.description?.includes(masked)) ||
+                (k.keyString && tx.description?.includes(k.keyString)) ||
+                (k.id && tx.description?.includes(k.id))
+              );
+            });
+
+            if (!hasMatchingKey) {
+              if (tx.id) orphanIdsToDelete.push(tx.id);
+              return;
+            }
+          }
+          reconciledTxs.push(tx);
+        });
+
+        const allIdsToDelete = [...duplicateIdsToDelete, ...orphanIdsToDelete];
+        if (allIdsToDelete.length > 0 && typeof fetch !== 'undefined') {
+          allIdsToDelete.forEach(delId => {
+            if (delId && delId.includes('-')) {
               fetch('/api/supabase-proxy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'delete', table: 'transactions', id: dupId })
+                body: JSON.stringify({ action: 'delete', table: 'transactions', id: delId })
               }).catch(() => {});
             }
           });
         }
 
-        this._transactions = deduplicatedTxs;
+        this._transactions = reconciledTxs;
 
         let calculatedLifetime = 0;
         let calculatedBalance = 0;
@@ -693,11 +739,11 @@ export class WalletService {
 
     const tx = new Transaction({
       id: 'tx_' + Math.random().toString(36).substring(2, 9),
-      userId: apiKey.userId || 'usr_current',
+      userId: apiKey?.userId || 'usr_current',
       type: 'deposit',
       amount,
       title: 'Setoran API Key',
-      description: `Validasi berhasil: ${apiKey.getMaskedKey()}`,
+      description: `Validasi berhasil: ${typeof apiKey?.getMaskedKey === 'function' ? apiKey.getMaskedKey() : (apiKey?.keyString || apiKey || 'Sistem')}`,
       status: 'success',
       createdAt: new Date().toISOString()
     });
@@ -846,6 +892,7 @@ export class WalletService {
       type: 'withdrawal',
       amount: numAmount,
       fee,
+      netPayout: totalReceive,
       title: `${strategy.getLabel()}`,
       description: `Penarikan ke ${accountIdentifier}${fee > 0 ? ` (Biaya Admin: Rp ${fee.toLocaleString('id-ID')})` : ''}`,
       status: 'pending',
@@ -859,11 +906,30 @@ export class WalletService {
 
     // Simpan ke Supabase jika repositori aktif
     if (this._transactionRepository) {
-      this._transactionRepository.create(tx)
-        .then(saved => {
-          if (saved && saved.id) tx.id = saved.id;
-        })
-        .catch(err => console.warn('[WalletService] Supabase create withdrawal tx fallback:', err.message));
+      try {
+        const saved = await this._transactionRepository.create(tx);
+        if (saved && saved.id) {
+          tx.id = saved.id;
+          this._persist();
+        }
+      } catch (err) {
+        console.warn('[WalletService] Supabase create withdrawal tx fallback:', err.message);
+      }
+    }
+
+    // Siarkan ke Admin Panel dan tab lain via BroadcastChannel
+    if (this._broadcastChannel) {
+      try {
+        this._broadcastChannel.postMessage({
+          type: 'WITHDRAWAL_REQUESTED',
+          transaction: tx,
+          userId,
+          amount: numAmount,
+          method,
+          recipient: accountIdentifier,
+          timestamp: Date.now()
+        });
+      } catch (e) {}
     }
 
     // 6. Emit balance & withdrawal event

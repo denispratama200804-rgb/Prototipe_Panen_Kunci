@@ -263,7 +263,7 @@ export default defineConfig(({ mode }) => {
                     if (adminSupabase) {
                       let query = adminSupabase
                         .from('transactions')
-                        .select('*')
+                        .select('*, users:user_id(id, name, email, phone, account_number, bank_name)')
                         .order('created_at', { ascending: false });
 
                       const targetUserId = parsed.userId || parsed.user_id;
@@ -271,14 +271,90 @@ export default defineConfig(({ mode }) => {
                         query = query.eq('user_id', targetUserId);
                       }
 
-                      const { data: txs, error } = await query;
+                      let { data: txs, error } = await query;
+
+                      if (error) {
+                        console.warn('[vite-proxy] Join error on transactions, fallback to select *:', error.message);
+                        const fallback = await adminSupabase
+                          .from('transactions')
+                          .select('*')
+                          .order('created_at', { ascending: false });
+                        if (fallback.error) {
+                          res.statusCode = 400;
+                          res.end(JSON.stringify({ success: false, error: fallback.error.message }));
+                          return;
+                        }
+                        txs = fallback.data;
+                      }
+
+                      const formatted = (txs || []).map(row => {
+                        const amount = Number(row.amount || 0);
+                        const fee = Number(row.fee || 0);
+                        const netPayout = row.net_payout !== null && row.net_payout !== undefined
+                          ? Number(row.net_payout)
+                          : Math.max(0, amount - fee);
+
+                        return {
+                          id: row.id,
+                          userId: row.user_id,
+                          user_id: row.user_id,
+                          userName: row.users?.name || 'Pengguna',
+                          userEmail: row.users?.email || '-',
+                          userPhone: row.users?.phone || '',
+                          userBank: row.users?.bank_name || '',
+                          userAccountNumber: row.users?.account_number || '',
+                          type: row.type,
+                          amount: amount,
+                          fee: fee,
+                          netPayout: netPayout,
+                          net_payout: netPayout,
+                          title: row.title,
+                          description: row.description,
+                          status: row.status,
+                          method: row.method,
+                          recipient: row.recipient,
+                          createdAt: row.created_at,
+                          created_at: row.created_at,
+                          updatedAt: row.updated_at,
+                          updated_at: row.updated_at,
+                          source: 'supabase'
+                        };
+                      });
+
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true, data: formatted }));
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                    }
+                    return;
+                  }
+
+                  if (action === 'check_key_exists') {
+                    if (adminSupabase) {
+                      const keyString = (parsed.keyString || parsed.key_string || '').trim();
+                      if (!keyString) {
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({ success: true, exists: false }));
+                        return;
+                      }
+
+                      const { data, error } = await adminSupabase
+                        .from('api_keys')
+                        .select('id, user_id, status, created_at')
+                        .eq('key_string', keyString)
+                        .maybeSingle();
 
                       if (error) {
                         res.statusCode = 400;
                         res.end(JSON.stringify({ success: false, error: error.message }));
                       } else {
                         res.statusCode = 200;
-                        res.end(JSON.stringify({ success: true, data: txs || [] }));
+                        res.end(JSON.stringify({
+                          success: true,
+                          exists: !!data,
+                          key: data || null
+                        }));
                       }
                     } else {
                       res.statusCode = 500;

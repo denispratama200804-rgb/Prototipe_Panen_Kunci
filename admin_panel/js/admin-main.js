@@ -103,6 +103,36 @@ class AdminApp {
       }
     }).catch(e => console.warn('Supabase api_keys auto-sync:', e));
 
+    // Auto-sync data permohonan penarikan dana dari Supabase di background
+    adminDataService.fetchTransactionsFromSupabase().then(() => {
+      if (this.currentTab === 'withdrawals' || this.currentTab === 'dashboard') {
+        this.refreshCurrentView(false);
+      }
+    }).catch(e => console.warn('Supabase transactions auto-sync:', e));
+
+    // Real-time listener: saat ada permohonan penarikan dana baru masuk
+    adminDataService.on('withdrawal_received', (data) => {
+      toast.info(
+        `Permohonan penarikan dana sebesar Rp ${Number(data.amount || 0).toLocaleString('id-ID')} baru saja masuk!`,
+        'Permohonan Payout Baru'
+      );
+      if (this.currentTab === 'withdrawals' || this.currentTab === 'dashboard') {
+        this.refreshCurrentView(false, false);
+      }
+      // Re-render navbar mount to update counters
+      const navbarMount = document.getElementById('admin-navbar-mount');
+      if (navbarMount) {
+        navbarMount.innerHTML = this.navbar.render(this.currentTab, this._getViewTitle(this.currentTab));
+        this.navbar.bindEvents(navbarMount);
+      }
+    });
+
+    adminDataService.on('transactions_updated', () => {
+      if (this.currentTab === 'withdrawals' || this.currentTab === 'dashboard') {
+        this.refreshCurrentView(false, false);
+      }
+    });
+
     this._renderLayout();
     this._mountView(this.currentTab);
 
@@ -204,6 +234,15 @@ class AdminApp {
     // Scroll to top on view change
     const viewMount = document.getElementById('admin-view-mount');
     if (viewMount) viewMount.scrollTop = 0;
+
+    // Fetch update data terbaru saat membuka tab withdrawals atau dashboard
+    if (tab === 'withdrawals' || tab === 'dashboard') {
+      adminDataService.fetchTransactionsFromSupabase().then(() => {
+        if (this.currentTab === tab) {
+          this.refreshCurrentView(false, false);
+        }
+      }).catch(() => {});
+    }
   }
 
   _mountView(tab, withAnimation = true) {

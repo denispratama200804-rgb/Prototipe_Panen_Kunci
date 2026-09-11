@@ -97,12 +97,16 @@ async function runTests() {
   const validKeyString = 'sk-kie-test1234567890abcdef';
   const submitResult = await apiKeyService.submitKey(validKeyString, 'usr_denis');
   assert(submitResult.success === true, 'Valid API Key accepted');
-  assert(walletService.getBalance() === initialBalance + 3000, 'Reward Rp 3.000 added to wallet balance');
+  assert(walletService.getPassiveBalance() === 3000, 'Reward Rp 3.000 added to passive balance');
 
   // Submit duplicate key (SRS requirement)
   const dupResult = await apiKeyService.submitKey(validKeyString, 'usr_denis');
   assert(dupResult.success === false, 'Duplicate API Key correctly rejected');
   assert(dupResult.message.includes('sudah pernah'), 'Rejection message explains duplication');
+
+  // Admin approves key: convert passive to active + add test balance to reach minimum limit
+  walletService.convertPassiveToActive(3000, validKeyString);
+  walletService.addDeposit(50000, 'Test Fund');
 
   // Test 7: Withdrawal Execution & Minimum Threshold
   console.log('\n[7] Testing Withdrawal & Minimum Limit (Rp 50.000):');

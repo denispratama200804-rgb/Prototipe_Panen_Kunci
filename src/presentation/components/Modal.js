@@ -124,22 +124,32 @@ export class ModalComponent {
     const cancelBtn = modalWrapper.querySelector('.modal-cancel-btn');
 
     const handleConfirm = async () => {
-      if (typeof onConfirm === 'function') {
-        const result = await onConfirm({
-          close: () => this.close(),
-          modal: modalWrapper,
-          confirmBtn
-        });
-        if (result === false || options.autoClose === false) {
-          return;
-        }
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
       }
-      this.close();
+      try {
+        if (typeof onConfirm === 'function') {
+          const result = await onConfirm({
+            close: () => this.close(modalWrapper),
+            modal: modalWrapper,
+            confirmBtn
+          });
+          if (result === false || options.autoClose === false) {
+            return;
+          }
+        }
+        this.close(modalWrapper);
+      } catch (err) {
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+        }
+        throw err;
+      }
     };
 
     const handleCancel = () => {
       if (typeof onCancel === 'function') onCancel();
-      this.close();
+      this.close(modalWrapper);
     };
 
     backdrop.addEventListener('click', handleCancel);
@@ -158,11 +168,13 @@ export class ModalComponent {
     });
   }
 
-  close() {
-    if (!this._currentModal) return;
+  close(targetModal = null) {
+    const modal = targetModal || this._currentModal;
+    if (!modal) return;
 
-    const modal = this._currentModal;
-    this._currentModal = null;
+    if (this._currentModal === modal) {
+      this._currentModal = null;
+    }
 
     modal.classList.add('opacity-0');
     const card = modal.querySelector('.modal-card');

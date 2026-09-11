@@ -81,12 +81,35 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
   }
 
   /**
-   * Mengecek apakah keyString sudah pernah disetorkan sebelumnya
+   * Mengecek apakah keyString sudah pernah disetorkan sebelumnya (Global Check bypass RLS)
    * @param {string} keyString
    * @returns {Promise<ApiKey|null>}
    */
   async getByKeyString(keyString) {
-    if (!isSupabaseConfigured() || !keyString) return null;
+    if (!keyString) return null;
+
+    // 1. Coba via proxy untuk memeriksa keunikan lintas seluruh pengguna (bypass RLS)
+    try {
+      if (typeof fetch !== 'undefined') {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'check_key_exists', keyString })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.exists && json.key) {
+            return this._toDomain(json.key);
+          } else if (json.success && !json.exists) {
+            return null;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[SupabaseApiKeyRepository] Proxy check key warning:', e.message);
+    }
+
+    if (!isSupabaseConfigured()) return null;
 
     const { data, error } = await supabase
       .from(this.tableName)
@@ -152,9 +175,16 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
           if (json.success && json.data) {
             return this._toDomain(json.data);
           }
+        } else {
+          const errJson = await res.json().catch(() => ({}));
+          const errMsg = errJson.error || `Proxy insert failed (status ${res.status})`;
+          throw new Error(errMsg);
         }
       }
     } catch (proxyErr) {
+      if (proxyErr.message && (proxyErr.message.includes('duplicate') || proxyErr.message.includes('unique') || proxyErr.message.includes('violates'))) {
+        throw proxyErr;
+      }
       console.warn('[SupabaseApiKeyRepository] Proxy insert fallback:', proxyErr.message);
     }
 

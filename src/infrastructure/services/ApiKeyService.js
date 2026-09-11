@@ -281,19 +281,6 @@ export class ApiKeyService {
     }
 
     if (isDuplicateLocal || isDuplicateRemote) {
-      const invalidEntry = new ApiKey({
-        id: 'key_' + Math.random().toString(36).substring(2, 9),
-        keyString: trimmed,
-        userId,
-        status: 'invalid',
-        rewardAmount: 0,
-        credits: 0,
-        errorMessage: 'API Key sudah pernah disetorkan sebelumnya (Duplikat ditolak).',
-        createdAt: new Date().toISOString()
-      });
-      this._keys.unshift(invalidEntry);
-      this._persist();
-
       return {
         success: false,
         message: 'API Key ini sudah pernah disetorkan ke sistem dan tidak dapat digunakan kembali.'
@@ -344,23 +331,34 @@ export class ApiKeyService {
       createdAt: new Date().toISOString()
     });
 
-    this._keys.unshift(newApiKey);
-    this._persist();
-
-    // Simpan ke Supabase jika repositori aktif
+    // Simpan ke database Supabase terlebih dahulu sebelum kredit saldo
     if (this._apiKeyRepository) {
       try {
         const saved = await this._apiKeyRepository.create(newApiKey);
         if (saved && saved.id) {
           newApiKey.id = saved.id;
-          this._persist();
         }
       } catch (err) {
-        console.warn('[ApiKeyService] Supabase create key fallback:', err.message);
+        console.error('[ApiKeyService] Gagal menyimpan API Key ke database:', err.message);
+        const isDuplicate = err.message && (
+          err.message.includes('duplicate') ||
+          err.message.includes('unique') ||
+          err.message.includes('api_keys_key_string_key')
+        );
+
+        return {
+          success: false,
+          message: isDuplicate
+            ? 'API Key ini sudah pernah disetorkan ke sistem dan tidak dapat digunakan kembali.'
+            : (err.message || 'Gagal menyimpan API Key ke server. Silakan coba beberapa saat lagi.')
+        };
       }
     }
 
-    // 5. Kreditkan saldo ke dompet pengguna sebagai Saldo Pasif
+    this._keys.unshift(newApiKey);
+    this._persist();
+
+    // 5. Kreditkan saldo ke dompet pengguna sebagai Saldo Pasif HANYA setelah key terbukti valid dan tersimpan
     this._walletService.addPassiveDeposit(rewardAmount, newApiKey);
 
     // 6. Emit event

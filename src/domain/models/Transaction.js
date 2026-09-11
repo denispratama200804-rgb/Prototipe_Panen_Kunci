@@ -32,6 +32,7 @@ export class Transaction {
     method = '',
     recipient = '',
     fee = 0,
+    netPayout = null,
     createdAt = new Date().toISOString(),
     processedAt = '',
     proofImage = '',
@@ -47,6 +48,7 @@ export class Transaction {
     this.method = method;
     this.recipient = recipient;
     this.fee = fee;
+    this.netPayout = netPayout !== null && netPayout !== undefined ? Number(netPayout) : Math.max(0, Number(amount || 0) - Number(fee || 0));
     this.createdAt = createdAt;
     this.processedAt = processedAt;
     this.proofImage = proofImage;

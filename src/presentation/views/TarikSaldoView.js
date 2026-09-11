@@ -340,16 +340,26 @@ export class TarikSaldoView extends IComponent {
       const fee = this._walletService.getFeeForMethod(method, amount);
       const totalReceive = Math.max(0, amount - fee);
 
+      if (!account) {
+        this._notification.error(method === 'bank'
+          ? 'Harap masukkan nomor rekening bank tujuan pencairan.'
+          : 'Harap masukkan nomor handphone / akun e-wallet tujuan pencairan.');
+        accountInput?.focus();
+        return;
+      }
       if (amount <= 0 || isNaN(amount)) {
-        this._notification.error('Nominal penarikan harus valid.');
+        this._notification.error('Nominal penarikan harus valid dan lebih dari Rp 0.');
+        amountInput?.focus();
         return;
       }
       if (amount < minWithdrawal) {
-        this._notification.error(`Batas minimal penarikan adalah Rp ${minWithdrawal.toLocaleString('id-ID')}.`);
+        this._notification.error(`Nominal penarikan minimal adalah Rp ${minWithdrawal.toLocaleString('id-ID')}. Saldo Anda: Rp ${currentBalance.toLocaleString('id-ID')}.`);
+        amountInput?.focus();
         return;
       }
       if (amount > currentBalance) {
-        this._notification.error(`Saldo tidak mencukupi (Saldo Anda: Rp ${currentBalance.toLocaleString('id-ID')}).`);
+        this._notification.error(`Saldo tidak mencukupi (Saldo Anda: Rp ${currentBalance.toLocaleString('id-ID')}, penarikan diminta: Rp ${amount.toLocaleString('id-ID')}).`);
+        amountInput?.focus();
         return;
       }
 
@@ -358,35 +368,53 @@ export class TarikSaldoView extends IComponent {
         title: 'Konfirmasi Penarikan',
         message: 'Periksa kembali rincian penarikan saldo Anda sebelum memproses:',
         html: `
-          <div class="bg-surface-container-low rounded-2xl p-4 flex flex-col gap-2.5 text-xs text-text-heading border border-surface-container">
-            <div class="flex justify-between">
-              <span class="text-text-body">Metode Pencairan</span>
-              <strong class="text-primary font-bold">${methodLabel}</strong>
+          <div class="flex flex-col gap-2.5 text-left w-full my-1">
+            <div class="bg-surface-container-low rounded-2xl p-3.5 space-y-2 border border-surface-container">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-text-body font-medium">Nominal</span>
+                <span class="font-bold text-text-heading font-mono text-sm">Rp ${amount.toLocaleString('id-ID')}</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-text-body font-medium">Biaya Admin</span>
+                <span class="font-semibold text-error font-mono">${fee > 0 ? '-Rp ' + fee.toLocaleString('id-ID') : 'Gratis'}</span>
+              </div>
+              <div class="h-[1px] w-full bg-outline-variant/30 my-1"></div>
+              <div class="flex justify-between items-center bg-primary/10 p-2.5 rounded-xl border border-primary/20">
+                <span class="text-xs text-primary font-bold">Total Diterima</span>
+                <span class="font-headline-md text-base font-extrabold text-primary font-mono">Rp ${totalReceive.toLocaleString('id-ID')}</span>
+              </div>
             </div>
-            <div class="flex justify-between">
-              <span class="text-text-body">Nomor Tujuan</span>
-              <strong class="font-mono font-bold">${account}</strong>
+
+            <div class="bg-surface-container rounded-2xl p-3 flex items-center gap-3 border border-surface-container-high">
+              <div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[20px]">${method === 'bank' ? 'account_balance' : 'account_balance_wallet'}</span>
+              </div>
+              <div class="flex flex-col min-w-0 text-left">
+                <span class="text-[10px] text-outline uppercase tracking-wider font-semibold">Tujuan Pencairan</span>
+                <span class="text-xs font-bold text-text-heading truncate font-mono">${methodLabel} - ${account}</span>
+              </div>
             </div>
-            <div class="flex justify-between">
-              <span class="text-text-body">Nominal Penarikan</span>
-              <strong class="font-bold">Rp ${amount.toLocaleString('id-ID')}</strong>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-text-body">Biaya Admin</span>
-              <strong class="font-bold font-mono ${fee > 0 ? 'text-amber-500' : 'text-slate-500'}">Rp ${fee.toLocaleString('id-ID')}</strong>
-            </div>
-            <div class="h-[1px] bg-outline-variant/30 my-1"></div>
-            <div class="flex justify-between text-sm font-extrabold">
-              <span class="text-text-heading">Total Diterima</span>
-              <strong class="text-secondary font-mono text-base">Rp ${totalReceive.toLocaleString('id-ID')}</strong>
+
+            <div class="bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 p-2.5 rounded-xl flex items-center gap-2 text-left">
+              <span class="material-symbols-outlined text-[18px] shrink-0">info</span>
+              <span class="text-[11px] leading-tight">Pastikan data di atas sudah benar sebelum melanjutkan.</span>
             </div>
           </div>
         `,
         type: 'confirm',
-        confirmText: 'Proses Pencairan Sekarang',
-        cancelText: 'Periksa Kembali',
+        confirmText: 'Tarik Sekarang',
+        cancelText: 'Batal',
         showCancel: true,
-        onConfirm: async () => {
+        autoClose: false,
+        onConfirm: async ({ close, confirmBtn }) => {
+          if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = `
+              <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              <span>Memproses...</span>
+            `;
+          }
+
           const user = this._authService.getCurrentUser();
           const res = await this._walletService.withdraw({
             amount,
@@ -395,18 +423,44 @@ export class TarikSaldoView extends IComponent {
             userId: user ? user.id : 'usr_guest'
           });
 
+          // Tutup popup konfirmasi
+          close();
+
           if (res.success) {
             this._notification.showModal({
               title: 'Permintaan Penarikan Berhasil Diajukan!',
-              message: `Permintaan penarikan dana sebesar <strong class="text-primary font-bold">Rp ${amount.toLocaleString('id-ID')}</strong> (Biaya admin: <strong class="text-amber-500 font-bold">Rp ${fee.toLocaleString('id-ID')}</strong>, Total diterima: <strong class="text-secondary font-bold">Rp ${totalReceive.toLocaleString('id-ID')}</strong>) ke <strong>${methodLabel} (${account})</strong> telah tercatat dan <strong>menunggu persetujuan admin</strong>.`,
+              message: `Permintaan penarikan dana sebesar <strong class="text-primary font-bold">Rp ${amount.toLocaleString('id-ID')}</strong> ke <strong class="text-text-heading">${methodLabel} (${account})</strong> telah berhasil terkirim ke Admin Panel dan sedang <strong class="text-amber-500 font-bold">menunggu persetujuan admin</strong>.`,
+              html: `
+                <div class="bg-surface-container-low rounded-2xl p-3.5 flex flex-col gap-2 text-xs border border-surface-container mt-2 text-left">
+                  <div class="flex justify-between items-center">
+                    <span class="text-text-body">ID Transaksi</span>
+                    <strong class="font-mono text-primary font-bold">#${res.transaction?.id || '-'}</strong>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-text-body">Nominal Penarikan</span>
+                    <strong class="font-mono font-bold">Rp ${amount.toLocaleString('id-ID')}</strong>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-text-body">Biaya Admin</span>
+                    <strong class="font-mono ${fee > 0 ? 'text-amber-500' : 'text-slate-500'}">Rp ${fee.toLocaleString('id-ID')}</strong>
+                  </div>
+                  <div class="h-[1px] bg-outline-variant/30 my-0.5"></div>
+                  <div class="flex justify-between items-center text-sm font-extrabold">
+                    <span class="text-text-heading">Total Dana Masuk</span>
+                    <strong class="text-secondary font-mono text-base">Rp ${totalReceive.toLocaleString('id-ID')}</strong>
+                  </div>
+                </div>
+              `,
               type: 'info',
               confirmText: 'Lihat Status di Riwayat',
               onConfirm: () => {
                 window.location.hash = '/riwayat';
               }
             });
+            return false;
           } else {
             this._notification.error(res.message || 'Gagal memproses penarikan.');
+            return false;
           }
         }
       });

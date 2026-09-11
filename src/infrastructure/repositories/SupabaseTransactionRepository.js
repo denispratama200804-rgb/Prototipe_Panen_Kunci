@@ -84,11 +84,18 @@ export class SupabaseTransactionRepository extends ITransactionRepository {
       } catch (_) {}
     }
 
+    const numAmount = Number(tx.amount || 0);
+    const numFee = Number(tx.fee || 0);
+    const netPayout = tx.netPayout !== undefined
+      ? Number(tx.netPayout)
+      : (tx.net_payout !== undefined ? Number(tx.net_payout) : Math.max(0, numAmount - numFee));
+
     const payload = {
       user_id: validUserId,
       type: tx.type,
-      amount: Number(tx.amount || 0),
-      fee: Number(tx.fee || 0),
+      amount: numAmount,
+      fee: numFee,
+      net_payout: netPayout,
       title: tx.title,
       description: tx.description || '',
       status: tx.status || 'pending',
@@ -189,18 +196,25 @@ export class SupabaseTransactionRepository extends ITransactionRepository {
    * @private
    */
   _toDomain(row) {
+    const amount = Number(row.amount || 0);
+    const fee = Number(row.fee || 0);
+    const netPayout = row.net_payout !== null && row.net_payout !== undefined
+      ? Number(row.net_payout)
+      : (row.netPayout !== null && row.netPayout !== undefined ? Number(row.netPayout) : Math.max(0, amount - fee));
+
     return new Transaction({
       id: row.id,
-      userId: row.user_id,
+      userId: row.user_id || row.userId,
       type: row.type,
-      amount: Number(row.amount),
-      fee: Number(row.fee || 0),
+      amount: amount,
+      fee: fee,
+      netPayout: netPayout,
       title: row.title,
       description: row.description || '',
       status: row.status,
       method: row.method || '',
       recipient: row.recipient || '',
-      createdAt: row.created_at
+      createdAt: row.created_at || row.createdAt
     });
   }
 }

@@ -535,7 +535,7 @@ export class WithdrawalsView {
 
     // Reject (Refund)
     container.querySelectorAll('[data-action="reject-wd"]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
         const reason = prompt(
           `Masukkan alasan penolakan penarikan #${id}:\n(Saldo user akan otomatis di-refund kembali ke akunnya)`,
@@ -543,7 +543,7 @@ export class WithdrawalsView {
         );
 
         if (reason !== null && reason.trim()) {
-          const res = this.dataService.rejectWithdrawal(id, reason.trim());
+          const res = await this.dataService.rejectWithdrawal(id, reason.trim());
           if (res.success) {
             this.toast.warning(
               `Penarikan #${id} ditolak. Saldo Rp ${res.refundAmount.toLocaleString('id-ID')} telah dikembalikan (refund) ke akun user!`,
@@ -986,8 +986,8 @@ export class WithdrawalsView {
         <span>Memproses...</span>
       `;
 
-      setTimeout(() => {
-        const res = this.dataService.approveWithdrawal(tx.id, {
+      setTimeout(async () => {
+        const res = await this.dataService.approveWithdrawal(tx.id, {
           proofImage: finalProof,
           notes
         });

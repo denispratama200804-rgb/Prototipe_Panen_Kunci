@@ -9,13 +9,73 @@ import { supabase, isSupabaseConfigured } from '../../../src/infrastructure/supa
 export class AdminDataService {
   constructor(prefix = 'panenkunci:') {
     this.prefix = prefix;
+    this._listeners = {};
     this._cleanDummyUsers();
     this._cleanDummyKeys();
+    this._initRealtimeSync();
     // Auto-sync awal dari Supabase di background
     this.fetchConfigFromSupabase().catch(() => {});
     this.fetchUsersFromSupabase().catch(() => {});
     this.fetchApiKeysFromSupabase().catch(() => {});
     this.fetchTransactionsFromSupabase().catch(() => {});
+  }
+
+  on(event, callback) {
+    if (!this._listeners) this._listeners = {};
+    if (!this._listeners[event]) this._listeners[event] = [];
+    this._listeners[event].push(callback);
+    return () => {
+      if (this._listeners && this._listeners[event]) {
+        this._listeners[event] = this._listeners[event].filter(cb => cb !== callback);
+      }
+    };
+  }
+
+  emit(event, data) {
+    if (this._listeners && this._listeners[event]) {
+      this._listeners[event].forEach(cb => {
+        try { cb(data); } catch (e) { console.error(e); }
+      });
+    }
+  }
+
+  _initRealtimeSync() {
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        this._syncChannel = new BroadcastChannel('panenkunci_sync');
+        this._syncChannel.onmessage = async (event) => {
+          const data = event.data;
+          if (!data) return;
+          if (data.type === 'WITHDRAWAL_REQUESTED') {
+            await this.fetchTransactionsFromSupabase();
+            this.emit('withdrawal_received', data);
+          } else if (data.type === 'KEY_SUBMITTED' || data.type === 'KEY_DEPOSITED') {
+            await this.fetchApiKeysFromSupabase();
+            this.emit('key_received', data);
+          }
+        };
+      } catch (e) {
+        console.warn('[AdminDataService] BroadcastChannel listener warning:', e.message);
+      }
+    }
+
+    if (isSupabaseConfigured() && supabase && typeof supabase.channel === 'function') {
+      try {
+        this._supabaseTxChannel = supabase
+          .channel('admin_transactions_realtime')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'transactions' },
+            async (payload) => {
+              await this.fetchTransactionsFromSupabase();
+              this.emit('transactions_updated', payload);
+            }
+          )
+          .subscribe();
+      } catch (err) {
+        console.warn('[AdminDataService] Supabase realtime transactions error:', err.message);
+      }
+    }
   }
 
   /**
@@ -756,6 +816,29 @@ export class AdminDataService {
       if (!proxySuccess && isSupabaseConfigured()) {
         await supabase.from('api_keys').update({ status: 'invalid', error_message: reason }).eq('id', keyId);
       }
+
+      // Sinkronkan juga status transaksi di Supabase menjadi 'failed'
+      try {
+        const targetTxId = tx?.id || (userTxs && userTxs[uTxIdx]?.id);
+        if (targetTxId && targetTxId.includes('-')) {
+          await fetch('/api/supabase-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update',
+              table: 'transactions',
+              id: targetTxId,
+              data: {
+                status: 'failed',
+                title: 'Setoran API Key Ditolak',
+                description: `Ditolak Admin: ${reason}`
+              }
+            })
+          });
+        }
+      } catch (txErr) {
+        console.warn('[AdminDataService] Sync reject transaction ke Supabase warning:', txErr.message);
+      }
     } catch (err) {
       console.warn('[AdminDataService] Sync reject ke Supabase error:', err.message);
     }
@@ -775,6 +858,7 @@ export class AdminDataService {
    */
   async deleteApiKey(id) {
     const keys = this.getApiKeys();
+    const deletedKey = keys.find(k => k.id === id);
     const updated = keys.filter(k => k.id !== id);
     this._set('api_keys', updated);
 
@@ -802,6 +886,28 @@ export class AdminDataService {
 
       if (!proxySuccess && isSupabaseConfigured()) {
         await supabase.from('api_keys').delete().eq('id', id);
+      }
+
+      // Hapus juga transaksi deposit terkait di Supabase
+      if (deletedKey) {
+        const suffix = (deletedKey.keyString && deletedKey.keyString.length >= 4) ? deletedKey.keyString.slice(-4) : '';
+        const masked = deletedKey.keyString && deletedKey.keyString.length > 12
+          ? `${deletedKey.keyString.slice(0, 9)}...${deletedKey.keyString.slice(-4)}`
+          : (deletedKey.keyString || '');
+
+        const allTxs = this.getTransactions();
+        const relatedTx = allTxs.find(t =>
+          t.type === 'deposit' &&
+          ((suffix && t.description?.includes(suffix)) || (masked && t.description?.includes(masked)) || t.description?.includes(id))
+        );
+
+        if (relatedTx && relatedTx.id && relatedTx.id.includes('-')) {
+          await fetch('/api/supabase-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', table: 'transactions', id: relatedTx.id })
+          });
+        }
       }
     } catch (err) {
       console.warn('[AdminDataService] Sync delete api_key ke Supabase error:', err.message);
@@ -887,11 +993,45 @@ export class AdminDataService {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
-          this._set('transactions', json.data);
-          return json.data;
+          const normalized = json.data.map(t => {
+            const amount = Number(t.amount || 0);
+            const fee = Number(t.fee || 0);
+            const netPayout = t.netPayout !== undefined
+              ? Number(t.netPayout)
+              : (t.net_payout !== undefined ? Number(t.net_payout) : Math.max(0, amount - fee));
+
+            return {
+              ...t,
+              id: t.id,
+              userId: t.userId || t.user_id,
+              user_id: t.user_id || t.userId,
+              userName: t.userName || t.users?.name || 'Pengguna',
+              userEmail: t.userEmail || t.users?.email || '-',
+              userPhone: t.userPhone || t.users?.phone || '',
+              userBank: t.userBank || t.users?.bank_name || '',
+              userAccountNumber: t.userAccountNumber || t.users?.account_number || '',
+              type: t.type,
+              amount,
+              fee,
+              netPayout,
+              net_payout: netPayout,
+              title: t.title || 'Transaksi Saldo',
+              description: t.description || '',
+              status: t.status || 'pending',
+              method: t.method || '',
+              recipient: t.recipient || '',
+              createdAt: t.createdAt || t.created_at || new Date().toISOString(),
+              created_at: t.created_at || t.createdAt || new Date().toISOString()
+            };
+          }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+          this._set('transactions', normalized);
+          return normalized;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn('[AdminDataService] fetchTransactionsFromSupabase warning:', e.message);
+    }
     return this.getTransactions();
   }
 
@@ -902,7 +1042,7 @@ export class AdminDataService {
    * @param {string} [options.proofImage] Base64 data URL atau URL gambar bukti transfer
    * @param {string} [options.notes] Catatan transfer dari admin
    */
-  approveWithdrawal(transactionId, { proofImage = '', notes = '' } = {}) {
+  async approveWithdrawal(transactionId, { proofImage = '', notes = '' } = {}) {
     const txs = this.getTransactions();
     const idx = txs.findIndex(t => t.id === transactionId);
     if (idx !== -1) {
@@ -955,6 +1095,34 @@ export class AdminDataService {
       globalNotifs.unshift(newNotif);
       this._set('notifications', globalNotifs);
 
+      // Sinkronkan update status transaksi ke database Supabase
+      try {
+        await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update',
+            table: 'transactions',
+            id: transactionId,
+            data: {
+              status: 'success',
+              updated_at: new Date().toISOString()
+            }
+          })
+        });
+      } catch (err) {
+        console.warn('[AdminDataService] Supabase approve withdrawal sync warning:', err.message);
+      }
+
+      // Siarkan ke user tab via BroadcastChannel
+      this._broadcastSync({
+        type: 'WITHDRAWAL_APPROVED',
+        transactionId,
+        userId: targetUserId,
+        status: 'success',
+        proofNotes: notes
+      });
+
       return { success: true, transaction: tx, notification: newNotif };
     }
     return { success: false, message: 'Transaksi tidak ditemukan' };
@@ -976,11 +1144,11 @@ export class AdminDataService {
 
     return {
       id: tx.userId || 'usr_budi_01',
-      name: 'Budi Santoso',
+      name: tx.userName || 'Budi Santoso',
       phone: tx.recipient || '081234567890',
       bankName: tx.method ? tx.method.toUpperCase() : 'DANA',
       accountNumber: tx.recipient || '081234567890',
-      accountHolder: 'BUDI SANTOSO',
+      accountHolder: (tx.userName || 'BUDI SANTOSO').toUpperCase(),
       isVerified: true
     };
   }
@@ -988,7 +1156,7 @@ export class AdminDataService {
   /**
    * Tolak permintaan penarikan dana dan OTOMATIS REFUND saldo ke dompet user
    */
-  rejectWithdrawal(transactionId, reason = 'Data rekening tidak valid') {
+  async rejectWithdrawal(transactionId, reason = 'Data rekening tidak valid') {
     const txs = this.getTransactions();
     const idx = txs.findIndex(t => t.id === transactionId);
     if (idx === -1) {
@@ -1026,6 +1194,36 @@ export class AdminDataService {
     };
     txs.unshift(refundTx);
     this._set('transactions', txs);
+
+    // Sinkronkan update status transaksi ke database Supabase
+    try {
+      await fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          table: 'transactions',
+          id: transactionId,
+          data: {
+            status: 'failed',
+            description: tx.description,
+            updated_at: new Date().toISOString()
+          }
+        })
+      });
+    } catch (err) {
+      console.warn('[AdminDataService] Supabase reject withdrawal sync warning:', err.message);
+    }
+
+    // Siarkan refund ke user tab
+    this._broadcastSync({
+      type: 'WITHDRAWAL_REJECTED',
+      transactionId,
+      userId: tx.userId,
+      status: 'failed',
+      reason,
+      refundAmount
+    });
 
     return { success: true, refundAmount, newBalance, transaction: tx };
   }
