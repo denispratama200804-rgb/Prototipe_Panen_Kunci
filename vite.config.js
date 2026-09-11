@@ -28,19 +28,21 @@ export default defineConfig(({ mode }) => {
       }
       const { data, error } = await query;
       if (!error && Array.isArray(data)) {
-        return data.map(row => ({
-          id: row.id,
-          userId: row.user_id,
-          userName: row.user_name || 'Pengguna',
-          userAvatar: row.user_avatar || '',
-          userEmail: row.user_email || '',
-          sender: row.sender,
-          text: row.text,
-          timestamp: new Date(row.created_at).getTime(),
-          timeStr: row.time_str || '',
-          readByAdmin: Boolean(row.read_by_admin),
-          readByUser: Boolean(row.read_by_user)
-        }));
+        return data
+          .filter(row => row && row.user_id !== 'usr_budi_live' && row.user_id !== 'usr_siti_live' && !String(row.id || '').startsWith('msg_demo_') && row.user_email !== 'budi.santoso@gmail.com')
+          .map(row => ({
+            id: row.id,
+            userId: row.user_id,
+            userName: row.user_name || 'Pengguna',
+            userAvatar: row.user_avatar || '',
+            userEmail: row.user_email || '',
+            sender: row.sender,
+            text: row.text,
+            timestamp: new Date(row.created_at).getTime(),
+            timeStr: row.time_str || '',
+            readByAdmin: Boolean(row.read_by_admin),
+            readByUser: Boolean(row.read_by_user)
+          }));
       }
     } catch (_) {}
 
@@ -54,10 +56,11 @@ export default defineConfig(({ mode }) => {
       if (storeRow && storeRow.avatar) {
         const parsed = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
         if (Array.isArray(parsed)) {
+          const validChats = parsed.filter(m => m && m.userId !== 'usr_budi_live' && m.userId !== 'usr_siti_live' && !String(m.id || '').startsWith('msg_demo_') && m.userEmail !== 'budi.santoso@gmail.com');
           if (targetUserId) {
-            return parsed.filter(m => m.userId === targetUserId);
+            return validChats.filter(m => m.userId === targetUserId);
           }
-          return parsed;
+          return validChats;
         }
       }
     } catch (_) {}

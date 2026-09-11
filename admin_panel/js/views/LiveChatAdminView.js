@@ -18,13 +18,25 @@ export class LiveChatAdminView {
   }
 
   _getAllConversations() {
-    const registeredUsers = this.adminDataService ? this.adminDataService.getAllUsers() : [];
+    let registeredUsers = [];
+    if (this.adminDataService) {
+      if (typeof this.adminDataService.getAllUsers === 'function') {
+        registeredUsers = this.adminDataService.getAllUsers();
+      } else if (typeof this.adminDataService.getUsers === 'function') {
+        registeredUsers = this.adminDataService.getUsers();
+      }
+    }
     return this.chatService.getAllConversations(registeredUsers);
   }
 
   render() {
     const conversations = this._getAllConversations();
     
+    // Cegah terpilihnya user dummy secara otomatis
+    if (this.selectedUserId === 'usr_budi_live' || this.selectedUserId === 'usr_siti_live') {
+      this.selectedUserId = null;
+    }
+
     // Default pilih user pertama jika belum ada yang dipilih
     if (!this.selectedUserId && conversations.length > 0) {
       this.selectedUserId = conversations[0].userId;
@@ -40,13 +52,13 @@ export class LiveChatAdminView {
     return `
       <div class="view-fade-enter max-w-7xl mx-auto w-full">
         
-        <!-- Main Chat Console (Mobile PWA Adaptive & Desktop Referensi) -->
-        <div class="chat-console-card admin-card rounded-2xl overflow-hidden w-full max-w-full border border-slate-800/90 shadow-2xl bg-[#0b1329] flex flex-col lg:grid lg:grid-cols-12 gap-0 h-[calc(100dvh-4.6rem)] sm:h-[calc(100vh-5.4rem)] max-h-[calc(100dvh-4.6rem)] sm:max-h-[calc(100vh-5.4rem)]">
+        <!-- Main Chat Console (Flex Layout on Desktop for perfect full-width split, Adaptive on Mobile) -->
+        <div class="chat-console-card admin-card rounded-2xl overflow-hidden w-full max-w-full border border-slate-800/90 shadow-2xl bg-[#0b1329] flex flex-col lg:flex-row gap-0 h-[calc(100dvh-4.6rem)] sm:h-[calc(100vh-5.4rem)] max-h-[calc(100dvh-4.6rem)] sm:max-h-[calc(100vh-5.4rem)]">
           
-          <!-- Column 1: Inbox / Daftar Percakapan (Mobile: Toggle Inbox | Desktop: Col 4) -->
+          <!-- Column 1: Inbox / Daftar Percakapan (Desktop: w-80 xl:w-96 shrink-0 | Mobile: Toggle Inbox) -->
           <div 
             id="admin-chat-inbox-pane" 
-            class="chat-inbox-pane lg:col-span-4 ${this.mobileView === 'chat' ? 'hidden lg:flex' : 'flex'} flex-col h-full min-h-0 overflow-hidden border-r border-slate-800/80 bg-[#080f20]/95 w-full lg:w-auto"
+            class="chat-inbox-pane w-full lg:w-80 xl:w-96 shrink-0 ${this.mobileView === 'chat' ? 'hidden lg:flex' : 'flex'} flex-col h-full min-h-0 overflow-hidden border-r border-slate-800/80 bg-[#080f20]/95"
           >
             <!-- Pane Header -->
             <div class="admin-card-header px-4 py-3 text-xs flex items-center justify-between border-b border-slate-800/80 shrink-0">
@@ -86,10 +98,10 @@ export class LiveChatAdminView {
             </div>
           </div>
 
-          <!-- Column 2: Active Chat Workspace (Mobile: Toggle Chat | Desktop: Col 8) -->
+          <!-- Column 2: Active Chat Workspace (Desktop: flex-1 min-w-0 fills remaining width | Mobile: Toggle Chat) -->
           <div 
             id="admin-chat-active-pane" 
-            class="lg:col-span-8 ${this.mobileView === 'inbox' ? 'hidden lg:flex' : 'flex'} flex-col h-full min-h-0 overflow-hidden bg-[#0b1329] w-full lg:w-auto relative"
+            class="chat-active-pane flex-1 min-w-0 ${this.mobileView === 'inbox' ? 'hidden lg:flex' : 'flex'} flex-col h-full min-h-0 overflow-hidden bg-[#0b1329] relative"
           >
             ${selectedConv ? this._renderActiveChatWorkspace(selectedConv, messages) : this._renderEmptyState()}
           </div>
@@ -358,6 +370,16 @@ export class LiveChatAdminView {
     const activePane = container.querySelector('#admin-chat-active-pane');
     if (!inboxPane || !activePane) return;
 
+    const isDesktop = window.innerWidth >= 1024;
+    if (isDesktop) {
+      // Desktop: Kedua panel (inbox dan chat workspace) SELALU tampil berdampingan penuh
+      inboxPane.classList.remove('hidden');
+      inboxPane.classList.add('flex');
+      activePane.classList.remove('hidden');
+      activePane.classList.add('flex');
+      return;
+    }
+
     if (this.mobileView === 'chat') {
       // Sembunyikan inbox di layar HP, tampilkan obrolan aktif secara full-screen
       inboxPane.classList.add('hidden');
@@ -375,6 +397,13 @@ export class LiveChatAdminView {
 
   bindEvents(container) {
     if (!container) return;
+
+    // Listener responsif saat ukuran layar window berubah
+    if (this._onResize) {
+      window.removeEventListener('resize', this._onResize);
+    }
+    this._onResize = () => this._updateMobileViewPanes(container);
+    window.addEventListener('resize', this._onResize);
 
     // Search input
     const searchInput = container.querySelector('#admin-chat-search');
@@ -658,6 +687,10 @@ export class LiveChatAdminView {
   }
 
   destroy() {
+    if (this._onResize) {
+      window.removeEventListener('resize', this._onResize);
+      this._onResize = null;
+    }
     this._unsubscribers.forEach(unsub => {
       if (typeof unsub === 'function') unsub();
     });

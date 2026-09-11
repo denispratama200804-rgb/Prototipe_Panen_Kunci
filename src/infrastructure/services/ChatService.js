@@ -49,7 +49,9 @@ export class ChatService {
           m &&
           m.userId !== 'usr_budi_live' &&
           m.userId !== 'usr_siti_live' &&
-          !String(m.id || '').startsWith('msg_demo_')
+          !String(m.id || '').startsWith('msg_demo_') &&
+          m.userEmail !== 'budi.santoso@gmail.com' &&
+          !String(m.text || '').includes('penarikan saldo saya ke rekening BCA')
         );
         if (cleaned.length !== parsed.length) {
           localStorage.setItem(this.storageKey, JSON.stringify(cleaned));
@@ -198,7 +200,14 @@ export class ChatService {
 
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
-        const remoteChats = json.data;
+        const remoteChats = json.data.filter(r =>
+          r &&
+          r.userId !== 'usr_budi_live' &&
+          r.userId !== 'usr_siti_live' &&
+          !String(r.id || '').startsWith('msg_demo_') &&
+          r.userEmail !== 'budi.santoso@gmail.com' &&
+          !String(r.text || '').includes('penarikan saldo saya ke rekening BCA')
+        );
         const localChats = this._getRawChats();
         const localMap = new Map();
 
@@ -250,7 +259,7 @@ export class ChatService {
    * Jika percakapan masih kosong, inisialisasi dengan pesan sambutan Admin.
    */
   getMessages(userId) {
-    if (!userId) return [];
+    if (!userId || userId === 'usr_budi_live' || userId === 'usr_siti_live') return [];
     let chats = this._getRawChats();
     let userMessages = chats.filter(m => m.userId === userId);
 
@@ -410,7 +419,13 @@ export class ChatService {
     chats.forEach(m => {
       if (!m || !m.userId) return;
       // Filter mutlak user dummy
-      if (m.userId === 'usr_budi_live' || m.userId === 'usr_siti_live') return;
+      if (
+        m.userId === 'usr_budi_live' ||
+        m.userId === 'usr_siti_live' ||
+        String(m.id || '').startsWith('msg_demo_') ||
+        m.userEmail === 'budi.santoso@gmail.com' ||
+        String(m.text || '').includes('penarikan saldo saya ke rekening BCA')
+      ) return;
 
       if (!groups[m.userId]) {
         groups[m.userId] = {
@@ -437,19 +452,40 @@ export class ChatService {
       }
     });
 
-    // Jika diberikan daftar user terdaftar (dari AdminDataService / Supabase), lengkapi info profil
+    // Jika diberikan daftar user terdaftar (dari AdminDataService / Supabase), daftarkan pengguna asli ke inbox
     if (Array.isArray(registeredUsers) && registeredUsers.length > 0) {
       registeredUsers.forEach(u => {
-        if (!u || !u.id || u.role === 'admin' || u.role === 'system_config') return;
+        if (
+          !u ||
+          !u.id ||
+          u.role === 'admin' ||
+          u.role === 'system_config' ||
+          u.email?.includes('panenkunci.internal') ||
+          u.id === 'usr_budi_live' ||
+          u.id === 'usr_siti_live' ||
+          u.email === 'budi.santoso@gmail.com'
+        ) return;
+
         if (groups[u.id]) {
           if (u.name) groups[u.id].userName = u.name;
           if (u.email) groups[u.id].userEmail = u.email;
           if (u.avatar) groups[u.id].userAvatar = u.avatar;
+        } else {
+          // Pengguna terdaftar nyata yang belum pernah chat tetap muncul di daftar inbox
+          groups[u.id] = {
+            userId: u.id,
+            userName: u.name || 'Pengguna',
+            userAvatar: u.avatar || '',
+            userEmail: u.email || '',
+            messages: [],
+            unreadCount: 0,
+            lastMessage: null
+          };
         }
       });
     }
 
-    // Urutkan percakapan berdasarkan waktu pesan terakhir
+    // Urutkan percakapan berdasarkan waktu pesan terakhir, atau abjad nama jika belum ada pesan
     const list = Object.values(groups).map(conv => {
       conv.messages.sort((a, b) => a.timestamp - b.timestamp);
       conv.lastMessage = conv.messages[conv.messages.length - 1] || null;
@@ -459,7 +495,8 @@ export class ChatService {
     return list.sort((a, b) => {
       const timeA = a.lastMessage ? a.lastMessage.timestamp : 0;
       const timeB = b.lastMessage ? b.lastMessage.timestamp : 0;
-      return timeB - timeA;
+      if (timeB !== timeA) return timeB - timeA;
+      return (a.userName || '').localeCompare(b.userName || '');
     });
   }
 

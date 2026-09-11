@@ -1414,6 +1414,10 @@ export class AdminDataService {
   /**
    * Mengambil daftar seluruh pengguna dari cache data tersinkron
    */
+  getAllUsers(options = {}) {
+    return this.getUsers(options);
+  }
+
   getUsers({ search = '' } = {}) {
     const rawUsers = this._get('all_users', []);
 

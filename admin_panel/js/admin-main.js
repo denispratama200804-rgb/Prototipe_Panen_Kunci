@@ -326,16 +326,33 @@ class AdminApp {
     const viewInstance = this.views[tab] || this.views.dashboard;
     this.currentViewInstance = viewInstance;
 
-    let html = viewInstance.render();
-    if (!withAnimation) {
-      html = html.replace(/\bview-fade-enter\b/g, '');
-    }
-    viewMount.innerHTML = html;
+    let html = '';
+    try {
+      html = viewInstance.render();
+      if (!withAnimation) {
+        html = html.replace(/\bview-fade-enter\b/g, '');
+      }
+      viewMount.innerHTML = html;
 
-    if (typeof viewInstance.bindEvents === 'function') {
-      viewInstance.bindEvents(viewMount, () => {
-        this.refreshCurrentView(false, false);
-      });
+      if (typeof viewInstance.bindEvents === 'function') {
+        viewInstance.bindEvents(viewMount, () => {
+          this.refreshCurrentView(false, false);
+        });
+      }
+    } catch (err) {
+      console.error(`[AdminApp] Gagal memuat tampilan "${tab}":`, err);
+      viewMount.innerHTML = `
+        <div class="p-8 text-center text-slate-300">
+          <div class="w-16 h-16 rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center mx-auto mb-3">
+            <span class="material-symbols-outlined text-3xl">error</span>
+          </div>
+          <h3 class="text-base font-bold text-white mb-1">Gagal Memuat Tampilan</h3>
+          <p class="text-xs text-slate-400 max-w-md mx-auto mb-4">${err?.message || 'Terjadi kesalahan sistem'}</p>
+          <button onclick="window.location.reload()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer">
+            Muat Ulang Halaman
+          </button>
+        </div>
+      `;
     }
 
     // Kembalikan fokus dan posisi kursor pengguna jika sebelumnya sedang mengetik
