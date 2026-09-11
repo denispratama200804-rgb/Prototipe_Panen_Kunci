@@ -5,7 +5,10 @@ import { AppEvents } from '../../core/events/EventBus.js';
  * TarikSaldoView
  * Prinsip: Single Responsibility Principle (SRP) & Liskov Substitution Principle (LSP)
  * Halaman penarikan saldo ke e-wallet (DANA, GoPay, OVO, ShopeePay) atau transfer bank.
- * Metode pencairan dan nomor rekening/e-wallet dikunci otomatis sesuai dengan yang terdaftar di Profil Pengguna.
+ * 
+ * Aturan Bisnis:
+ * 1. Jika saldo tersedia < nominal minimal penarikan admin, halaman otomatis terkunci dan tidak dapat melakukan penarikan.
+ * 2. Metode pencairan dan nomor rekening/e-wallet disesuaikan otomatis dengan data profil dan metode lain terkunci.
  */
 export class TarikSaldoView extends IComponent {
   /**
@@ -21,6 +24,7 @@ export class TarikSaldoView extends IComponent {
     this._eventBus = container.resolve('EventBus');
     this._handleConfigSync = null;
     this._handleUserUpdate = null;
+    this._handleBalanceUpdate = null;
   }
 
   /**
@@ -76,6 +80,10 @@ export class TarikSaldoView extends IComponent {
   render() {
     const balance = this._walletService.getBalance();
     const minWithdrawal = this._walletService.minWithdrawal;
+    const isLocked = balance < minWithdrawal;
+    const remainingBalance = Math.max(0, minWithdrawal - balance);
+    const progressPercent = minWithdrawal > 0 ? Math.min(100, Math.max(0, Math.round((balance / minWithdrawal) * 100))) : 0;
+
     const user = this._authService.getCurrentUser();
     const resolved = this._resolveUserPaymentMethod(user);
 
@@ -157,6 +165,54 @@ export class TarikSaldoView extends IComponent {
             </a>
           </div>
 
+          <!-- KARTU PERINGATAN KETIKA SALDO DI BAWAH BATAS MINIMAL ADMIN (TERKUNCI) -->
+          ${
+            isLocked
+              ? `
+            <div class="bg-rose-500/10 border border-rose-500/30 rounded-3xl p-5 flex flex-col gap-3 shadow-xs">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 text-rose-500 font-bold text-sm">
+                  <span class="material-symbols-outlined text-[22px]">lock</span>
+                  <span>Penarikan Saldo Terkunci</span>
+                </div>
+                <span class="text-[10px] font-bold text-rose-500 bg-rose-500/15 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  Min. Rp ${minWithdrawal.toLocaleString('id-ID')}
+                </span>
+              </div>
+
+              <p class="text-xs text-text-body leading-relaxed">
+                Saldo Anda saat ini <strong class="text-rose-500 font-bold font-mono">Rp ${balance.toLocaleString('id-ID')}</strong>, belum memenuhi batas minimal penarikan yang ditetapkan admin sebesar <strong class="text-text-heading font-bold font-mono">Rp ${minWithdrawal.toLocaleString('id-ID')}</strong>.
+              </p>
+
+              <!-- Progress Bar Pengumpulan Saldo -->
+              <div class="flex flex-col gap-1.5 mt-0.5">
+                <div class="flex justify-between text-[11px] font-semibold">
+                  <span class="text-text-body">Progres Pengumpulan Saldo</span>
+                  <span class="text-rose-500 font-mono font-bold">${progressPercent}%</span>
+                </div>
+                <div class="w-full h-2.5 bg-surface-container-high rounded-full overflow-hidden">
+                  <div class="h-full bg-rose-500 rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
+                </div>
+                <div class="flex justify-between items-center text-[10px] text-text-body mt-0.5">
+                  <span>Rp ${balance.toLocaleString('id-ID')}</span>
+                  <span class="text-rose-500 font-bold">Kurang Rp ${remainingBalance.toLocaleString('id-ID')} lagi</span>
+                </div>
+              </div>
+
+              <div class="pt-1.5 flex items-center gap-2">
+                <a
+                  href="#/dashboard"
+                  class="w-full bg-primary text-white text-xs font-bold py-2.5 px-4 rounded-xl text-center shadow hover:bg-primary/90 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <span class="material-symbols-outlined text-[16px]">add_circle</span>
+                  <span>Setor API Key & Tambah Saldo</span>
+                </a>
+              </div>
+            </div>
+          `
+              : ''
+          }
+
           <!-- Peringatan jika belum mengatur rekening/e-wallet di profil -->
           ${
             !resolved.isConfigured || !resolved.registeredAccount
@@ -182,29 +238,51 @@ export class TarikSaldoView extends IComponent {
           }
 
           <!-- Withdrawal Form -->
-          <form id="withdrawalForm" class="flex flex-col gap-4">
+          <form id="withdrawalForm" class="flex flex-col gap-4 ${isLocked ? 'pointer-events-none-disabled' : ''}">
             
             <!-- Amount Input Section -->
-            <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-3">
-              <label class="font-label-md text-xs font-bold text-text-heading" for="withdrawAmount">
-                Nominal Penarikan
-              </label>
+            <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-3 relative ${isLocked ? 'border-rose-500/20' : ''}">
+              <div class="flex items-center justify-between">
+                <label class="font-label-md text-xs font-bold text-text-heading" for="withdrawAmount">
+                  Nominal Penarikan
+                </label>
+                ${
+                  isLocked
+                    ? `
+                  <span class="text-[10px] font-bold text-rose-500 px-2 py-0.5 rounded-full bg-rose-500/10 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[12px]">lock</span>
+                    <span>Terkunci</span>
+                  </span>
+                `
+                    : ''
+                }
+              </div>
 
               <div class="relative flex items-center">
-                <span class="absolute left-4 text-lg font-bold text-text-heading">Rp</span>
+                <span class="absolute left-4 text-lg font-bold ${isLocked ? 'text-outline' : 'text-text-heading'}">Rp</span>
                 <input
                   id="withdrawAmount"
                   type="number"
                   placeholder="${minWithdrawal.toLocaleString('id-ID')}"
                   min="${minWithdrawal}"
                   step="1000"
-                  value="${minWithdrawal}"
-                  class="w-full bg-surface-container-low rounded-2xl py-3.5 pl-12 pr-28 text-lg font-bold text-text-heading border border-surface-container focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-mono"
+                  value="${isLocked ? '' : minWithdrawal}"
+                  ${isLocked ? 'disabled readonly' : ''}
+                  class="w-full rounded-2xl py-3.5 pl-12 pr-28 text-lg font-bold border font-mono transition-all ${
+                    isLocked
+                      ? 'bg-surface-container-low/50 text-outline border-surface-container cursor-not-allowed select-none'
+                      : 'bg-surface-container-low text-text-heading border-surface-container focus:outline-none focus:ring-2 focus:ring-primary/40'
+                  }"
                 />
                 <button
                   type="button"
                   id="btnWithdrawAll"
-                  class="absolute right-2.5 bg-primary/10 text-primary px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-primary hover:text-white transition-all active:scale-95"
+                  ${isLocked ? 'disabled' : ''}
+                  class="absolute right-2.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    isLocked
+                      ? 'bg-surface-container text-outline/50 cursor-not-allowed pointer-events-none'
+                      : 'bg-primary/10 text-primary hover:bg-primary hover:text-white active:scale-95'
+                  }"
                 >
                   Tarik Semua
                 </button>
@@ -215,14 +293,29 @@ export class TarikSaldoView extends IComponent {
                 ${uniqueQuick
                   .map(
                     amt => `
-                  <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="${amt}">
+                  <button
+                    type="button"
+                    class="btn-quick-amount py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+                      isLocked
+                        ? 'bg-surface-container-low/40 border-surface-container/60 text-outline/40 cursor-not-allowed pointer-events-none'
+                        : 'bg-surface-container-low border-surface-container text-text-heading hover:bg-primary-fixed'
+                    }"
+                    data-amount="${amt}"
+                    ${isLocked ? 'disabled' : ''}
+                  >
                     ${formatChip(amt)}
                   </button>
                 `
                   )
                   .join('')}
               </div>
-              <p class="text-[11px] text-outline" id="minWithdrawalNotice">Batas minimal penarikan adalah Rp ${minWithdrawal.toLocaleString('id-ID')}.</p>
+              <p class="text-[11px] ${isLocked ? 'text-rose-500 font-medium' : 'text-outline'}" id="minWithdrawalNotice">
+                ${
+                  isLocked
+                    ? `Penarikan terkunci: Saldo minimal penarikan adalah Rp ${minWithdrawal.toLocaleString('id-ID')}.`
+                    : `Batas minimal penarikan adalah Rp ${minWithdrawal.toLocaleString('id-ID')}.`
+                }
+              </p>
             </div>
 
             <!-- Method Selection Grid (Disesuaikan otomatis sesuai profil, metode lain terkunci) -->
@@ -368,15 +461,32 @@ export class TarikSaldoView extends IComponent {
               </div>
             </div>
 
-            <!-- Submit Button -->
+            <!-- Submit Button (Dinamis: Terkunci jika saldo < minWithdrawal atau profil belum diatur) -->
             <button
               type="submit"
               id="btnSubmitWithdrawal"
-              ${!resolved.isConfigured || !resolved.registeredAccount ? 'disabled' : ''}
-              class="w-full bg-secondary text-white font-label-md font-bold text-sm rounded-full py-4 shadow-lg shadow-secondary/25 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              ${isLocked || !resolved.isConfigured || !resolved.registeredAccount ? 'disabled' : ''}
+              class="w-full font-label-md font-bold text-sm rounded-full py-4 shadow-lg transition-all flex items-center justify-center gap-2 mt-2 ${
+                isLocked
+                  ? 'bg-surface-container-high/60 text-outline border border-surface-container cursor-not-allowed pointer-events-none select-none shadow-none opacity-70'
+                  : (!resolved.isConfigured || !resolved.registeredAccount
+                      ? 'bg-secondary/50 text-white cursor-not-allowed opacity-50'
+                      : 'bg-secondary text-white shadow-secondary/25 hover:opacity-95 active:scale-[0.98]')
+              }"
             >
-              <span>${!resolved.isConfigured || !resolved.registeredAccount ? 'Lengkapi Rekening di Profil Terlebih Dahulu' : 'Lanjutkan Penarikan'}</span>
-              <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+              ${
+                isLocked
+                  ? `
+                <span class="material-symbols-outlined text-[20px] text-rose-500">lock</span>
+                <span>Penarikan Terkunci (Kurang Rp ${remainingBalance.toLocaleString('id-ID')})</span>
+              `
+                  : (!resolved.isConfigured || !resolved.registeredAccount
+                      ? `<span>Lengkapi Rekening di Profil Terlebih Dahulu</span>`
+                      : `
+                <span>Lanjutkan Penarikan</span>
+                <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+              `)
+              }
             </button>
           </form>
 
@@ -423,6 +533,11 @@ export class TarikSaldoView extends IComponent {
     // Tarik Semua
     withdrawAllBtn?.addEventListener('click', () => {
       const balance = this._walletService.getBalance();
+      const minWithdrawal = this._walletService.minWithdrawal;
+      if (balance < minWithdrawal) {
+        this._notification.warning(`Saldo Anda (Rp ${balance.toLocaleString('id-ID')}) belum mencapai batas minimal penarikan Rp ${minWithdrawal.toLocaleString('id-ID')}.`);
+        return;
+      }
       if (amountInput) {
         amountInput.value = balance;
         updateBreakdown();
@@ -432,6 +547,12 @@ export class TarikSaldoView extends IComponent {
     // Quick chips
     quickAmountBtns.forEach(btn => {
       btn.addEventListener('click', () => {
+        const balance = this._walletService.getBalance();
+        const minWithdrawal = this._walletService.minWithdrawal;
+        if (balance < minWithdrawal) {
+          this._notification.warning(`Penarikan terkunci. Batas minimal penarikan adalah Rp ${minWithdrawal.toLocaleString('id-ID')}.`);
+          return;
+        }
         if (amountInput) {
           amountInput.value = btn.getAttribute('data-amount');
           updateBreakdown();
@@ -442,6 +563,18 @@ export class TarikSaldoView extends IComponent {
     // Form submit -> Tampilkan Pop-Up Konfirmasi Penarikan (konfirmasi_penarikan_pop_up)
     form?.addEventListener('submit', (e) => {
       e.preventDefault();
+
+      const currentBalance = this._walletService.getBalance();
+      const minWithdrawal = this._walletService.minWithdrawal;
+
+      // VALIDASI UTAMA: Saldo di bawah batas minimal penarikan admin
+      if (currentBalance < minWithdrawal) {
+        const remaining = minWithdrawal - currentBalance;
+        this._notification.error(
+          `Penarikan terkunci! Saldo Anda (Rp ${currentBalance.toLocaleString('id-ID')}) belum mencapai batas minimal Rp ${minWithdrawal.toLocaleString('id-ID')} (kurang Rp ${remaining.toLocaleString('id-ID')}).`
+        );
+        return;
+      }
 
       const user = this._authService.getCurrentUser();
       const resolved = this._resolveUserPaymentMethod(user);
@@ -455,9 +588,6 @@ export class TarikSaldoView extends IComponent {
       const amount = Number(amountInput?.value);
       const method = resolved.method;
       const account = resolved.registeredAccount;
-
-      const currentBalance = this._walletService.getBalance();
-      const minWithdrawal = this._walletService.minWithdrawal;
 
       const methodLabel = resolved.label;
       const fee = this._walletService.getFeeForMethod(method, amount);
@@ -601,58 +731,39 @@ export class TarikSaldoView extends IComponent {
       this._eventBus.on(AppEvents.USER_UPDATED, handleUserUpdate);
     }
 
+    // Reaktif re-render saat saldo bertambah/berkurang (misal deposit diverifikasi admin)
+    const handleBalanceUpdate = () => {
+      const viewRoot = document.getElementById('app-view-root');
+      if (viewRoot && window.location.hash.includes('/tarik-saldo')) {
+        viewRoot.innerHTML = this.render();
+        this.mount(viewRoot);
+      }
+    };
+    this._handleBalanceUpdate = handleBalanceUpdate;
+    if (this._eventBus) {
+      this._eventBus.on(AppEvents.BALANCE_UPDATED, handleBalanceUpdate);
+    }
+
     // Real-time synchronization saat admin mengubah batas minimal / biaya di tab lain
     const handleConfigSync = () => {
       const currentMin = this._walletService.minWithdrawal;
-      if (amountInput) {
+      const currentBalance = this._walletService.getBalance();
+      const isLockedNow = currentBalance < currentMin;
+
+      // Jika status lock berubah atau config berubah, re-render tampilan agar lock state sinkron
+      const viewRoot = document.getElementById('app-view-root');
+      if (viewRoot && window.location.hash.includes('/tarik-saldo')) {
+        viewRoot.innerHTML = this.render();
+        this.mount(viewRoot);
+        return;
+      }
+
+      if (amountInput && !isLockedNow) {
         amountInput.min = currentMin;
         if (Number(amountInput.value) < currentMin) {
           amountInput.value = currentMin;
         }
       }
-      const notice = container.querySelector('#minWithdrawalNotice');
-      if (notice) {
-        notice.textContent = `Batas minimal penarikan adalah Rp ${currentMin.toLocaleString('id-ID')}.`;
-      }
-
-      // Update quick chips nominal penarikan
-      const quickContainer = container.querySelector('#quickAmountsContainer');
-      if (quickContainer) {
-        const quickAmounts = [currentMin, currentMin * 2, currentMin * 4, currentMin * 10];
-        const uniqueQuick = [...new Set(quickAmounts)].sort((a, b) => a - b).slice(0, 4);
-        const formatChip = (val) => {
-          if (val >= 1000000) return `${Number((val / 1000000).toFixed(1))} jt`;
-          return `${Math.round(val / 1000)} rb`;
-        };
-        quickContainer.innerHTML = uniqueQuick
-          .map(
-            amt => `
-          <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="${amt}">
-            ${formatChip(amt)}
-          </button>
-        `
-          )
-          .join('');
-
-        quickContainer.querySelectorAll('.btn-quick-amount').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const amt = Number(btn.getAttribute('data-amount'));
-            if (amt && amountInput) {
-              amountInput.value = amt;
-              updateBreakdown();
-            }
-          });
-        });
-      }
-
-      // Update badge biaya admin di setiap kartu metode
-      ['dana', 'gopay', 'ovo', 'shopeepay', 'bank'].forEach(m => {
-        const badge = container.querySelector(`.method-fee-badge[data-method="${m}"]`);
-        if (badge) {
-          const mFee = this._walletService.getFeeForMethod(m);
-          badge.textContent = `Biaya: Rp ${mFee.toLocaleString('id-ID')}`;
-        }
-      });
 
       updateBreakdown();
     };
@@ -672,6 +783,10 @@ export class TarikSaldoView extends IComponent {
     if (this._handleUserUpdate && this._eventBus) {
       this._eventBus.off(AppEvents.USER_UPDATED, this._handleUserUpdate);
       this._handleUserUpdate = null;
+    }
+    if (this._handleBalanceUpdate && this._eventBus) {
+      this._eventBus.off(AppEvents.BALANCE_UPDATED, this._handleBalanceUpdate);
+      this._handleBalanceUpdate = null;
     }
   }
 }
