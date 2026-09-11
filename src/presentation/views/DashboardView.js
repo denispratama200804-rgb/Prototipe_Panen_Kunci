@@ -143,6 +143,9 @@ export class DashboardView extends IComponent {
 
     return recentTx.map(tx => {
       const isDeposit = tx.type === 'deposit';
+      const isPending = tx.status === 'pending';
+      const isFailed = tx.status === 'failed';
+      const isSuccess = !isPending && !isFailed;
       const dateStr = new Date(tx.createdAt).toLocaleDateString('id-ID', {
         day: 'numeric',
         month: 'short',
@@ -150,23 +153,34 @@ export class DashboardView extends IComponent {
         minute: '2-digit'
       });
 
+      let statusBadge = '';
+      if (isPending) {
+        statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded font-medium border border-amber-500/20 inline-flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>Pending</span>';
+      } else if (isFailed) {
+        statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-error-container text-on-error-container rounded font-medium inline-flex items-center gap-1">Ditolak</span>';
+      }
+
+      let amountColor = isDeposit
+        ? (isPending ? 'text-amber-500' : 'text-secondary')
+        : (isFailed ? 'text-text-body line-through' : 'text-error-ruby');
+
       return `
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm hover:bg-surface-container-low transition-colors">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl ${isDeposit ? 'bg-secondary/10 text-secondary' : 'bg-error/10 text-error-ruby'} flex items-center justify-center shrink-0">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl ${isDeposit ? 'bg-secondary/10 text-secondary' : (isFailed ? 'bg-error-container text-error-ruby' : 'bg-error/10 text-error-ruby')} flex items-center justify-center shrink-0">
               <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">
                 ${isDeposit ? 'vpn_key' : 'account_balance_wallet'}
               </span>
             </div>
-            <div class="flex flex-col">
-              <div class="flex items-center gap-1.5">
-                <span class="font-label-md text-xs font-bold text-text-heading">${tx.title}</span>
-                ${tx.status === 'pending' ? '<span class="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded font-medium border border-amber-500/20 inline-flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>Pending</span>' : ''}
+            <div class="flex flex-col min-w-0">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-label-md text-xs font-bold text-text-heading truncate">${tx.title}</span>
+                ${statusBadge}
               </div>
               <span class="text-[11px] text-text-body">${dateStr}</span>
             </div>
           </div>
-          <span class="font-headline-md text-xs font-bold ${isDeposit ? (tx.status === 'pending' ? 'text-amber-500' : 'text-secondary') : 'text-error-ruby'}">
+          <span class="font-headline-md text-xs font-bold ${amountColor} shrink-0 pl-2">
             ${tx.getFormattedAmount()}
           </span>
         </div>

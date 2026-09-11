@@ -63,7 +63,11 @@ export class WalletService {
                 data.type === 'KEY_REJECTED' ||
                 data.type === 'KEY_STATUS_UPDATED' ||
                 data.type === 'KEY_DELETED' ||
-                data.type === 'BALANCE_UPDATED'
+                data.type === 'BALANCE_UPDATED' ||
+                data.type === 'WITHDRAWAL_APPROVED' ||
+                data.type === 'WITHDRAWAL_REJECTED' ||
+                data.type === 'WITHDRAWAL_CREATED' ||
+                data.type === 'TRANSACTION_UPDATED'
               ) {
                 this._loadWallet();
                 await this._syncFromRemote();

@@ -36,7 +36,8 @@ export class Transaction {
     createdAt = new Date().toISOString(),
     processedAt = '',
     proofImage = '',
-    proofNotes = ''
+    proofNotes = '',
+    rejectionReason = ''
   }) {
     this.id = id;
     this.userId = userId;
@@ -53,6 +54,7 @@ export class Transaction {
     this.processedAt = processedAt;
     this.proofImage = proofImage;
     this.proofNotes = proofNotes;
+    this.rejectionReason = rejectionReason || (description && typeof description === 'string' ? (description.match(/\(Ditolak:\s*([^)]+)\)/)?.[1] || '') : '');
   }
 
   /**
@@ -80,10 +82,12 @@ export class Transaction {
       method: this.method,
       recipient: this.recipient,
       fee: this.fee,
+      netPayout: this.netPayout,
       createdAt: this.createdAt,
       processedAt: this.processedAt,
       proofImage: this.proofImage,
-      proofNotes: this.proofNotes
+      proofNotes: this.proofNotes,
+      rejectionReason: this.rejectionReason
     };
   }
 }

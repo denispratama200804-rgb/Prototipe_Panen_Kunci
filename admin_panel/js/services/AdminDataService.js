@@ -1233,6 +1233,41 @@ export class AdminDataService {
     txs.unshift(refundTx);
     this._set('transactions', txs);
 
+    // Sinkronkan juga cache transaksi dan saldo per user (transactions_{userId})
+    if (tx.userId) {
+      const userTxKey = `transactions_${tx.userId}`;
+      const userTxs = this._get(userTxKey, []);
+      const uIdx = userTxs.findIndex(t => t.id === transactionId);
+      if (uIdx !== -1) {
+        userTxs[uIdx].status = 'failed';
+        userTxs[uIdx].rejectionReason = reason;
+        userTxs[uIdx].description = tx.description;
+        userTxs[uIdx].processedAt = tx.processedAt;
+      }
+      userTxs.unshift(refundTx);
+      this._set(userTxKey, userTxs);
+
+      const userBalKey = `wallet_balance_${tx.userId}`;
+      const userBal = Number(this._get(userBalKey, 0));
+      this._set(userBalKey, userBal + refundAmount);
+
+      // Tambahkan notifikasi ke akun user
+      const notifsKey = `notifications_${tx.userId}`;
+      const notifs = this._get(notifsKey, []);
+      const newNotif = {
+        id: 'notif_' + Math.random().toString(36).substring(2, 9),
+        userId: tx.userId,
+        type: 'withdrawal_failed',
+        title: 'Permintaan Penarikan Ditolak',
+        message: `Penarikan sebesar Rp ${refundAmount.toLocaleString('id-ID')} ditolak (${reason}). Dana telah dikembalikan ke saldo aktif Anda.`,
+        amount: refundAmount,
+        createdAt: new Date().toISOString(),
+        isRead: false
+      };
+      notifs.unshift(newNotif);
+      this._set(notifsKey, notifs);
+    }
+
     // Sinkronkan update status transaksi ke database Supabase
     try {
       await fetch('/api/supabase-proxy', {

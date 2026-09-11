@@ -143,23 +143,51 @@ export class SaldoDetailView extends IComponent {
         year: 'numeric'
       });
 
+      const isPending = w.status === 'pending';
+      const isFailed = w.status === 'failed';
+      const isSuccess = !isPending && !isFailed;
+
+      let statusIcon = 'check';
+      let iconBg = 'bg-secondary';
+      let badgeHtml = '<span class="px-2 py-0.5 bg-secondary/10 text-secondary rounded-md text-[10px] font-bold mt-0.5">Berhasil</span>';
+      let amountClass = 'text-text-heading';
+      let statusSubtext = '<span class="text-[10px] text-secondary font-medium">Ditransfer</span>';
+
+      if (isFailed) {
+        statusIcon = 'close';
+        iconBg = 'bg-error-ruby';
+        badgeHtml = '<span class="px-2 py-0.5 bg-error-container text-on-error-container rounded-md text-[10px] font-bold mt-0.5">Ditolak</span>';
+        amountClass = 'text-text-body line-through';
+        statusSubtext = '<span class="text-[10px] text-text-body font-medium">Dikembalikan ke Saldo</span>';
+      } else if (isPending) {
+        statusIcon = 'hourglass_empty';
+        iconBg = 'bg-warning-amber';
+        badgeHtml = '<span class="px-2 py-0.5 bg-warning-amber/15 text-warning-amber border border-warning-amber/30 rounded-md text-[10px] font-bold mt-0.5 animate-pulse">Pending</span>';
+        amountClass = 'text-warning-amber';
+        statusSubtext = '<span class="text-[10px] text-warning-amber font-medium">Dalam Antrean</span>';
+      }
+
+      const rejectionReason = w.rejectionReason || (w.description && typeof w.description === 'string' ? (w.description.match(/\(Ditolak:\s*([^)]+)\)/)?.[1] || '') : '');
+
       return `
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-primary relative">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-primary relative shrink-0">
               <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">account_balance</span>
-              <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-secondary rounded-full flex items-center justify-center text-white border-2 border-surface-card">
-                <span class="material-symbols-outlined text-[10px] font-bold">check</span>
+              <div class="absolute -bottom-1 -right-1 w-4 h-4 ${iconBg} rounded-full flex items-center justify-center text-white border-2 border-surface-card">
+                <span class="material-symbols-outlined text-[10px] font-bold">${statusIcon}</span>
               </div>
             </div>
-            <div class="flex flex-col">
-              <span class="font-label-md text-xs font-bold text-text-heading">${w.title}</span>
+            <div class="flex flex-col min-w-0">
+              <span class="font-label-md text-xs font-bold text-text-heading truncate">${w.title}</span>
               <span class="text-[11px] text-text-body">${dateStr}</span>
+              ${isFailed && rejectionReason ? `<span class="text-[10px] text-error-ruby truncate mt-0.5" title="${rejectionReason}">Alasan: ${rejectionReason}</span>` : ''}
             </div>
           </div>
-          <div class="flex flex-col items-end">
-            <span class="font-headline-md text-xs font-bold text-text-heading">- Rp ${w.amount.toLocaleString('id-ID')}</span>
-            <span class="px-2 py-0.5 bg-secondary/10 text-secondary rounded-md text-[10px] font-bold mt-0.5">Berhasil</span>
+          <div class="flex flex-col items-end shrink-0 pl-2">
+            <span class="font-headline-md text-xs font-bold ${amountClass}">- Rp ${w.amount.toLocaleString('id-ID')}</span>
+            ${badgeHtml}
+            ${statusSubtext ? `<div class="mt-0.5">${statusSubtext}</div>` : ''}
           </div>
         </div>
       `;
