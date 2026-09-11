@@ -3,6 +3,42 @@
  * Panen Kunci Executive Control Center
  * Arsitektur: Modern App Hub Dashboard + Responsive Desktop & Mobile Web
  */
+// ONE-TIME CACHE WIPE (Deployed to Vercel)
+if (!localStorage.getItem('panenkunci_wiped_v3')) {
+  console.log('🧹 Menjalankan pembersihan cache menyeluruh (V3)...');
+  const prefix = 'panenkunci:';
+  const keysToRemove = [];
+  for(let i=0; i<localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(k && (k.includes('wallet_balance') || k.includes('wallet_passive_balance') || k.includes('lifetime_earnings') || k.includes('transactions') || k.includes('api_keys'))){
+      keysToRemove.push(k);
+    }
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+  
+  localStorage.removeItem(prefix + 'wallet_balance');
+  localStorage.removeItem(prefix + 'wallet_passive_balance');
+  localStorage.removeItem(prefix + 'lifetime_earnings');
+
+  const usersRaw = localStorage.getItem(prefix + 'all_users');
+  if (usersRaw) {
+    try {
+      let users = JSON.parse(usersRaw);
+      if (Array.isArray(users)) {
+        users = users.map(u => {
+          delete u.manualBalance;
+          delete u.customBalance;
+          delete u.balance;
+          return u;
+        });
+        localStorage.setItem(prefix + 'all_users', JSON.stringify(users));
+      }
+    } catch(e) {}
+  }
+  localStorage.setItem('panenkunci_wiped_v3', 'true');
+  console.log('✅ Pembersihan selesai.');
+}
+
 import { adminDataService } from './services/AdminDataService.js';
 import { toast } from './services/ToastService.js';
 import { Navbar } from './components/Navbar.js';
