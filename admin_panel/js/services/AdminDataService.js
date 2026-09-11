@@ -1375,20 +1375,28 @@ export class AdminDataService {
         );
 
         // Petakan kolom Supabase ke objek pengguna di admin panel
-        const mappedUsers = cleanRemote.map(row => ({
-          id: row.id,
-          name: row.name || 'Tanpa Nama',
-          email: row.email || '-',
-          phone: row.phone || '-',
-          bankName: row.bank_name || '-',
-          accountNumber: row.account_number || '-',
-          accountHolder: row.account_holder || row.name || '-',
-          role: row.role || 'user',
-          isVerified: Boolean(row.is_verified),
-          createdAt: row.created_at || new Date().toISOString(),
-          avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : '',
-          customBalance: balanceMap[row.id] !== undefined ? balanceMap[row.id] : 0
-        }));
+        const mappedUsers = cleanRemote.map(row => {
+          const bank = (row.bank_name || '').trim();
+          const acc = (row.account_number || '').trim();
+          const phone = (row.phone || '').trim();
+          const hasPayment = Boolean(bank && bank !== '-' && ((acc && acc !== '-') || (phone && phone !== '-')));
+          const isVerified = Boolean(row.role === 'admin' || (row.is_verified && hasPayment) || hasPayment);
+
+          return {
+            id: row.id,
+            name: row.name || 'Tanpa Nama',
+            email: row.email || '-',
+            phone: row.phone || '-',
+            bankName: row.bank_name || '-',
+            accountNumber: row.account_number || '-',
+            accountHolder: row.account_holder || row.name || '-',
+            role: row.role || 'user',
+            isVerified: isVerified,
+            createdAt: row.created_at || new Date().toISOString(),
+            avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : '',
+            customBalance: balanceMap[row.id] !== undefined ? balanceMap[row.id] : 0
+          };
+        });
 
         this._set('all_users', mappedUsers);
         return mappedUsers;

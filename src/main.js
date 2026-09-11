@@ -128,7 +128,7 @@ function bootstrap() {
   const authService = new AuthService(storage, authValidator, eventBus, userRepository);
   container.registerSingleton('AuthService', authService);
 
-  const walletService = new WalletService(storage, withdrawalValidator, strategyFactory, eventBus, transactionRepository);
+  const walletService = new WalletService(storage, withdrawalValidator, strategyFactory, eventBus, transactionRepository, apiKeyRepository);
   container.registerSingleton('WalletService', walletService);
 
   const apiKeyService = new ApiKeyService(storage, apiKeyValidator, walletService, eventBus, apiKeyRepository);

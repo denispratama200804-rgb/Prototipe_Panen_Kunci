@@ -212,6 +212,10 @@ export class ApiKeyService {
       if (remoteKeys && Array.isArray(remoteKeys)) {
         this._keys = remoteKeys;
         this._persist();
+        if (remoteKeys.length === 0) {
+          const globalKeys = (this._storage.get('api_keys') || []).filter(k => k.userId !== userId);
+          this._storage.set('api_keys', globalKeys);
+        }
         this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});
       }
     } catch (err) {

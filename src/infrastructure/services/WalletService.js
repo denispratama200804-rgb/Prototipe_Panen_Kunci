@@ -17,12 +17,13 @@ export class WalletService {
    * @param {import('../../core/events/EventBus.js').EventBus} eventBus
    * @param {import('../../core/interfaces/ITransactionRepository.js').ITransactionRepository} [transactionRepository]
    */
-  constructor(storage, validator, strategyFactory, eventBus, transactionRepository = null) {
+  constructor(storage, validator, strategyFactory, eventBus, transactionRepository = null, apiKeyRepository = null) {
     this._storage = storage;
     this._validator = validator;
     this._strategyFactory = strategyFactory;
     this._eventBus = eventBus;
     this._transactionRepository = transactionRepository;
+    this._apiKeyRepository = apiKeyRepository;
 
     this._balance = 0;
     this._passiveBalance = 0;
@@ -508,7 +509,20 @@ export class WalletService {
       const userKeysKey = `api_keys_${userId}`;
       const savedUserKeys = this._storage.get(userKeysKey) || [];
       const globalKeys = (this._storage.get('api_keys') || []).filter(k => k.userId === userId);
-      const combinedKeys = savedUserKeys.length > 0 ? savedUserKeys : globalKeys;
+      let combinedKeys = savedUserKeys.length > 0 ? savedUserKeys : globalKeys;
+
+      // Jika remote transactions kosong dan apiKeyRepository juga kosong, bersihkan cache lokal key pengguna
+      if (this._apiKeyRepository) {
+        try {
+          const remoteKeys = await this._apiKeyRepository.getAll(userId);
+          if (Array.isArray(remoteKeys) && remoteKeys.length === 0 && combinedKeys.length > 0) {
+            this._storage.set(userKeysKey, []);
+            const cleanGlobal = (this._storage.get('api_keys') || []).filter(k => k.userId !== userId);
+            this._storage.set('api_keys', cleanGlobal);
+            combinedKeys = [];
+          }
+        } catch (e) {}
+      }
 
       const validKeys = combinedKeys.filter(k => k.status === 'valid');
       const pendingKeys = combinedKeys.filter(k => k.status === 'pending');

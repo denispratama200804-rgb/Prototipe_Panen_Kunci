@@ -66,7 +66,7 @@ export class DashboardView extends IComponent {
                 <span class="text-white/70">Status Akun</span>
                 <span class="font-bold text-white flex items-center gap-1.5 mt-0.5">
                   <span class="w-2 h-2 rounded-full ${isVerified ? 'bg-secondary-fixed' : 'bg-warning-amber'}"></span>
-                  ${isVerified ? 'Terverifikasi' : 'Belum Diverifikasi'}
+                  ${isVerified ? 'Terverifikasi' : 'Belum Terverifikasi'}
                 </span>
               </div>
             </div>

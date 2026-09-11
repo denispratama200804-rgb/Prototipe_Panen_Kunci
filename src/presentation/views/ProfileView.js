@@ -85,9 +85,9 @@ export class ProfileView extends IComponent {
               </div>
 
               <!-- Status badge verifikasi -->
-              <div class="absolute top-0 right-0 ${user.isVerified ? 'bg-secondary' : 'bg-outline'} text-white shadow-sm rounded-full p-1 flex items-center justify-center border-2 border-white" title="${user.isVerified ? 'Akun Terverifikasi' : 'Menunggu Verifikasi'}">
+              <div class="absolute top-0 right-0 ${user.isVerified ? 'bg-secondary' : 'bg-warning-amber'} text-white shadow-sm rounded-full p-1 flex items-center justify-center border-2 border-white" title="${user.isVerified ? 'Akun Terverifikasi' : 'Belum Terverifikasi'}">
                 <span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">
-                  ${user.isVerified ? 'verified' : 'pending'}
+                  ${user.isVerified ? 'verified' : 'hourglass_empty'}
                 </span>
               </div>
 
@@ -130,12 +130,12 @@ export class ProfileView extends IComponent {
               </div>
             ` : ''}
 
-            <div class="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full ${user.isVerified ? 'bg-secondary-container/50 text-on-secondary-container' : 'bg-surface-container text-text-body'} text-xs font-semibold">
-              <span class="material-symbols-outlined text-[16px] ${user.isVerified ? 'text-secondary' : 'text-outline'}" style="font-variation-settings: 'FILL' 1;">
+            <div class="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full ${user.isVerified ? 'bg-secondary-container/50 text-on-secondary-container' : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'} text-xs font-semibold">
+              <span class="material-symbols-outlined text-[16px] ${user.isVerified ? 'text-secondary' : 'text-amber-500'}" style="font-variation-settings: 'FILL' 1;">
                 ${user.isVerified ? 'verified' : 'hourglass_empty'}
               </span>
-              <span class="${user.isVerified ? 'text-secondary' : 'text-text-body'} font-bold">
-                ${user.isVerified ? 'Akun Terverifikasi' : 'Menunggu Verifikasi Admin'}
+              <span class="${user.isVerified ? 'text-secondary' : 'text-amber-600 font-bold'}">
+                ${user.isVerified ? 'Akun Terverifikasi' : 'Belum Terverifikasi'}
               </span>
             </div>
 

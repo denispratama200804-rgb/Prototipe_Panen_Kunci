@@ -448,7 +448,21 @@ export class AuthService {
   async updateProfile(updates) {
     if (!this._currentUser) return;
 
+    // Evaluasi apakah pengguna telah mendaftarkan rekening atau e-wallet yang valid
+    const finalBank = updates.bankName !== undefined ? updates.bankName : this._currentUser.bankName;
+    const finalAcc = updates.accountNumber !== undefined ? updates.accountNumber : this._currentUser.accountNumber;
+    const finalPhone = updates.phone !== undefined ? updates.phone : this._currentUser.phone;
+
+    const b = (finalBank || '').trim();
+    const a = (finalAcc || '').trim();
+    const p = (finalPhone || '').trim();
+    const hasPayment = Boolean(b && b !== '-' && ((a && a !== '-') || (p && p !== '-')));
+
+    // Otomatis verifikasi akun jika user sudah mendaftarkan rekening e-wallet
+    updates.isVerified = hasPayment;
+
     Object.assign(this._currentUser, updates);
+    this._currentUser.isVerified = hasPayment;
     this._saveSession(this._currentUser, this._currentUser.role || 'user');
 
     // Update di Supabase cloud jika terhubung
@@ -457,6 +471,7 @@ export class AuthService {
         const updated = await this._userRepository.update(this._currentUser.id, updates);
         if (updated) {
           this._currentUser = updated;
+          this._currentUser.isVerified = hasPayment;
           this._saveSession(this._currentUser, this._currentUser.role || 'user');
         }
       } catch (err) {
@@ -465,6 +480,14 @@ export class AuthService {
           throw err;
         }
       }
+    }
+
+    // Perbarui juga data di cache registered_accounts lokal jika ada
+    const localAccounts = this._storage.get('registered_accounts') || [];
+    const accIdx = localAccounts.findIndex(acc => acc.id === this._currentUser.id || acc.email?.toLowerCase() === this._currentUser.email?.toLowerCase());
+    if (accIdx !== -1) {
+      localAccounts[accIdx] = { ...localAccounts[accIdx], ...updates, isVerified: hasPayment };
+      this._storage.set('registered_accounts', localAccounts);
     }
 
     this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
@@ -746,7 +769,7 @@ export class AuthService {
               bankName: '',
               accountNumber: '',
               accountHolder: fullName.toUpperCase(),
-              isVerified: true,
+              isVerified: false,
               avatar: avatarUrl
             };
 
@@ -780,7 +803,7 @@ export class AuthService {
           bankName: '',
           accountNumber: '',
           accountHolder: fullName.toUpperCase(),
-          isVerified: true,
+          isVerified: false,
           avatar: avatarUrl
         });
       }

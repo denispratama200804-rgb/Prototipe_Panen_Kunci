@@ -41,9 +41,23 @@ export class User {
     this.bankName = bankName || '';
     this.accountNumber = accountNumber || '';
     this.accountHolder = accountHolder || '';
-    this.isVerified = Boolean(isVerified);
     this.createdAt = createdAt;
     this.avatar = (avatar && avatar !== '/avatar.png') ? avatar : '';
+
+    // Akun terverifikasi jika sudah mendaftarkan rekening e-wallet atau merupakan administrator
+    const hasPayment = this.hasPaymentDetails();
+    this.isVerified = this.isAdmin() ? Boolean(isVerified) : hasPayment;
+  }
+
+  /**
+   * Mengecek apakah pengguna sudah mendaftarkan rekening atau e-wallet pencairan yang valid
+   * @returns {boolean}
+   */
+  hasPaymentDetails() {
+    const b = (this.bankName || '').trim();
+    const a = (this.accountNumber || '').trim();
+    const p = (this.phone || '').trim();
+    return Boolean(b && b !== '-' && ((a && a !== '-') || (p && p !== '-')));
   }
 
   /**
