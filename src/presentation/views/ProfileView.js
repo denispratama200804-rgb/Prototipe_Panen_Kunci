@@ -379,7 +379,7 @@ export class ProfileView extends IComponent {
       const bankCategories = [
         {
           group: 'E-Wallet',
-          items: ['DANA', 'GoPay', 'ShopeePay']
+          items: ['DANA', 'GoPay', 'OVO', 'ShopeePay']
         },
         {
           group: 'Bank Transfer',

@@ -63,7 +63,7 @@ async function runTests() {
   assert(danaStrategy.getLabel() === 'DANA', 'Dana strategy resolved');
   assert(danaStrategy.calculateFee(50000) === 1000, 'Dana fee is 1000 default (synchronized with admin config)');
   const allStrategies = strategyFactory.getAll();
-  assert(allStrategies.length === 4, 'All 4 strategies registered (DANA, GoPay, OVO, Bank)');
+  assert(allStrategies.length === 5, 'All 5 strategies registered (DANA, GoPay, OVO, ShopeePay, Bank)');
 
   // Test 4: AuthService
   console.log('\n[4] Testing AuthService:');

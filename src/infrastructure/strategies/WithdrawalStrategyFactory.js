@@ -1,6 +1,7 @@
 import { DanaStrategy } from './DanaStrategy.js';
 import { GopayStrategy } from './GopayStrategy.js';
 import { OvoStrategy } from './OvoStrategy.js';
+import { ShopeePayStrategy } from './ShopeePayStrategy.js';
 import { BankTransferStrategy } from './BankTransferStrategy.js';
 
 /**
@@ -18,6 +19,7 @@ export class WithdrawalStrategyFactory {
     this.register(new DanaStrategy());
     this.register(new GopayStrategy());
     this.register(new OvoStrategy());
+    this.register(new ShopeePayStrategy());
     this.register(new BankTransferStrategy());
   }
 

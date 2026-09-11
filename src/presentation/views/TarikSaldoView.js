@@ -1,9 +1,11 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
+import { AppEvents } from '../../core/events/EventBus.js';
 
 /**
  * TarikSaldoView
  * Prinsip: Single Responsibility Principle (SRP) & Liskov Substitution Principle (LSP)
- * Halaman penarikan saldo ke e-wallet (DANA, GoPay, OVO) atau transfer bank dengan popup konfirmasi.
+ * Halaman penarikan saldo ke e-wallet (DANA, GoPay, OVO, ShopeePay) atau transfer bank.
+ * Metode pencairan dan nomor rekening/e-wallet dikunci otomatis sesuai dengan yang terdaftar di Profil Pengguna.
  */
 export class TarikSaldoView extends IComponent {
   /**
@@ -16,14 +18,66 @@ export class TarikSaldoView extends IComponent {
     this._notification = container.resolve('NotificationService');
     this._authService = container.resolve('AuthService');
     this._strategyFactory = container.resolve('WithdrawalStrategyFactory');
+    this._eventBus = container.resolve('EventBus');
+    this._handleConfigSync = null;
+    this._handleUserUpdate = null;
+  }
+
+  /**
+   * Mengidentifikasi metode pencairan dan nomor rekening/e-wallet dari data profil pengguna
+   * @param {import('../../domain/models/User.js').User|null} user
+   * @returns {Object}
+   * @private
+   */
+  _resolveUserPaymentMethod(user) {
+    const rawBank = (user?.bankName || '').trim();
+    const rawBankLower = rawBank.toLowerCase();
+    const isConfigured = Boolean(rawBank && rawBank !== 'Belum diatur' && rawBank !== '-');
+
+    let method = 'dana';
+    let label = 'DANA';
+    let isBank = false;
+    let registeredAccount = user?.phone || user?.accountNumber || '';
+
+    if (rawBankLower.includes('dana')) {
+      method = 'dana';
+      label = 'DANA';
+      registeredAccount = user?.phone || user?.accountNumber || '';
+    } else if (rawBankLower.includes('gopay')) {
+      method = 'gopay';
+      label = 'GoPay';
+      registeredAccount = user?.phone || user?.accountNumber || '';
+    } else if (rawBankLower.includes('ovo')) {
+      method = 'ovo';
+      label = 'OVO';
+      registeredAccount = user?.phone || user?.accountNumber || '';
+    } else if (rawBankLower.includes('shopee') || rawBankLower.includes('spay')) {
+      method = 'shopeepay';
+      label = 'ShopeePay';
+      registeredAccount = user?.phone || user?.accountNumber || '';
+    } else if (isConfigured) {
+      method = 'bank';
+      label = `Bank Transfer (${rawBank})`;
+      isBank = true;
+      registeredAccount = user?.accountNumber || user?.phone || '';
+    }
+
+    return {
+      method,
+      label,
+      rawBank,
+      isConfigured,
+      isBank,
+      registeredAccount,
+      accountHolder: user?.accountHolder || user?.name || ''
+    };
   }
 
   render() {
     const balance = this._walletService.getBalance();
     const minWithdrawal = this._walletService.minWithdrawal;
     const user = this._authService.getCurrentUser();
-    const defaultPhone = user?.phone || '';
-    const defaultBankAcc = user?.accountNumber || '';
+    const resolved = this._resolveUserPaymentMethod(user);
 
     // Nominal cepat (quick chips) dinamis proporsional mengikuti batas minimum admin
     const quickAmounts = [
@@ -43,6 +97,46 @@ export class TarikSaldoView extends IComponent {
     const feeGopay = getFee('gopay');
     const feeOvo = getFee('ovo');
     const feeBank = getFee('bank');
+    const feeShopeePay = getFee('shopeepay');
+
+    // Tentukan daftar kartu metode yang ditampilkan
+    const methodsList = [
+      {
+        id: 'dana',
+        label: 'DANA',
+        icon: 'account_balance_wallet',
+        iconColor: 'text-primary',
+        iconBg: 'bg-primary/10',
+        fee: feeDana
+      },
+      {
+        id: 'gopay',
+        label: 'GoPay',
+        icon: 'account_balance_wallet',
+        iconColor: 'text-[#00AED6]',
+        iconBg: 'bg-[#00AED6]/10',
+        fee: feeGopay
+      },
+      {
+        id: resolved.method === 'shopeepay' ? 'shopeepay' : 'ovo',
+        label: resolved.method === 'shopeepay' ? 'ShopeePay' : 'OVO',
+        icon: 'account_balance_wallet',
+        iconColor: resolved.method === 'shopeepay' ? 'text-[#EE4D2D]' : 'text-[#8b5cf6]',
+        iconBg: resolved.method === 'shopeepay' ? 'bg-[#EE4D2D]/10' : 'bg-[#4C2A86]/10',
+        fee: resolved.method === 'shopeepay' ? feeShopeePay : feeOvo
+      },
+      {
+        id: 'bank',
+        label: resolved.isBank ? `Bank (${resolved.rawBank})` : 'Bank Transfer',
+        icon: 'account_balance',
+        iconColor: 'text-primary',
+        iconBg: 'bg-primary/10',
+        fee: feeBank
+      }
+    ];
+
+    const currentFee = getFee(resolved.method);
+    const currentReceive = Math.max(0, minWithdrawal - currentFee);
 
     return `
       <div class="flex flex-col w-full min-h-screen bg-background pb-28 pt-20">
@@ -62,6 +156,30 @@ export class TarikSaldoView extends IComponent {
               <span>Riwayat</span>
             </a>
           </div>
+
+          <!-- Peringatan jika belum mengatur rekening/e-wallet di profil -->
+          ${
+            !resolved.isConfigured || !resolved.registeredAccount
+              ? `
+            <div class="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-5 flex flex-col gap-3">
+              <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-sm">
+                <span class="material-symbols-outlined text-[22px]">error</span>
+                <span>Rekening / E-Wallet Belum Diatur</span>
+              </div>
+              <p class="text-xs text-text-body leading-relaxed">
+                Anda belum melengkapi rekening bank atau e-wallet utama di profil Anda. Sesuai ketentuan keamanan, penarikan saldo hanya dapat diproses ke rekening/e-wallet yang telah Anda simpan di menu profil.
+              </p>
+              <a
+                href="#/profil"
+                class="bg-amber-500 text-slate-950 font-bold text-xs py-3 px-4 rounded-2xl text-center shadow hover:bg-amber-400 transition-all flex items-center justify-center gap-1.5"
+              >
+                <span class="material-symbols-outlined text-[18px]">manage_accounts</span>
+                <span>Lengkapi Rekening di Profil Sekarang</span>
+              </a>
+            </div>
+          `
+              : ''
+          }
 
           <!-- Withdrawal Form -->
           <form id="withdrawalForm" class="flex flex-col gap-4">
@@ -94,119 +212,133 @@ export class TarikSaldoView extends IComponent {
 
               <!-- Quick Denomination Chips -->
               <div class="grid grid-cols-4 gap-2 mt-1" id="quickAmountsContainer">
-                ${uniqueQuick.map(amt => `
+                ${uniqueQuick
+                  .map(
+                    amt => `
                   <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="${amt}">
                     ${formatChip(amt)}
                   </button>
-                `).join('')}
+                `
+                  )
+                  .join('')}
               </div>
               <p class="text-[11px] text-outline" id="minWithdrawalNotice">Batas minimal penarikan adalah Rp ${minWithdrawal.toLocaleString('id-ID')}.</p>
             </div>
 
-            <!-- Method Selection Grid -->
-            <div class="flex flex-col gap-2">
-              <label class="font-label-md text-xs font-bold text-text-heading px-1">
-                Pilih Metode Pencairan
-              </label>
+            <!-- Method Selection Grid (Disesuaikan otomatis sesuai profil, metode lain terkunci) -->
+            <div class="flex flex-col gap-2.5">
+              <div class="flex items-center justify-between px-1">
+                <label class="font-label-md text-xs font-bold text-text-heading">
+                  Pilih Metode Pencairan
+                </label>
+                <span class="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[12px]">lock</span>
+                  <span>Terkunci Sesuai Profil</span>
+                </span>
+              </div>
 
               <div class="grid grid-cols-2 gap-2.5">
-                <!-- DANA -->
-                <label class="relative cursor-pointer group">
-                  <input type="radio" name="withdrawal_method" value="dana" checked class="peer sr-only"/>
-                  <div class="bg-surface-card p-3.5 rounded-2xl border border-surface-container shadow-sm flex flex-col items-center justify-center gap-1.5 peer-checked:border-primary peer-checked:ring-2 peer-checked:ring-primary/20 peer-checked:bg-primary-fixed/20 transition-all hover:bg-surface-container-low">
-                    <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                      <span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
-                    </div>
-                    <span class="font-label-md text-xs font-bold text-text-heading">DANA</span>
-                    <span class="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 method-fee-badge" data-method="dana">
-                      Biaya: Rp ${feeDana.toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                  <div class="absolute top-2.5 right-2.5 w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity">
-                    <span class="material-symbols-outlined text-[14px] font-bold">check</span>
-                  </div>
-                </label>
+                ${methodsList
+                  .map(m => {
+                    const isSelected = m.id === resolved.method;
+                    if (isSelected) {
+                      return `
+                        <!-- Active & Selected Method (Sesuai Profil) -->
+                        <div class="relative ring-2 ring-primary border-2 border-primary bg-primary/5 rounded-2xl p-3.5 shadow-sm flex flex-col items-center justify-center gap-1.5 transition-all">
+                          <input type="radio" name="withdrawal_method" value="${m.id}" checked class="sr-only"/>
+                          <div class="w-9 h-9 rounded-full ${m.iconBg} flex items-center justify-center ${m.iconColor}">
+                            <span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">${m.icon}</span>
+                          </div>
+                          <span class="font-label-md text-xs font-bold text-text-heading text-center truncate max-w-full">${m.label}</span>
+                          <span class="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 method-fee-badge" data-method="${m.id}">
+                            Biaya: Rp ${m.fee.toLocaleString('id-ID')}
+                          </span>
+                          <div class="absolute top-2.5 right-2.5 w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center shadow-xs">
+                            <span class="material-symbols-outlined text-[13px] font-bold">check</span>
+                          </div>
+                          <div class="absolute -top-2 left-3 bg-primary text-white text-[8px] font-extrabold px-2 py-0.5 rounded-full shadow-xs uppercase tracking-wider">
+                            Sesuai Profil
+                          </div>
+                        </div>
+                      `;
+                    } else {
+                      return `
+                        <!-- Locked & Disabled Method (Tidak Bisa Dipilih) -->
+                        <div class="relative bg-surface-container-low/50 rounded-2xl p-3.5 border border-surface-container/60 shadow-none flex flex-col items-center justify-center gap-1.5 opacity-40 pointer-events-none cursor-not-allowed filter grayscale-[30%] select-none" title="Metode ini terkunci. Rekening profil Anda terdaftar menggunakan ${resolved.label}.">
+                          <input type="radio" name="withdrawal_method" value="${m.id}" disabled class="sr-only"/>
+                          <div class="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-outline">
+                            <span class="material-symbols-outlined text-[22px]">${m.icon}</span>
+                          </div>
+                          <span class="font-label-md text-xs font-semibold text-text-heading text-center truncate max-w-full">${m.label}</span>
+                          <span class="text-[10px] text-outline px-2 py-0.5 rounded-full bg-surface-container method-fee-badge" data-method="${m.id}">
+                            Biaya: Rp ${m.fee.toLocaleString('id-ID')}
+                          </span>
+                          <div class="absolute top-2.5 right-2.5 w-5 h-5 bg-surface-container text-outline rounded-full flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[13px]">lock</span>
+                          </div>
+                        </div>
+                      `;
+                    }
+                  })
+                  .join('')}
+              </div>
 
-                <!-- GoPay -->
-                <label class="relative cursor-pointer group">
-                  <input type="radio" name="withdrawal_method" value="gopay" class="peer sr-only"/>
-                  <div class="bg-surface-card p-3.5 rounded-2xl border border-surface-container shadow-sm flex flex-col items-center justify-center gap-1.5 peer-checked:border-primary peer-checked:ring-2 peer-checked:ring-primary/20 peer-checked:bg-primary-fixed/20 transition-all hover:bg-surface-container-low">
-                    <div class="w-9 h-9 rounded-full bg-[#00AED6]/10 flex items-center justify-center text-[#00AED6]">
-                      <span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
-                    </div>
-                    <span class="font-label-md text-xs font-bold text-text-heading">GoPay</span>
-                    <span class="text-[10px] font-semibold text-[#00AED6] px-2 py-0.5 rounded-full bg-[#00AED6]/10 method-fee-badge" data-method="gopay">
-                      Biaya: Rp ${feeGopay.toLocaleString('id-ID')}
-                    </span>
+              <!-- Notice info penguncian metode sesuai profil -->
+              <div class="flex items-center justify-between bg-surface-card rounded-2xl px-4 py-2.5 border border-surface-container shadow-xs mt-0.5">
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined text-[15px]">lock</span>
                   </div>
-                  <div class="absolute top-2.5 right-2.5 w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity">
-                    <span class="material-symbols-outlined text-[14px] font-bold">check</span>
-                  </div>
-                </label>
-
-                <!-- OVO -->
-                <label class="relative cursor-pointer group">
-                  <input type="radio" name="withdrawal_method" value="ovo" class="peer sr-only"/>
-                  <div class="bg-surface-card p-3.5 rounded-2xl border border-surface-container shadow-sm flex flex-col items-center justify-center gap-1.5 peer-checked:border-primary peer-checked:ring-2 peer-checked:ring-primary/20 peer-checked:bg-primary-fixed/20 transition-all hover:bg-surface-container-low">
-                    <div class="w-9 h-9 rounded-full bg-[#4C2A86]/10 flex items-center justify-center text-[#4C2A86]">
-                      <span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
-                    </div>
-                    <span class="font-label-md text-xs font-bold text-text-heading">OVO</span>
-                    <span class="text-[10px] font-semibold text-[#8b5cf6] px-2 py-0.5 rounded-full bg-[#4C2A86]/10 method-fee-badge" data-method="ovo">
-                      Biaya: Rp ${feeOvo.toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                  <div class="absolute top-2.5 right-2.5 w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity">
-                    <span class="material-symbols-outlined text-[14px] font-bold">check</span>
-                  </div>
-                </label>
-
-                <!-- Bank Transfer -->
-                <label class="relative cursor-pointer group">
-                  <input type="radio" name="withdrawal_method" value="bank" class="peer sr-only"/>
-                  <div class="bg-surface-card p-3.5 rounded-2xl border border-surface-container shadow-sm flex flex-col items-center justify-center gap-1.5 peer-checked:border-primary peer-checked:ring-2 peer-checked:ring-primary/20 peer-checked:bg-primary-fixed/20 transition-all hover:bg-surface-container-low">
-                    <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                      <span class="material-symbols-outlined text-[22px]">account_balance</span>
-                    </div>
-                    <span class="font-label-md text-xs font-bold text-text-heading">Bank Transfer</span>
-                    <span class="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 method-fee-badge" data-method="bank">
-                      Biaya: Rp ${feeBank.toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                  <div class="absolute top-2.5 right-2.5 w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity">
-                    <span class="material-symbols-outlined text-[14px] font-bold">check</span>
-                  </div>
-                </label>
+                  <p class="text-[11px] text-text-body truncate">
+                    Metode terkunci ke <strong class="text-text-heading font-bold">${resolved.label}</strong>
+                  </p>
+                </div>
+                <a href="#/profil" class="text-xs font-bold text-primary hover:underline flex items-center gap-0.5 shrink-0 ml-2">
+                  <span>Ubah di Profil</span>
+                  <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+                </a>
               </div>
             </div>
 
-            <!-- Recipient Identifier Section -->
+            <!-- Recipient Identifier Section (Terkunci Otomatis dari Profil) -->
             <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-2">
-              <label class="font-label-md text-xs font-bold text-text-heading" for="accountIdentifier">
-                Nomor Handphone E-Wallet / Rekening Bank
-              </label>
+              <div class="flex items-center justify-between">
+                <label class="font-label-md text-xs font-bold text-text-heading" for="accountIdentifier">
+                  ${resolved.isBank ? `Nomor Rekening Bank (${resolved.rawBank || 'Bank'})` : `Nomor Handphone E-Wallet (${resolved.label})`}
+                </label>
+                <span class="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[12px]">verified</span>
+                  <span>Terkunci</span>
+                </span>
+              </div>
 
               <div class="relative flex items-center">
-                <span class="material-symbols-outlined absolute left-3.5 text-outline text-[20px]">phone_iphone</span>
+                <span class="material-symbols-outlined absolute left-3.5 text-outline text-[20px]">
+                  ${resolved.isBank ? 'account_balance' : 'phone_iphone'}
+                </span>
                 <input
                   id="accountIdentifier"
                   type="text"
-                  placeholder="0812xxxxxxxx / Nomor Rekening"
-                  value="${defaultPhone}"
+                  placeholder="${resolved.isBank ? 'Nomor Rekening Bank' : '0812xxxxxxxx'}"
+                  value="${resolved.registeredAccount}"
+                  readonly
                   required
-                  class="w-full bg-surface-container-low rounded-2xl py-3.5 pl-11 pr-12 text-sm text-text-heading font-mono border border-surface-container focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+                  class="w-full bg-surface-container-low/70 rounded-2xl py-3.5 pl-11 pr-24 text-sm text-text-heading font-mono border border-surface-container cursor-not-allowed font-semibold select-none focus:outline-none"
                 />
-                <button
-                  type="button"
-                  id="btnPasteAccount"
-                  class="absolute right-2.5 p-2 text-outline hover:text-primary transition-colors"
-                  title="Paste"
+                <a
+                  href="#/profil"
+                  class="absolute right-2.5 px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/10 rounded-xl transition-colors flex items-center gap-0.5"
+                  title="Ubah rekening atau e-wallet di profil Anda"
                 >
-                  <span class="material-symbols-outlined text-[20px]">content_paste</span>
-                </button>
+                  <span class="material-symbols-outlined text-[14px]">edit</span>
+                  <span>Ubah</span>
+                </a>
               </div>
 
-              <p class="text-[11px] text-outline mt-0.5">Pastikan nomor aktif dan terdaftar sesuai akun e-wallet Anda.</p>
+              <div class="flex items-center justify-between text-[11px] text-outline mt-0.5">
+                <span>Atas Nama: <strong class="text-text-heading">${resolved.accountHolder || user?.name || '-'}</strong></span>
+                <span class="text-primary font-medium">${resolved.label}</span>
+              </div>
             </div>
 
             <!-- Live Transaction Breakdown Section -->
@@ -222,12 +354,12 @@ export class TarikSaldoView extends IComponent {
                 </div>
                 <div class="flex justify-between items-center text-text-body">
                   <span>Biaya Admin</span>
-                  <span class="font-bold font-mono text-amber-500" id="summaryFee">Rp ${feeDana.toLocaleString('id-ID')}</span>
+                  <span class="font-bold font-mono text-amber-500" id="summaryFee">Rp ${currentFee.toLocaleString('id-ID')}</span>
                 </div>
                 <div class="w-full h-px bg-surface-container my-0.5"></div>
                 <div class="flex justify-between items-center text-sm font-extrabold text-text-heading">
                   <span>Total Diterima</span>
-                  <span class="text-secondary font-mono text-base font-bold" id="summaryTotalReceive">Rp ${(Math.max(0, minWithdrawal - feeDana)).toLocaleString('id-ID')}</span>
+                  <span class="text-secondary font-mono text-base font-bold" id="summaryTotalReceive">Rp ${currentReceive.toLocaleString('id-ID')}</span>
                 </div>
                 <div class="flex justify-between items-center text-[11px] text-text-body pt-1 border-t border-surface-container/50">
                   <span class="text-outline">Total Potong Saldo</span>
@@ -240,9 +372,10 @@ export class TarikSaldoView extends IComponent {
             <button
               type="submit"
               id="btnSubmitWithdrawal"
-              class="w-full bg-secondary text-white font-label-md font-bold text-sm rounded-full py-4 shadow-lg shadow-secondary/25 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-2"
+              ${!resolved.isConfigured || !resolved.registeredAccount ? 'disabled' : ''}
+              class="w-full bg-secondary text-white font-label-md font-bold text-sm rounded-full py-4 shadow-lg shadow-secondary/25 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>Lanjutkan Penarikan</span>
+              <span>${!resolved.isConfigured || !resolved.registeredAccount ? 'Lengkapi Rekening di Profil Terlebih Dahulu' : 'Lanjutkan Penarikan'}</span>
               <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
             </button>
           </form>
@@ -257,15 +390,19 @@ export class TarikSaldoView extends IComponent {
     const amountInput = container.querySelector('#withdrawAmount');
     const accountInput = container.querySelector('#accountIdentifier');
     const withdrawAllBtn = container.querySelector('#btnWithdrawAll');
-    const pasteBtn = container.querySelector('#btnPasteAccount');
     const quickAmountBtns = container.querySelectorAll('.btn-quick-amount');
-    const methodRadios = container.querySelectorAll('input[name="withdrawal_method"]');
+
+    // Helper untuk mendeteksi profil pengguna terkini
+    const getCurrentResolved = () => {
+      const u = this._authService.getCurrentUser();
+      return this._resolveUserPaymentMethod(u);
+    };
 
     // Helper untuk update live summary breakdown biaya
     const updateBreakdown = () => {
       const amount = Number(amountInput?.value) || 0;
-      const selectedRadio = container.querySelector('input[name="withdrawal_method"]:checked');
-      const method = selectedRadio ? selectedRadio.value : 'dana';
+      const resolved = getCurrentResolved();
+      const method = resolved.method;
       const fee = this._walletService.getFeeForMethod(method, amount);
       const totalReceive = Math.max(0, amount - fee);
 
@@ -286,65 +423,49 @@ export class TarikSaldoView extends IComponent {
     // Tarik Semua
     withdrawAllBtn?.addEventListener('click', () => {
       const balance = this._walletService.getBalance();
-      amountInput.value = balance;
-      updateBreakdown();
+      if (amountInput) {
+        amountInput.value = balance;
+        updateBreakdown();
+      }
     });
 
     // Quick chips
     quickAmountBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        amountInput.value = btn.getAttribute('data-amount');
-        updateBreakdown();
-      });
-    });
-
-    // Auto-update account placeholder & fee breakdown based on method
-    methodRadios.forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        const user = this._authService.getCurrentUser();
-        if (e.target.value === 'bank') {
-          accountInput.value = user?.accountNumber || '';
-          accountInput.placeholder = 'Masukkan Nomor Rekening Bank';
-        } else {
-          accountInput.value = user?.phone || '';
-          accountInput.placeholder = 'Nomor Handphone E-Wallet (0812xxxx)';
+        if (amountInput) {
+          amountInput.value = btn.getAttribute('data-amount');
+          updateBreakdown();
         }
-        updateBreakdown();
       });
-    });
-
-    // Paste account
-    pasteBtn?.addEventListener('click', async () => {
-      try {
-        if (navigator.clipboard && navigator.clipboard.readText) {
-          const text = await navigator.clipboard.readText();
-          if (text) accountInput.value = text;
-        }
-      } catch (err) {}
     });
 
     // Form submit -> Tampilkan Pop-Up Konfirmasi Penarikan (konfirmasi_penarikan_pop_up)
     form?.addEventListener('submit', (e) => {
       e.preventDefault();
 
-      const amount = Number(amountInput.value);
-      const selectedRadio = container.querySelector('input[name="withdrawal_method"]:checked');
-      const method = selectedRadio ? selectedRadio.value : 'dana';
-      const account = accountInput.value.trim();
+      const user = this._authService.getCurrentUser();
+      const resolved = this._resolveUserPaymentMethod(user);
+
+      if (!resolved.isConfigured || !resolved.registeredAccount) {
+        this._notification.error('Harap lengkapi rekening atau nomor e-wallet di profil Anda terlebih dahulu.');
+        window.location.hash = '/profil';
+        return;
+      }
+
+      const amount = Number(amountInput?.value);
+      const method = resolved.method;
+      const account = resolved.registeredAccount;
 
       const currentBalance = this._walletService.getBalance();
       const minWithdrawal = this._walletService.minWithdrawal;
 
-      const strategy = this._strategyFactory.get(method);
-      const methodLabel = strategy.getLabel();
+      const methodLabel = resolved.label;
       const fee = this._walletService.getFeeForMethod(method, amount);
       const totalReceive = Math.max(0, amount - fee);
 
       if (!account) {
-        this._notification.error(method === 'bank'
-          ? 'Harap masukkan nomor rekening bank tujuan pencairan.'
-          : 'Harap masukkan nomor handphone / akun e-wallet tujuan pencairan.');
-        accountInput?.focus();
+        this._notification.error('Nomor rekening atau e-wallet di profil belum terdaftar. Silakan lengkapi di profil.');
+        window.location.hash = '/profil';
         return;
       }
       if (amount <= 0 || isNaN(amount)) {
@@ -387,11 +508,12 @@ export class TarikSaldoView extends IComponent {
 
             <div class="bg-surface-container rounded-2xl p-3 flex items-center gap-3 border border-surface-container-high">
               <div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <span class="material-symbols-outlined text-[20px]">${method === 'bank' ? 'account_balance' : 'account_balance_wallet'}</span>
+                <span class="material-symbols-outlined text-[20px]">${resolved.isBank ? 'account_balance' : 'account_balance_wallet'}</span>
               </div>
               <div class="flex flex-col min-w-0 text-left">
-                <span class="text-[10px] text-outline uppercase tracking-wider font-semibold">Tujuan Pencairan</span>
+                <span class="text-[10px] text-outline uppercase tracking-wider font-semibold">Tujuan Pencairan (Sesuai Profil)</span>
                 <span class="text-xs font-bold text-text-heading truncate font-mono">${methodLabel} - ${account}</span>
+                <span class="text-[10px] text-text-body mt-0.5">a.n. ${resolved.accountHolder || user?.name || '-'}</span>
               </div>
             </div>
 
@@ -415,12 +537,12 @@ export class TarikSaldoView extends IComponent {
             `;
           }
 
-          const user = this._authService.getCurrentUser();
+          const currentUser = this._authService.getCurrentUser();
           const res = await this._walletService.withdraw({
             amount,
             method,
             accountIdentifier: account,
-            userId: user ? user.id : 'usr_guest'
+            userId: currentUser ? currentUser.id : 'usr_guest'
           });
 
           // Tutup popup konfirmasi
@@ -466,6 +588,19 @@ export class TarikSaldoView extends IComponent {
       });
     });
 
+    // Reaktif re-render saat data profil pengguna diperbarui (misal user ubah rekening di profil)
+    const handleUserUpdate = () => {
+      const viewRoot = document.getElementById('app-view-root');
+      if (viewRoot && window.location.hash.includes('/tarik-saldo')) {
+        viewRoot.innerHTML = this.render();
+        this.mount(viewRoot);
+      }
+    };
+    this._handleUserUpdate = handleUserUpdate;
+    if (this._eventBus) {
+      this._eventBus.on(AppEvents.USER_UPDATED, handleUserUpdate);
+    }
+
     // Real-time synchronization saat admin mengubah batas minimal / biaya di tab lain
     const handleConfigSync = () => {
       const currentMin = this._walletService.minWithdrawal;
@@ -489,11 +624,15 @@ export class TarikSaldoView extends IComponent {
           if (val >= 1000000) return `${Number((val / 1000000).toFixed(1))} jt`;
           return `${Math.round(val / 1000)} rb`;
         };
-        quickContainer.innerHTML = uniqueQuick.map(amt => `
+        quickContainer.innerHTML = uniqueQuick
+          .map(
+            amt => `
           <button type="button" class="btn-quick-amount py-1.5 rounded-xl bg-surface-container-low border border-surface-container text-xs font-semibold text-text-heading hover:bg-primary-fixed transition-colors" data-amount="${amt}">
             ${formatChip(amt)}
           </button>
-        `).join('');
+        `
+          )
+          .join('');
 
         quickContainer.querySelectorAll('.btn-quick-amount').forEach(btn => {
           btn.addEventListener('click', () => {
@@ -507,7 +646,7 @@ export class TarikSaldoView extends IComponent {
       }
 
       // Update badge biaya admin di setiap kartu metode
-      ['dana', 'gopay', 'ovo', 'bank'].forEach(m => {
+      ['dana', 'gopay', 'ovo', 'shopeepay', 'bank'].forEach(m => {
         const badge = container.querySelector(`.method-fee-badge[data-method="${m}"]`);
         if (badge) {
           const mFee = this._walletService.getFeeForMethod(m);
@@ -529,6 +668,10 @@ export class TarikSaldoView extends IComponent {
     if (this._handleConfigSync) {
       window.removeEventListener('panenkunci:config_updated', this._handleConfigSync);
       this._handleConfigSync = null;
+    }
+    if (this._handleUserUpdate && this._eventBus) {
+      this._eventBus.off(AppEvents.USER_UPDATED, this._handleUserUpdate);
+      this._handleUserUpdate = null;
     }
   }
 }
