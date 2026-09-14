@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perbandingan Icon Foto vs SVG</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+      gap: 30px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, auto);
+      gap: 24px;
+      align-items: center;
+      background: white;
+      padding: 30px;
+      border-radius: 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    }
+    .cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .label {
+      font-size: 12px;
+      font-weight: bold;
+      color: #64748b;
+    }
+    .box {
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+    .box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+  <h2>Verifikasi Akurasi Visual Icon E-Wallet & Bank</h2>
+  <div class="grid">
+    <div class="cell">
+      <span class="label">Foto 1 (Asli E-Wallet)</span>
+      <div class="box">
+        <img src="../public/images/icon-ewallet.png" alt="Foto 1">
+      </div>
+    </div>
+    <div class="cell">
+      <span class="label">SVG Foto 1 (E-Wallet)</span>
+      <div class="box">
+        <svg viewBox="0 0 48 48" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="24" r="23" fill="#DCE4F5"/>
+          <!-- Wallet body -->
+          <rect x="13.5" y="14" width="20.5" height="19.5" rx="3.5" stroke="#040E41" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <!-- Wallet flap -->
+          <path d="M21 18.5H30.5C32.433 18.5 34 20.067 34 22V25.5C34 27.433 32.433 29 30.5 29H21V18.5Z" fill="#DCE4F5" stroke="#040E41" stroke-width="2.6" stroke-linejoin="round"/>
+          <!-- Snap button -->
+          <circle cx="28" cy="23.75" r="1.6" fill="#040E41"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="cell">
+      <span class="label">Foto 2 (Asli Bank)</span>
+      <div class="box">
+        <img src="../public/images/icon-bank.png" alt="Foto 2">
+      </div>
+    </div>
+    <div class="cell">
+      <span class="label">SVG Foto 2 (Bank)</span>
+      <div class="box">
+        <svg viewBox="0 0 48 48" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="24" r="23" fill="#DCE4F5"/>
+          <!-- Roof -->
+          <path d="M24 13L13 20H35L24 13Z" fill="#040E41"/>
+          <!-- 3 Columns -->
+          <rect x="16" y="22.5" width="3.2" height="9" rx="0.5" fill="#040E41"/>
+          <rect x="22.4" y="22.5" width="3.2" height="9" rx="0.5" fill="#040E41"/>
+          <rect x="28.8" y="22.5" width="3.2" height="9" rx="0.5" fill="#040E41"/>
+          <!-- Base line -->
+          <rect x="13" y="33" width="22" height="2.5" rx="1.25" fill="#040E41"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
