@@ -442,13 +442,13 @@ export class HeaderComponent {
     document.body.style.overflow = 'hidden';
 
     lightboxMount.innerHTML = `
-      <div id="proof-lightbox-overlay" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto custom-scrollbar animate-in fade-in duration-200">
-        <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-auto" style="max-height: calc(100vh - 2rem);">
+      <div id="proof-lightbox-overlay" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto custom-scrollbar animate-in fade-in duration-200">
+        <div class="max-w-md w-full bg-surface-card border border-surface-container rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-auto" style="max-height: calc(100vh - 2rem);">
           <!-- Close Button -->
           <button
             type="button"
             id="btn-close-proof-lightbox"
-            class="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
+            class="absolute top-4 right-4 w-9 h-9 rounded-full bg-surface-container-high text-text-body hover:text-text-heading hover:bg-surface-container-highest flex items-center justify-center transition-colors"
             title="Tutup (Esc)"
           >
             <span class="material-symbols-outlined text-[20px]">close</span>
@@ -456,33 +456,33 @@ export class HeaderComponent {
 
           <!-- Header -->
           <div class="flex items-center gap-3 pr-8">
-            <div class="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-2xl">receipt_long</span>
+            <div class="w-10 h-10 rounded-2xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0 shadow-xs">
+              <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
             </div>
             <div>
-              <h3 class="text-sm sm:text-base font-bold text-white">Foto Bukti Transfer</h3>
-              <p class="text-[11px] text-slate-400">Pencairan #${notif.transactionId || 'tx'}</p>
+              <h3 class="text-sm sm:text-base font-bold text-text-heading">Foto Bukti Transfer</h3>
+              <p class="text-[11px] text-text-body">Pencairan #${notif.transactionId || 'tx'}</p>
             </div>
           </div>
 
-          <!-- Image Container with Zoomable Look -->
-          <div class="rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 flex items-center justify-center p-1 relative shadow-inner">
-            <img src="${notif.proofImage}" alt="Bukti Transfer Penuh" class="w-full max-h-[50vh] object-contain rounded-xl" />
+          <!-- Image Container with Clean Look -->
+          <div class="rounded-2xl overflow-hidden border border-surface-container bg-surface-container-low flex items-center justify-center p-2 relative shadow-inner">
+            <img src="${notif.proofImage}" alt="Bukti Transfer Penuh" class="w-full max-h-[50vh] object-contain rounded-xl shadow-xs" />
           </div>
 
           <!-- Transaction Summary Info -->
-          <div class="p-3 bg-slate-950/60 rounded-2xl border border-slate-800 space-y-1.5 text-xs">
-            <div class="flex justify-between text-slate-400">
+          <div class="p-3.5 bg-surface-container-low rounded-2xl border border-surface-container space-y-2 text-xs">
+            <div class="flex justify-between items-center text-text-body">
               <span>Nominal Dicairkan:</span>
-              <span class="font-bold text-emerald-400 font-mono">Rp ${(Number(notif.amount) || 0).toLocaleString('id-ID')}</span>
+              <span class="font-bold text-secondary text-sm font-mono">Rp ${(Number(notif.amount) || 0).toLocaleString('id-ID')}</span>
             </div>
-            <div class="flex justify-between text-slate-400">
+            <div class="flex justify-between items-center text-text-body">
               <span>Tujuan Transfer:</span>
-              <span class="font-medium text-white">${notif.recipient || notif.method || '-'}</span>
+              <span class="font-semibold text-text-heading font-mono">${notif.recipient || notif.method || '-'}</span>
             </div>
-            <div class="flex justify-between text-slate-400">
+            <div class="flex justify-between items-center text-text-body">
               <span>Waktu Pengiriman:</span>
-              <span class="text-slate-300">${new Date(notif.createdAt).toLocaleString('id-ID')}</span>
+              <span class="font-medium text-text-heading">${new Date(notif.createdAt).toLocaleString('id-ID')}</span>
             </div>
           </div>
 
@@ -492,7 +492,7 @@ export class HeaderComponent {
               href="${notif.proofImage}"
               download="bukti-transfer-panenkunci-${notif.transactionId || 'tx'}.png"
               id="btn-download-proof-img"
-              class="flex-1 py-3 px-4 rounded-xl bg-primary text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-primary-container transition-all active:scale-[0.98] shadow-md shadow-primary/20"
+              class="flex-1 py-3 px-4 rounded-2xl bg-primary text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-primary-container transition-all active:scale-[0.98] shadow-md shadow-primary/20"
             >
               <span class="material-symbols-outlined text-[18px]">download</span>
               <span>Unduh Foto Bukti</span>
@@ -500,7 +500,7 @@ export class HeaderComponent {
             <button
               type="button"
               id="btn-dismiss-lightbox"
-              class="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+              class="py-3 px-5 rounded-2xl bg-surface-container text-text-heading text-xs font-bold hover:bg-surface-container-high transition-colors"
             >
               Tutup
             </button>

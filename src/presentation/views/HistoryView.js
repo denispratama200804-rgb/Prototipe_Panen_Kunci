@@ -235,30 +235,30 @@ export class HistoryView extends IComponent {
           document.body.style.overflow = 'hidden';
           const lightbox = document.createElement('div');
           lightbox.id = 'hist-proof-lightbox-overlay';
-          lightbox.className = 'fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200';
+          lightbox.className = 'fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200';
           lightbox.innerHTML = `
-            <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-auto" style="max-height: calc(100vh - 2rem);">
-              <button type="button" id="btn-close-hist-lightbox" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center" title="Tutup (Esc)">
+            <div class="max-w-md w-full bg-surface-card border border-surface-container rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-auto" style="max-height: calc(100vh - 2rem);">
+              <button type="button" id="btn-close-hist-lightbox" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-surface-container-high text-text-body hover:text-text-heading hover:bg-surface-container-highest flex items-center justify-center transition-colors" title="Tutup (Esc)">
                 <span class="material-symbols-outlined text-[20px]">close</span>
               </button>
               <div class="flex items-center gap-3 pr-8">
-                <div class="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                  <span class="material-symbols-outlined text-2xl">receipt_long</span>
+                <div class="w-10 h-10 rounded-2xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0 shadow-xs">
+                  <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-white">Bukti Transfer Resmi</h3>
-                  <p class="text-[11px] text-slate-400">Penarikan #${w.id}</p>
+                  <h3 class="text-sm font-bold text-text-heading">Bukti Transfer Resmi</h3>
+                  <p class="text-[11px] text-text-body">Penarikan #${w.id}</p>
                 </div>
               </div>
-              <div class="rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 p-1">
-                <img src="${w.proofImage}" alt="Bukti Transfer" class="w-full max-h-[50vh] object-contain rounded-xl" />
+              <div class="rounded-2xl overflow-hidden border border-surface-container bg-surface-container-low p-2 shadow-inner">
+                <img src="${w.proofImage}" alt="Bukti Transfer" class="w-full max-h-[50vh] object-contain rounded-xl shadow-xs" />
               </div>
-              <div class="flex items-center gap-2 pt-1">
-                <a href="${w.proofImage}" download="bukti-transfer-${w.id}.png" class="flex-1 py-2.5 px-4 rounded-xl bg-primary text-white text-xs font-bold text-center flex items-center justify-center gap-2 shadow-md">
+              <div class="flex items-center gap-2.5 pt-1">
+                <a href="${w.proofImage}" download="bukti-transfer-${w.id}.png" class="flex-1 py-3 px-4 rounded-2xl bg-primary text-white text-xs font-bold text-center flex items-center justify-center gap-2 shadow-md shadow-primary/20 hover:bg-primary-container transition-all">
                   <span class="material-symbols-outlined text-[18px]">download</span>
                   <span>Unduh Foto Bukti</span>
                 </a>
-                <button type="button" id="btn-cancel-hist-lightbox" class="py-2.5 px-4 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer">Tutup</button>
+                <button type="button" id="btn-cancel-hist-lightbox" class="py-3 px-5 rounded-2xl bg-surface-container text-text-heading text-xs font-bold hover:bg-surface-container-high cursor-pointer transition-colors">Tutup</button>
               </div>
             </div>
           `;

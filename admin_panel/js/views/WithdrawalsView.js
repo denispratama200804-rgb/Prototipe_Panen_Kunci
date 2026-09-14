@@ -970,21 +970,29 @@ export class WithdrawalsView {
       canvas.height = 780;
       const ctx = canvas.getContext('2d');
 
-      // Background Gradient
-      const bgGrad = ctx.createLinearGradient(0, 0, 600, 780);
-      bgGrad.addColorStop(0, '#0F172A');
-      bgGrad.addColorStop(1, '#020617');
-      ctx.fillStyle = bgGrad;
+      // Background Clean Light Paper
+      ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, 600, 780);
 
-      // Top Header bar
-      ctx.fillStyle = '#1E293B';
-      ctx.fillRect(0, 0, 600, 100);
+      // Border outline of the receipt
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(2, 2, 596, 776);
 
-      // Header Icon Badge
+      // Top Header accent bar
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillRect(4, 4, 592, 100);
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(4, 104);
+      ctx.lineTo(596, 104);
+      ctx.stroke();
+
+      // Header Icon Badge (Emerald Green Circle with white check)
       ctx.fillStyle = '#10B981';
       ctx.beginPath();
-      ctx.arc(300, 100, 42, 0, Math.PI * 2);
+      ctx.arc(300, 100, 40, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#FFFFFF';
@@ -993,25 +1001,25 @@ export class WithdrawalsView {
       ctx.fillText('✓', 300, 112);
 
       // Title
-      ctx.fillStyle = '#10B981';
+      ctx.fillStyle = '#059669';
       ctx.font = 'bold 24px Arial, sans-serif';
-      ctx.fillText('TRANSFER BERHASIL', 300, 180);
+      ctx.fillText('TRANSFER BERHASIL', 300, 175);
 
-      ctx.fillStyle = '#94A3B8';
+      ctx.fillStyle = '#64748B';
       ctx.font = '14px Arial, sans-serif';
-      ctx.fillText('Panen Kunci Payout Gateway • Struk Resmi', 300, 205);
+      ctx.fillText('Panen Kunci Payout Gateway • Struk Resmi', 300, 202);
 
       // Amount Display
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#0F172A';
       ctx.font = 'bold 38px Arial, sans-serif';
-      ctx.fillText(`Rp ${netPayout.toLocaleString('id-ID')}`, 300, 265);
+      ctx.fillText(`Rp ${netPayout.toLocaleString('id-ID')}`, 300, 260);
 
       // Divider
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(50, 295);
-      ctx.lineTo(550, 295);
+      ctx.moveTo(50, 290);
+      ctx.lineTo(550, 290);
       ctx.stroke();
 
       // Transaction Details Table
@@ -1027,13 +1035,13 @@ export class WithdrawalsView {
       ];
 
       ctx.textAlign = 'left';
-      let y = 335;
+      let y = 330;
       rows.forEach(([label, val]) => {
-        ctx.fillStyle = '#94A3B8';
+        ctx.fillStyle = '#64748B';
         ctx.font = '14px Arial, sans-serif';
         ctx.fillText(label, 60, y);
 
-        ctx.fillStyle = label === 'Status:' ? '#10B981' : '#FFFFFF';
+        ctx.fillStyle = label === 'Status:' ? '#059669' : '#0F172A';
         ctx.font = label === 'Status:' ? 'bold 14px Arial, sans-serif' : 'bold 14px monospace';
         ctx.textAlign = 'right';
         ctx.fillText(val, 540, y);
@@ -1042,13 +1050,17 @@ export class WithdrawalsView {
         y += 38;
       });
 
-      // Bottom Watermark
-      ctx.fillStyle = '#1E293B';
-      ctx.fillRect(40, 680, 520, 60);
+      // Bottom Watermark Box
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillRect(40, 675, 520, 65);
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(40, 675, 520, 65);
+
       ctx.fillStyle = '#64748B';
       ctx.font = '12px Arial, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Bukti transfer ini sah dan diproses secara otomatis oleh Admin Panen Kunci.', 300, 715);
+      ctx.fillText('Bukti transfer ini sah dan diproses secara otomatis oleh Admin Panen Kunci.', 300, 712);
 
       const generatedDataUrl = canvas.toDataURL('image/png');
       updatePreview(generatedDataUrl);
