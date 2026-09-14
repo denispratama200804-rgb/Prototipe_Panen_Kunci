@@ -231,11 +231,10 @@ export class LiveChatAdminView {
           <button
             type="button"
             id="admin-refresh-chat-btn"
-            class="admin-nav-btn px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            class="admin-nav-btn p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer"
             title="Refresh Percakapan"
           >
             <span class="material-symbols-outlined text-base text-indigo-500">sync</span>
-            <span>Segarkan</span>
           </button>
         </div>
       </div>
@@ -610,7 +609,8 @@ export class LiveChatAdminView {
     // Refresh button dengan remote cloud fetch
     refreshBtn?.addEventListener('click', async () => {
       refreshBtn.disabled = true;
-      refreshBtn.classList.add('animate-spin');
+      const iconEl = refreshBtn.querySelector('.material-symbols-outlined');
+      if (iconEl) iconEl.classList.add('animate-spin');
       try {
         await this.chatService.syncFromRemote(this.selectedUserId);
         if (this.selectedUserId) {
@@ -632,7 +632,7 @@ export class LiveChatAdminView {
       } finally {
         setTimeout(() => {
           refreshBtn.disabled = false;
-          refreshBtn.classList.remove('animate-spin');
+          if (iconEl) iconEl.classList.remove('animate-spin');
         }, 400);
       }
     });
