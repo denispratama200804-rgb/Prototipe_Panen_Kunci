@@ -168,13 +168,33 @@ export class AuthService {
         this._storage.set('current_user', saved);
       }
       this._currentUser = new User(saved);
+
+      // Pastikan role bersih, tegas, dan konsisten (mencegah perpindahan sesi ke admin secara otomatis)
+      const isExplicitAdmin = (this._currentUser.role === 'admin') ||
+                              (this._currentUser.email === 'admin@panenkunci.id') ||
+                              (this._currentUser.email === 'admin@panenkunci.com');
+      const safeRole = isExplicitAdmin ? 'admin' : 'user';
+      this._currentUser.role = safeRole;
+
       this._session = savedSession || {
         userId: this._currentUser.id,
         name: this._currentUser.name,
         email: this._currentUser.email,
-        role: this._currentUser.role || 'user',
+        role: safeRole,
         loginAt: new Date().toISOString()
       };
+      this._session.role = safeRole;
+
+      // Bersihkan / sinkronkan flag localStorage agar role user biasa tidak pernah mengakses admin panel
+      if (typeof localStorage !== 'undefined') {
+        if (safeRole === 'admin') {
+          localStorage.setItem('panenkunci:admin_logged_in', 'true');
+          localStorage.setItem('panenkunci:auth_role', 'admin');
+        } else {
+          localStorage.removeItem('panenkunci:admin_logged_in');
+          localStorage.setItem('panenkunci:auth_role', 'user');
+        }
+      }
 
       if (this._currentUser.role !== 'admin' && this._currentUser.id) {
         this._startPresenceHeartbeat(this._currentUser.id);
@@ -185,8 +205,13 @@ export class AuthService {
         this._userRepository.getByEmail(this._currentUser.email)
           .then(remote => {
             if (remote) {
+              const isRemoteAdmin = (remote.role === 'admin') ||
+                                    (remote.email === 'admin@panenkunci.id') ||
+                                    (remote.email === 'admin@panenkunci.com');
+              const validatedRole = isRemoteAdmin ? 'admin' : 'user';
+              remote.role = validatedRole;
               this._currentUser = remote;
-              this._saveSession(this._currentUser, this._currentUser.role);
+              this._saveSession(this._currentUser, validatedRole);
               this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
             }
           })
@@ -197,6 +222,10 @@ export class AuthService {
       this._session = null;
       this._storage.remove('current_user');
       this._storage.remove('session');
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('panenkunci:admin_logged_in');
+        localStorage.removeItem('panenkunci:auth_role');
+      }
     }
 
     // Periksa apakah ada pesan selamat datang dari OAuth Google yang tersimpan
@@ -291,10 +320,8 @@ export class AuthService {
           }
 
           const isAdmin = userFromDb.role === 'admin' ||
-                          userFromDb.isAdmin() ||
                           email === 'admin@panenkunci.id' ||
-                          email === 'admin@panenkunci.com' ||
-                          email.startsWith('admin@');
+                          email === 'admin@panenkunci.com';
           const role = isAdmin ? 'admin' : 'user';
 
           this._saveSession(userFromDb, role);
@@ -332,7 +359,8 @@ export class AuthService {
           }
 
           const isRoleAdmin = (userProfile && userProfile.role === 'admin') ||
-                              email.startsWith('admin') ||
+                              email === 'admin@panenkunci.id' ||
+                              email === 'admin@panenkunci.com' ||
                               authData.user.user_metadata?.role === 'admin';
 
           const resolvedUser = userProfile || new User({
@@ -444,7 +472,7 @@ export class AuthService {
         }
 
         // C. Simpan data profil pengguna PASTI ke tabel `public.users` di Supabase
-        const isRoleAdmin = email.startsWith('admin') || email === 'admin@panenkunci.id';
+        const isRoleAdmin = email === 'admin@panenkunci.id' || email === 'admin@panenkunci.com';
         const role = isRoleAdmin ? 'admin' : 'user';
 
         const newUserData = {
@@ -502,7 +530,7 @@ export class AuthService {
       };
     }
 
-    const isLocalAdmin = email.startsWith('admin') || email === 'admin@panenkunci.id';
+    const isLocalAdmin = email === 'admin@panenkunci.id' || email === 'admin@panenkunci.com';
     const localRole = isLocalAdmin ? 'admin' : 'user';
 
     const localUser = new User({
@@ -844,8 +872,7 @@ export class AuthService {
       const fullName = (meta.full_name || meta.name || email.split('@')[0]).trim();
       const avatarUrl = meta.avatar_url || meta.picture || '';
 
-      const isRoleAdmin = email.startsWith('admin') ||
-                          email === 'admin@panenkunci.id' ||
+      const isRoleAdmin = email === 'admin@panenkunci.id' ||
                           email === 'admin@panenkunci.com';
       const defaultRole = isRoleAdmin ? 'admin' : 'user';
 

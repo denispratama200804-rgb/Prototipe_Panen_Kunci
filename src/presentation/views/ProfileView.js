@@ -1,4 +1,5 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
+import { renderPaymentMethodIcon } from '../utils/PaymentMethodHelper.js';
 
 /**
  * ProfileView
@@ -52,14 +53,17 @@ export class ProfileView extends IComponent {
       <div class="flex flex-col w-full min-h-screen bg-background pb-28 pt-20">
         <div class="px-margin-mobile max-w-md mx-auto w-full flex flex-col gap-5">
           
+          <!-- Hidden file input separated outside to prevent double event bubbling / double picker dialog -->
+          <input type="file" id="avatarFileInput" accept="image/*" class="hidden" />
+
           <!-- Profile Header Card -->
           <div class="flex flex-col items-center pt-6 pb-6 bg-surface-card rounded-3xl border border-surface-container shadow-sm text-center relative overflow-hidden">
             <!-- Decorative circle -->
             <div class="absolute -right-8 -top-8 w-32 h-32 bg-primary/5 rounded-full blur-xl pointer-events-none"></div>
 
             <!-- Avatar -->
-            <div class="relative mb-2 group">
-              <div class="w-24 h-24 rounded-full overflow-hidden shadow-md ring-4 ring-primary/15 bg-surface-container relative flex items-center justify-center">
+            <div class="relative mb-2 group cursor-pointer" id="avatarContainer" title="Klik untuk mengganti foto profil">
+              <div class="w-24 h-24 rounded-full overflow-hidden shadow-md ring-4 ring-primary/15 group-hover:ring-primary/40 bg-surface-container relative flex items-center justify-center transition-all">
                 ${user.avatar ? `
                   <img
                     id="profileAvatarImg"
@@ -82,24 +86,30 @@ export class ProfileView extends IComponent {
                     <span class="material-symbols-outlined text-4xl">person</span>
                   </div>
                 `}
+
+                <!-- Loading Overlay Spinner -->
+                <div id="avatarLoadingOverlay" class="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center text-white hidden z-20 transition-opacity">
+                  <span class="material-symbols-outlined text-2xl animate-spin">progress_activity</span>
+                  <span class="text-[8px] font-bold mt-1 tracking-wider uppercase">Menyimpan...</span>
+                </div>
               </div>
 
               <!-- Status badge verifikasi -->
-              <div class="absolute top-0 right-0 ${user.isVerified ? 'bg-secondary' : 'bg-warning-amber'} text-white shadow-sm rounded-full p-1 flex items-center justify-center border-2 border-white" title="${user.isVerified ? 'Akun Terverifikasi' : 'Belum Terverifikasi'}">
+              <div class="absolute top-0 right-0 ${user.isVerified ? 'bg-secondary' : 'bg-warning-amber'} text-white shadow-sm rounded-full p-1 flex items-center justify-center border-2 border-white z-10" title="${user.isVerified ? 'Akun Terverifikasi' : 'Belum Terverifikasi'}">
                 <span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">
                   ${user.isVerified ? 'verified' : 'hourglass_empty'}
                 </span>
               </div>
 
               <!-- Tombol Ganti Foto / Upload Avatar -->
-              <label
-                for="avatarFileInput"
+              <button
+                type="button"
+                id="btnTriggerAvatar"
                 class="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-white shadow-md flex items-center justify-center cursor-pointer hover:bg-primary-container active:scale-95 transition-all border-2 border-white z-10"
-                title="Unggah Foto Profil"
+                title="Unggah Foto Profil (1 Kali Klik)"
               >
                 <span class="material-symbols-outlined text-[16px]">photo_camera</span>
-                <input type="file" id="avatarFileInput" accept="image/*" class="hidden" />
-              </label>
+              </button>
             </div>
 
             <!-- Tombol Hapus Foto (jika user memiliki avatar yang aktif) -->
@@ -160,8 +170,8 @@ export class ProfileView extends IComponent {
             <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-4">
               <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                    <span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+                  <div class="w-10 h-10 rounded-2xl overflow-hidden shadow-xs flex items-center justify-center shrink-0">
+                    ${renderPaymentMethodIcon(user.bankName, 'w-10 h-10')}
                   </div>
                   <div>
                     <h4 class="font-headline-md text-sm text-text-heading font-bold" id="profileBankName">
@@ -317,7 +327,20 @@ export class ProfileView extends IComponent {
   mount(container) {
     // Avatar upload / update & sync
     const avatarInput = container.querySelector('#avatarFileInput');
+    const avatarContainer = container.querySelector('#avatarContainer');
+    const btnTriggerAvatar = container.querySelector('#btnTriggerAvatar');
+    const avatarOverlay = container.querySelector('#avatarLoadingOverlay');
     const removeAvatarBtn = container.querySelector('#btnRemoveAvatar');
+
+    // Trigger file picker saat klik avatar besar atau tombol kamera (1 kali aksi langsung)
+    avatarContainer?.addEventListener('click', () => {
+      avatarInput?.click();
+    });
+
+    btnTriggerAvatar?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      avatarInput?.click();
+    });
 
     avatarInput?.addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
@@ -328,10 +351,9 @@ export class ProfileView extends IComponent {
         return;
       }
 
-      const cameraLabel = container.querySelector('label[for="avatarFileInput"]');
-      const originalLabel = cameraLabel ? cameraLabel.innerHTML : '';
-      if (cameraLabel) {
-        cameraLabel.innerHTML = '<span class="material-symbols-outlined text-[15px] animate-spin">progress_activity</span>';
+      // Tampilkan visual loading overlay interaktif pada foto profil
+      if (avatarOverlay) {
+        avatarOverlay.classList.remove('hidden');
       }
 
       try {
@@ -354,13 +376,13 @@ export class ProfileView extends IComponent {
         }
 
         await this._authService.updateProfile({ avatar: base64Image });
-        this._notification.success('Foto profil berhasil diunggah dan diperbarui!');
+        this._notification.success('Foto profil berhasil diunggah dan disimpan!');
       } catch (err) {
         console.error('Upload avatar error:', err);
         this._notification.error('Gagal memperbarui foto profil: ' + (err.message || 'Terjadi kesalahan'));
       } finally {
-        if (cameraLabel) {
-          cameraLabel.innerHTML = originalLabel;
+        if (avatarOverlay) {
+          avatarOverlay.classList.add('hidden');
         }
         avatarInput.value = '';
       }

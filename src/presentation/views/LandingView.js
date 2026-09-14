@@ -1,5 +1,6 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { AppEvents } from '../../core/events/EventBus.js';
+import { renderPaymentMethodPill } from '../utils/PaymentMethodHelper.js';
 
 /**
  * LandingView
@@ -127,19 +128,14 @@ export class LandingView extends IComponent {
             <section class="px-margin-mobile py-8 bg-surface-container-low text-center">
               <h4 class="font-label-md text-xs font-bold text-text-heading uppercase tracking-wider mb-3">Mendukung Penarikan Melalui</h4>
               <div class="flex flex-wrap justify-center gap-2">
-                <!-- Payment Method Pills -->
-                <div class="bg-surface-card border border-surface-container px-3.5 py-1.5 rounded-full shadow-sm text-xs font-semibold text-on-surface-variant flex items-center gap-2">
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#118EEA]"></span> DANA
-                </div>
-                <div class="bg-surface-card border border-surface-container px-3.5 py-1.5 rounded-full shadow-sm text-xs font-semibold text-on-surface-variant flex items-center gap-2">
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#00AED6]"></span> GoPay
-                </div>
-                <div class="bg-surface-card border border-surface-container px-3.5 py-1.5 rounded-full shadow-sm text-xs font-semibold text-on-surface-variant flex items-center gap-2">
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#4C3494]"></span> OVO
-                </div>
-                <div class="bg-surface-card border border-surface-container px-3.5 py-1.5 rounded-full shadow-sm text-xs font-semibold text-on-surface-variant flex items-center gap-2">
-                  <span class="material-symbols-outlined text-[16px] text-primary">account_balance</span> Bank Transfer
-                </div>
+                ${renderPaymentMethodPill('DANA')}
+                ${renderPaymentMethodPill('GoPay')}
+                ${renderPaymentMethodPill('OVO')}
+                ${renderPaymentMethodPill('ShopeePay')}
+                ${renderPaymentMethodPill('BCA')}
+                ${renderPaymentMethodPill('BRI')}
+                ${renderPaymentMethodPill('Mandiri')}
+                ${renderPaymentMethodPill('SeaBank')}
               </div>
             </section>
 

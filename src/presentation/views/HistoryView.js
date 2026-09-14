@@ -1,5 +1,6 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { AppEvents } from '../../core/events/EventBus.js';
+import { renderPaymentMethodIcon } from '../utils/PaymentMethodHelper.js';
 
 /**
  * HistoryView
@@ -169,11 +170,15 @@ export class HistoryView extends IComponent {
         <div class="bg-surface-card border border-surface-container rounded-2xl p-4 shadow-sm flex items-center justify-between relative overflow-hidden">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}"></div>
 
-          <div class="flex flex-col gap-1 pl-2">
-            <div class="flex items-center gap-2">
-              <span class="font-label-md text-xs font-bold text-text-heading">${w.title}</span>
-              ${badgeHtml}
+          <div class="flex items-center gap-3 pl-2">
+            <div class="w-9 h-9 shrink-0 rounded-xl overflow-hidden shadow-2xs flex items-center justify-center">
+              ${renderPaymentMethodIcon(w.title + ' ' + (w.description || ''), 'w-9 h-9')}
             </div>
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-2">
+                <span class="font-label-md text-xs font-bold text-text-heading">${w.title}</span>
+                ${badgeHtml}
+              </div>
             <span class="text-[11px] text-text-body">${w.description} • ${dateStr}</span>
             ${w.proofImage ? `
               <button
@@ -185,6 +190,7 @@ export class HistoryView extends IComponent {
                 <span>Lihat Bukti Foto Transfer</span>
               </button>
             ` : ''}
+            </div>
           </div>
 
           <div class="flex flex-col items-end shrink-0">

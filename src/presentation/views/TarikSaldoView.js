@@ -1,5 +1,6 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { AppEvents } from '../../core/events/EventBus.js';
+import { renderPaymentMethodIcon } from '../utils/PaymentMethodHelper.js';
 
 /**
  * TarikSaldoView
@@ -334,10 +335,10 @@ export class TarikSaldoView extends IComponent {
                     if (isSelected) {
                       return `
                         <!-- Active & Selected Method (Sesuai Profil) -->
-                        <div class="relative ring-2 ring-primary border-2 border-primary bg-primary/5 rounded-2xl p-3.5 shadow-sm flex flex-col items-center justify-center gap-1.5 transition-all">
+                        <div class="relative ring-2 ring-primary border-2 border-primary bg-primary/5 rounded-2xl p-3.5 shadow-sm flex flex-col items-center justify-center gap-2 transition-all">
                           <input type="radio" name="withdrawal_method" value="${m.id}" checked class="sr-only"/>
-                          <div class="w-9 h-9 rounded-full ${m.iconBg} flex items-center justify-center ${m.iconColor}">
-                            <span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">${m.icon}</span>
+                          <div class="w-10 h-10 rounded-2xl overflow-hidden shadow-xs flex items-center justify-center">
+                            ${renderPaymentMethodIcon(m.label, 'w-10 h-10')}
                           </div>
                           <span class="font-label-md text-xs font-bold text-text-heading text-center truncate max-w-full">${m.label}</span>
                           <span class="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 method-fee-badge" data-method="${m.id}">
@@ -354,10 +355,10 @@ export class TarikSaldoView extends IComponent {
                     } else {
                       return `
                         <!-- Locked & Disabled Method (Tidak Bisa Dipilih) -->
-                        <div class="relative bg-surface-container-low/50 rounded-2xl p-3.5 border border-surface-container/60 shadow-none flex flex-col items-center justify-center gap-1.5 opacity-40 pointer-events-none cursor-not-allowed filter grayscale-[30%] select-none" title="Metode ini terkunci. Rekening profil Anda terdaftar menggunakan ${resolved.label}.">
+                        <div class="relative bg-surface-container-low/50 rounded-2xl p-3.5 border border-surface-container/60 shadow-none flex flex-col items-center justify-center gap-2 opacity-40 pointer-events-none cursor-not-allowed filter grayscale-[40%] select-none" title="Metode ini terkunci. Rekening profil Anda terdaftar menggunakan ${resolved.label}.">
                           <input type="radio" name="withdrawal_method" value="${m.id}" disabled class="sr-only"/>
-                          <div class="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-outline">
-                            <span class="material-symbols-outlined text-[22px]">${m.icon}</span>
+                          <div class="w-10 h-10 rounded-2xl overflow-hidden flex items-center justify-center">
+                            ${renderPaymentMethodIcon(m.label, 'w-10 h-10')}
                           </div>
                           <span class="font-label-md text-xs font-semibold text-text-heading text-center truncate max-w-full">${m.label}</span>
                           <span class="text-[10px] text-outline px-2 py-0.5 rounded-full bg-surface-container method-fee-badge" data-method="${m.id}">
@@ -403,9 +404,9 @@ export class TarikSaldoView extends IComponent {
               </div>
 
               <div class="relative flex items-center">
-                <span class="material-symbols-outlined absolute left-3.5 text-outline text-[20px]">
-                  ${resolved.isBank ? 'account_balance' : 'phone_iphone'}
-                </span>
+                <div class="absolute left-3 w-6 h-6 shrink-0 rounded-lg overflow-hidden shadow-2xs pointer-events-none flex items-center justify-center">
+                  ${renderPaymentMethodIcon(resolved.label, 'w-6 h-6')}
+                </div>
                 <input
                   id="accountIdentifier"
                   type="text"
@@ -634,8 +635,8 @@ export class TarikSaldoView extends IComponent {
             </div>
 
             <div class="bg-surface-container rounded-2xl p-3 flex items-center gap-3 border border-surface-container-high">
-              <div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <span class="material-symbols-outlined text-[20px]">${resolved.isBank ? 'account_balance' : 'account_balance_wallet'}</span>
+              <div class="w-10 h-10 rounded-2xl overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
+                ${renderPaymentMethodIcon(resolved.label, 'w-10 h-10')}
               </div>
               <div class="flex flex-col min-w-0 text-left">
                 <span class="text-[10px] text-outline uppercase tracking-wider font-semibold">Tujuan Pencairan (Sesuai Profil)</span>
