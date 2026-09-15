@@ -707,6 +707,10 @@ export default async function handler(req, res) {
       if (isUuidTxId) {
         txPayload.id = data.id;
       }
+      
+      if (data.created_at) {
+        txPayload.created_at = data.created_at;
+      }
 
       const { data: inserted, error } = await adminSupabase
         .from('transactions')

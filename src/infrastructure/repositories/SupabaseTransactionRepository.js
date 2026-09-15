@@ -99,6 +99,10 @@ export class SupabaseTransactionRepository extends ITransactionRepository {
       recipient: tx.recipient || ''
     };
 
+    if (tx.createdAt) {
+      payload.created_at = tx.createdAt;
+    }
+
     // PostgreSQL column id bertipe UUID; hanya kirim id jika valid UUID
     const isUuidTxId = tx.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tx.id);
     if (isUuidTxId) {
