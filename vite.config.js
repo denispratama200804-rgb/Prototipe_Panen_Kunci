@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
+import nodemailer from 'nodemailer';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -815,10 +816,60 @@ export default defineConfig(({ mode }) => {
                         res.statusCode = 400;
                         res.end(JSON.stringify({ success: false, error: error.message }));
                       } else {
+                        const actionLink = linkData?.properties?.action_link;
+                        const smtpEmail = env.SMTP_EMAIL || process.env.SMTP_EMAIL;
+                        const smtpPassword = env.SMTP_PASSWORD || process.env.SMTP_PASSWORD;
+                        
+                        if (smtpEmail && smtpPassword && actionLink) {
+                          try {
+                            const transporter = nodemailer.createTransport({
+                              host: env.SMTP_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+                              port: Number(env.SMTP_PORT || process.env.SMTP_PORT) || 465,
+                              secure: (Number(env.SMTP_PORT || process.env.SMTP_PORT) || 465) === 465,
+                              auth: { user: smtpEmail, pass: smtpPassword }
+                            });
+                            
+                            await transporter.sendMail({
+                              from: `"Panen Kunci (Local Dev)" <${smtpEmail}>`,
+                              to: data.email,
+                              subject: 'Pemulihan Kata Sandi Akun Panen Kunci',
+                              html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px;">
+                                <h2 style="color: #4F46E5;">Atur Ulang Kata Sandi</h2>
+                                <p>Halo,</p>
+                                <p>Ini adalah email dari server lokal (npm run dev). Klik tombol di bawah ini untuk membuat kata sandi baru Anda:</p>
+                                <div style="text-align: center; margin: 30px 0;">
+                                  <a href="${actionLink}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Atur Ulang Kata Sandi</a>
+                                </div>
+                                <p style="color: #666; font-size: 12px;">Atau salin dan tempel tautan berikut ke browser Anda:<br><a href="${actionLink}">${actionLink}</a></p>
+                              </div>`
+                            });
+                            
+                            res.statusCode = 200;
+                            res.end(JSON.stringify({
+                              success: true,
+                              emailSent: true,
+                              message: 'Tautan reset kata sandi telah dikirimkan ke email Anda via Nodemailer (Local).'
+                            }));
+                            return;
+                          } catch (mailErr) {
+                            console.error('[ViteProxy] Gagal mengirim email via Nodemailer:', mailErr);
+                            // Fallback jika gagal kirim
+                            res.statusCode = 200;
+                            res.end(JSON.stringify({
+                              success: true,
+                              emailSent: false,
+                              action_link: actionLink,
+                              message: 'Gagal mengirim email SMTP lokal.'
+                            }));
+                            return;
+                          }
+                        }
+
                         res.statusCode = 200;
                         res.end(JSON.stringify({
                           success: true,
-                          action_link: linkData?.properties?.action_link
+                          emailSent: false,
+                          action_link: actionLink
                         }));
                       }
                     } else {
