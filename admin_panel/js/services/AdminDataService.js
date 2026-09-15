@@ -1394,7 +1394,7 @@ export class AdminDataService {
             accountNumber: row.account_number || '-',
             accountHolder: row.account_holder || row.name || '-',
             role: row.role || 'user',
-            isVerified: isVerified,
+            isVerified: Boolean(row.is_verified),
             isOnline: isOnline,
             createdAt: row.created_at || new Date().toISOString(),
             updatedAt: row.updated_at || null,
