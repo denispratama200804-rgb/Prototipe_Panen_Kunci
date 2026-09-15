@@ -2,6 +2,10 @@ import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import dns from 'node:dns';
+
+// Fix local IPv6 ENETUNREACH issue
+dns.setDefaultResultOrder('ipv4first');
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -821,15 +825,18 @@ export default defineConfig(({ mode }) => {
                         res.end(JSON.stringify({ success: false, error: error.message }));
                       } else {
                         const actionLink = linkData?.properties?.action_link;
-                        const smtpEmail = env.SMTP_EMAIL || process.env.SMTP_EMAIL;
-                        const smtpPassword = env.SMTP_PASSWORD || process.env.SMTP_PASSWORD;
+                        
+                        // Reload env on every request to pick up .env changes without restarting
+                        const currentEnv = loadEnv(server.config.mode, process.cwd(), '');
+                        const smtpEmail = currentEnv.SMTP_EMAIL || process.env.SMTP_EMAIL;
+                        const smtpPassword = currentEnv.SMTP_PASSWORD || process.env.SMTP_PASSWORD;
                         
                         if (smtpEmail && smtpPassword && actionLink) {
                           try {
                             const transporter = nodemailer.createTransport({
-                              host: env.SMTP_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
-                              port: Number(env.SMTP_PORT || process.env.SMTP_PORT) || 465,
-                              secure: (Number(env.SMTP_PORT || process.env.SMTP_PORT) || 465) === 465,
+                              host: currentEnv.SMTP_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+                              port: Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || 465,
+                              secure: (Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || 465) === 465,
                               auth: { user: smtpEmail, pass: smtpPassword }
                             });
                             
@@ -852,7 +859,7 @@ export default defineConfig(({ mode }) => {
                             res.end(JSON.stringify({
                               success: true,
                               emailSent: true,
-                              message: 'Tautan reset kata sandi telah dikirimkan ke email Anda via Nodemailer (Local).'
+                              message: 'Email sudah dikirimkan melalui Gmail Anda.'
                             }));
                             return;
                           } catch (mailErr) {

@@ -614,7 +614,7 @@ export default async function handler(req, res) {
           return res.status(200).json({
             success: true,
             emailSent: true,
-            message: 'Tautan reset kata sandi telah dikirimkan ke email Anda.'
+            message: 'Email sudah dikirimkan melalui Gmail Anda.'
           });
         } catch (mailErr) {
           console.error('[SupabaseProxy] Gagal mengirim email via Nodemailer:', mailErr);
