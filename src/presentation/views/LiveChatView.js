@@ -42,14 +42,14 @@ export class LiveChatView extends IComponent {
     return `
       <div id="live-chat-screen" class="fixed inset-0 z-50 flex flex-col bg-[#f5f6fa] dark:bg-[#070b14] w-full h-full max-w-md mx-auto overflow-hidden shadow-2xl">
         
-        <!-- Header Chat (Persis Referensi Foto 2: Brand Theme, Avatar Headset, Subtitle Online) -->
-        <header class="h-16 px-4 bg-[#0b1c30] text-white flex items-center justify-between shrink-0 shadow-md border-b border-white/10 z-10">
+        <!-- Header Chat (Sesuai dengan style header app utama) -->
+        <header class="h-16 px-4 glass shadow-[0_1px_8px_rgba(0,0,0,0.04)] border-b border-surface-container-high/40 flex items-center justify-between shrink-0 z-10">
           <div class="flex items-center gap-3">
             <!-- Back Button -->
             <button
               type="button"
               id="chat-back-btn"
-              class="w-9 h-9 -ml-1 flex items-center justify-center text-white/90 hover:text-white hover:bg-white/10 rounded-full transition-colors active:scale-95 cursor-pointer"
+              class="w-9 h-9 -ml-1 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-colors active:scale-95 cursor-pointer"
               aria-label="Kembali"
             >
               <span class="material-symbols-outlined text-[24px]">arrow_back</span>
@@ -57,16 +57,16 @@ export class LiveChatView extends IComponent {
 
             <!-- Support Avatar with Headset -->
             <div class="relative">
-              <div class="w-10 h-10 rounded-full bg-white/15 border border-white/20 flex items-center justify-center text-white shadow-inner">
+              <div class="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
                 <span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">support_agent</span>
               </div>
             </div>
 
             <!-- Title & Status -->
             <div class="flex flex-col">
-              <h1 class="font-bold text-base text-white tracking-tight leading-tight">Pusat Bantuan</h1>
-              <div class="flex items-center gap-1.5 text-[11px] text-white/80 font-medium">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <h1 class="font-bold text-base text-on-surface tracking-tight leading-tight">Pusat Bantuan</h1>
+              <div class="flex items-center gap-1.5 text-[11px] text-text-body font-medium">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>Admin Online</span>
               </div>
             </div>
@@ -77,7 +77,7 @@ export class LiveChatView extends IComponent {
             <button
               type="button"
               id="btn-chat-info"
-              class="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              class="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-full transition-colors cursor-pointer"
               title="Informasi Bantuan"
             >
               <span class="material-symbols-outlined text-[20px]">info</span>

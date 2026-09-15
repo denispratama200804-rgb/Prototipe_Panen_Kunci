@@ -643,7 +643,7 @@ export class ProfileView extends IComponent {
           try {
             await this._authService.updateProfile({ bankName, accountNumber, accountHolder, phone });
             this._notification.success('Data rekening berhasil disimpan!');
-            
+
             // Re-render konten tampilan profil saat ini
             const viewRoot = document.getElementById('app-view-root');
             if (viewRoot) {
@@ -750,11 +750,11 @@ export class ProfileView extends IComponent {
         const contents = {
           help: {
             title: 'Pusat Bantuan & FAQ',
-            message: 'Jika mengalami kendala terkait penyetoran API Key atau pencairan dana, hubungi tim support Panen Kunci di support@panenkunci.id atau melalui layanan bantuan resmi.'
+            message: 'Jika mengalami kendala terkait penyetoran API Key atau pencairan dana, hubungi tim support Panen Kunci di panenkuncii@gmail.com atau melalui layanan bantuan resmi.'
           },
           terms: {
             title: 'Syarat & Ketentuan',
-            message: 'Setiap API Key yang disetor harus memiliki saldo 80 kredit aktif dari Kie.ai. Key yang sudah terdaftar tidak dapat digunakan kembali. Pencairan saldo dilakukan sesuai batas minimum penarikan yang berlaku.'
+            message: 'Setiap API Key yang disetor harus memiliki saldo 80 kredit aktif. Key yang sudah terdaftar tidak dapat digunakan kembali. Pencairan saldo dilakukan sesuai batas minimum penarikan yang berlaku.'
           },
           privacy: {
             title: 'Kebijakan Privasi',
