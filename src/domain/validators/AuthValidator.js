@@ -34,6 +34,10 @@ export class AuthValidator extends IValidator {
       errors.push('Konfirmasi kata sandi tidak cocok dengan kata sandi.');
     }
 
+    if (data.agreeTerms !== undefined && !data.agreeTerms) {
+      errors.push('Anda harus menyetujui Syarat & Ketentuan Layanan untuk mendaftar.');
+    }
+
     return {
       isValid: errors.length === 0,
       errors

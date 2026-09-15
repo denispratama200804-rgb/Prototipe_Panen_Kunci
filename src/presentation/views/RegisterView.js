@@ -119,11 +119,31 @@ export class RegisterView extends IComponent {
               </div>
             </div>
 
+            <!-- Terms and Condition Checkbox -->
+            <div class="pt-1">
+              <label class="flex items-start gap-2.5 cursor-pointer select-none text-left" for="regAgreeTerms">
+                <input
+                  id="regAgreeTerms"
+                  name="agreeTerms"
+                  type="checkbox"
+                  required
+                  class="mt-1 w-4 h-4 rounded border-outline-variant/40 text-primary accent-primary focus:ring-0 cursor-pointer"
+                />
+                <span class="font-body-md text-xs text-text-body leading-snug">
+                  Saya setuju dengan
+                  <button type="button" id="btnOpenTerms" class="text-primary font-semibold hover:underline inline p-0 m-0 bg-transparent border-0 cursor-pointer align-baseline text-xs">Syarat &amp; Ketentuan Layanan</button>
+                  serta
+                  <button type="button" id="btnOpenPrivacy" class="text-primary font-semibold hover:underline inline p-0 m-0 bg-transparent border-0 cursor-pointer align-baseline text-xs">Kebijakan Privasi</button>
+                  Panen Kunci.
+                </span>
+              </label>
+            </div>
+
             <!-- Submit Button -->
             <button
               id="btnRegSubmit"
               type="submit"
-              class="w-full bg-primary text-on-primary font-label-md font-bold text-sm rounded-2xl py-3.5 mt-3 shadow-lg shadow-primary/25 hover:bg-primary-container active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              class="w-full bg-primary text-on-primary font-label-md font-bold text-sm rounded-2xl py-3.5 mt-2 shadow-lg shadow-primary/25 hover:bg-primary-container active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               <span>Daftar Sekarang</span>
               <span class="material-symbols-outlined text-[20px]">how_to_reg</span>
@@ -225,6 +245,47 @@ export class RegisterView extends IComponent {
       }
     });
 
+    const agreeTermsInput = container.querySelector('#regAgreeTerms');
+    const btnOpenTerms = container.querySelector('#btnOpenTerms');
+    const btnOpenPrivacy = container.querySelector('#btnOpenPrivacy');
+
+    // Buka Modal Syarat & Ketentuan Layanan (Langkah 1 QA: Baca dokumen/tautan Syarat & Ketentuan Layanan)
+    btnOpenTerms?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this._notification.showModal({
+        title: 'Syarat & Ketentuan Layanan',
+        html: `
+          <div class="flex flex-col gap-3 text-xs text-text-body leading-relaxed max-h-60 overflow-y-auto pr-1">
+            <p><strong>1. Ketentuan Akun:</strong> Setiap pengguna wajib mengisi data akun dengan valid dan bertanggung jawab atas keamanan kredensial akun Panen Kunci masing-masing.</p>
+            <p><strong>2. Penyetoran API Key:</strong> Setiap API Key yang disetor harus merupakan key resmi yang valid dan memiliki saldo kredit aktif dari Kie.ai. Key duplikat atau tidak aktif akan otomatis ditolak oleh sistem verifikasi.</p>
+            <p><strong>3. Penarikan Saldo:</strong> Saldo hasil penjualan API Key dapat ditarik ke rekening bank atau e-wallet terdaftar setelah mencapai batas minimum penarikan.</p>
+            <p><strong>4. Kepatuhan:</strong> Dilarang keras melakukan rekayasa sistem, bot ilegal, atau manipulasi data. Pelanggaran terhadap ketentuan ini dapat mengakibatkan pembekuan akun.</p>
+          </div>
+        `,
+        type: 'info',
+        confirmText: 'Saya Mengerti'
+      });
+    });
+
+    // Buka Modal Kebijakan Privasi
+    btnOpenPrivacy?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this._notification.showModal({
+        title: 'Kebijakan Privasi',
+        html: `
+          <div class="flex flex-col gap-3 text-xs text-text-body leading-relaxed max-h-60 overflow-y-auto pr-1">
+            <p><strong>1. Perlindungan Data:</strong> Panen Kunci memprioritaskan keamanan informasi pribadi pengguna dengan enkripsi standar industri.</p>
+            <p><strong>2. Penggunaan Data:</strong> Data hanya digunakan untuk autentikasi akun, transaksi penyetoran, dan proses pencairan dana.</p>
+            <p><strong>3. Kerahasiaan:</strong> Kami tidak pernah menjual atau membagikan kredensial pengguna kepada pihak ketiga yang tidak berwenang.</p>
+          </div>
+        `,
+        type: 'info',
+        confirmText: 'Saya Mengerti'
+      });
+    });
+
     // Form submit
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -233,11 +294,19 @@ export class RegisterView extends IComponent {
       const email = emailInput.value.trim();
       const password = passInput.value;
       const confirmPassword = confirmInput.value;
+      const agreeTerms = agreeTermsInput ? agreeTermsInput.checked : false;
+
+      // Validasi persetujuan Syarat & Ketentuan Layanan (Langkah 2 & 3 QA)
+      if (!agreeTerms) {
+        this._notification.error('Harap centang dan setujui Syarat & Ketentuan Layanan sebelum melanjutkan pendaftaran.');
+        agreeTermsInput?.focus();
+        return;
+      }
 
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Proses</span>';
 
-      const res = await this._authService.register({ name, email, password, confirmPassword });
+      const res = await this._authService.register({ name, email, password, confirmPassword, agreeTerms });
 
       if (res.success) {
         this._notification.showModal({
