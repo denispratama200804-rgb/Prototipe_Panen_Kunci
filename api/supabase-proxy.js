@@ -618,20 +618,16 @@ export default async function handler(req, res) {
           });
         } catch (mailErr) {
           console.error('[SupabaseProxy] Gagal mengirim email via Nodemailer:', mailErr);
-          // Fallback ke return action_link jika email gagal
-          return res.status(200).json({
-            success: true,
-            emailSent: false,
-            action_link: actionLink,
-            message: 'Gagal mengirim email SMTP.'
+          return res.status(400).json({
+            success: false,
+            error: 'Gagal mengirim email. Harap pastikan SMTP_EMAIL dan SMTP_PASSWORD (App Password) di Vercel sudah benar dan Redeploy Vercel.'
           });
         }
       }
 
-      return res.status(200).json({
-        success: true,
-        emailSent: false,
-        action_link: actionLink
+      return res.status(400).json({
+        success: false,
+        error: 'Sistem email belum dikonfigurasi di Vercel. Harap tambahkan SMTP_EMAIL dan SMTP_PASSWORD di dashboard Vercel lalu klik Redeploy.'
       });
     }
 

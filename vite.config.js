@@ -864,24 +864,21 @@ export default defineConfig(({ mode }) => {
                             return;
                           } catch (mailErr) {
                             console.error('[ViteProxy] Gagal mengirim email via Nodemailer:', mailErr);
-                            // Fallback jika gagal kirim
-                            res.statusCode = 200;
+                            res.statusCode = 400;
                             res.end(JSON.stringify({
-                              success: true,
-                              emailSent: false,
-                              action_link: actionLink,
-                              message: 'Gagal mengirim email SMTP lokal.'
+                              success: false,
+                              error: 'Gagal mengirim email: Cek kembali keabsahan Password Aplikasi Gmail Anda dan koneksi internet.'
                             }));
                             return;
                           }
                         }
 
-                        res.statusCode = 200;
+                        res.statusCode = 400;
                         res.end(JSON.stringify({
-                          success: true,
-                          emailSent: false,
-                          action_link: actionLink
+                          success: false,
+                          error: 'Sistem email belum dikonfigurasi di file .env lokal Anda.'
                         }));
+                        return;
                       }
                     } else {
                       res.statusCode = 500;
