@@ -750,7 +750,7 @@ export class ProfileView extends IComponent {
         const contents = {
           help: {
             title: 'Pusat Bantuan & FAQ',
-            message: 'Jika mengalami kendala terkait penyetoran API Key atau pencairan dana, hubungi tim support Panen Kunci di panenkuncii@gmail.com atau melalui layanan bantuan resmi.'
+            message: 'Jika mengalami kendala terkait penyetoran API Key atau pencairan dana, hubungi tim support Panen Kunci di panenkuncii@gmail.com atau melalui layanan live chat kepada admin.'
           },
           terms: {
             title: 'Syarat & Ketentuan',
