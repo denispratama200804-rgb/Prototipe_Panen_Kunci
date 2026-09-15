@@ -16,6 +16,7 @@ export class DashboardView extends IComponent {
     this._walletService = container.resolve('WalletService');
     this._apiKeyService = container.resolve('ApiKeyService');
     this._authService = container.resolve('AuthService');
+    this._notificationService = container.resolve('NotificationService');
     this._eventBus = container.resolve('EventBus');
   }
 
@@ -240,6 +241,46 @@ export class DashboardView extends IComponent {
     this._unsubKeySubmitted = this._eventBus.on(AppEvents.API_KEY_SUBMITTED, () => {
       this._updateDashboardUI(container);
     });
+
+    // Cek apakah ada notifikasi payout (diterima / ditolak) yang belum dibaca
+    this._checkUnreadPayoutNotifications();
+
+    this._unsubNotifsUpdated = this._eventBus.on(AppEvents.NOTIFICATIONS_UPDATED, () => {
+      this._checkUnreadPayoutNotifications();
+    });
+  }
+
+  /**
+   * Cek notifikasi penarikan saldo (diterima / ditolak) yang belum dibaca
+   * dan tampilkan modal notifikasi otomatis di dashboard
+   */
+  _checkUnreadPayoutNotifications() {
+    if (!this._notificationService) return;
+    const notifs = this._notificationService.getNotifications();
+    const unreadPayout = notifs.find(n => 
+      !n.isRead && 
+      (n.type === 'withdrawal_success' || n.type === 'withdrawal_failed')
+    );
+
+    if (unreadPayout) {
+      const sessionAlertKey = `alerted_payout_${unreadPayout.id}`;
+      if (sessionStorage.getItem(sessionAlertKey)) return;
+      sessionStorage.setItem(sessionAlertKey, 'true');
+
+      const isSuccess = unreadPayout.type === 'withdrawal_success';
+      setTimeout(() => {
+        this._notificationService.showModal({
+          title: unreadPayout.title || (isSuccess ? 'Penarikan Saldo Diterima!' : 'Permintaan Penarikan Ditolak'),
+          message: unreadPayout.message,
+          type: isSuccess ? 'success' : 'error',
+          confirmText: 'Buka Notifikasi',
+          cancelText: 'Tutup',
+          onConfirm: () => {
+            document.getElementById('header-notif-btn')?.click();
+          }
+        });
+      }, 500);
+    }
   }
 
   destroy() {
@@ -254,6 +295,10 @@ export class DashboardView extends IComponent {
     if (this._unsubKeySubmitted) {
       this._unsubKeySubmitted();
       this._unsubKeySubmitted = null;
+    }
+    if (this._unsubNotifsUpdated) {
+      this._unsubNotifsUpdated();
+      this._unsubNotifsUpdated = null;
     }
   }
 

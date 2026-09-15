@@ -1173,7 +1173,9 @@ export class AdminDataService {
         transactionId,
         userId: targetUserId,
         status: 'success',
-        proofNotes: notes
+        amount: Number(tx.amount || 0),
+        proofImage: proofImage || '',
+        proofNotes: notes || ''
       });
 
       return { success: true, transaction: tx, notification: newNotif };
@@ -1281,6 +1283,11 @@ export class AdminDataService {
       };
       notifs.unshift(newNotif);
       this._set(notifsKey, notifs);
+
+      // Cadangkan ke notifikasi global
+      const globalNotifs = this._get('notifications', []);
+      globalNotifs.unshift(newNotif);
+      this._set('notifications', globalNotifs);
     }
 
     // Sinkronkan update status transaksi ke database Supabase

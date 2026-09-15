@@ -65,8 +65,6 @@ export class WalletService {
                 data.type === 'KEY_STATUS_UPDATED' ||
                 data.type === 'KEY_DELETED' ||
                 data.type === 'BALANCE_UPDATED' ||
-                data.type === 'WITHDRAWAL_APPROVED' ||
-                data.type === 'WITHDRAWAL_REJECTED' ||
                 data.type === 'WITHDRAWAL_CREATED' ||
                 data.type === 'TRANSACTION_UPDATED'
               ) {
@@ -76,6 +74,44 @@ export class WalletService {
                   balance: this._balance,
                   passiveBalance: this._passiveBalance,
                   lifetime: this._lifetimeEarnings
+                });
+              } else if (data.type === 'WITHDRAWAL_APPROVED') {
+                this._loadWallet();
+                await this._syncFromRemote();
+                this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+                  balance: this._balance,
+                  passiveBalance: this._passiveBalance,
+                  lifetime: this._lifetimeEarnings
+                });
+                const amountStr = data.amount ? `Rp ${Number(data.amount).toLocaleString('id-ID')}` : '';
+                this._eventBus.emit('PAYOUT_PROCESSED', {
+                  type: 'success',
+                  status: 'success',
+                  transactionId: data.transactionId,
+                  userId: data.userId,
+                  amount: data.amount,
+                  proofImage: data.proofImage || '',
+                  proofNotes: data.proofNotes || '',
+                  title: 'Penarikan Saldo Diterima!',
+                  message: `Pencairan dana ${amountStr} telah berhasil disetujui & ditransfer oleh Admin.`
+                });
+              } else if (data.type === 'WITHDRAWAL_REJECTED') {
+                this._loadWallet();
+                await this._syncFromRemote();
+                this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+                  balance: this._balance,
+                  passiveBalance: this._passiveBalance,
+                  lifetime: this._lifetimeEarnings
+                });
+                const refundStr = data.refundAmount ? `sebesar Rp ${Number(data.refundAmount).toLocaleString('id-ID')} ` : '';
+                this._eventBus.emit('PAYOUT_PROCESSED', {
+                  type: 'error',
+                  status: 'failed',
+                  transactionId: data.transactionId,
+                  userId: data.userId,
+                  refundAmount: data.refundAmount,
+                  title: 'Permintaan Penarikan Ditolak',
+                  message: `Penarikan ${refundStr}ditolak (${data.reason || 'Data tidak sesuai'}). Dana telah dikembalikan ke saldo aktif Anda.`
                 });
               }
             }
@@ -656,6 +692,10 @@ export class WalletService {
         balance: this._balance,
         passiveBalance: this._passiveBalance,
         lifetime: this._lifetimeEarnings
+      });
+
+      this._eventBus.emit(AppEvents.TRANSACTIONS_LOADED, {
+        transactions: this._transactions
       });
     } catch (err) {
       console.warn('[WalletService] Remote tx sync fallback to local cache:', err.message);

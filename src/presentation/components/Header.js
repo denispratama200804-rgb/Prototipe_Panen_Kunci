@@ -285,17 +285,25 @@ export class HeaderComponent {
                 minute: '2-digit'
               });
 
+              const isFailed = n.type === 'withdrawal_failed' || n.title?.toLowerCase().includes('ditolak');
+              const iconName = isFailed ? 'cancel' : 'task_alt';
+              const iconBgClass = isFailed ? 'bg-red-500/15 text-red-500' : 'bg-emerald-500/15 text-emerald-500';
+              const cardBgClass = isUnread
+                ? (isFailed ? 'bg-red-500/5 border border-red-500/30 shadow-sm' : 'bg-emerald-500/5 border border-emerald-500/30 shadow-sm')
+                : 'bg-surface-container-lowest border border-surface-container';
+              const unreadDotClass = isFailed ? 'bg-red-500' : 'bg-emerald-500';
+
               return `
-                <div class="rounded-2xl p-4 transition-all ${isUnread ? 'bg-secondary/5 border border-secondary/30 shadow-sm' : 'bg-surface-container-lowest border border-surface-container'} flex flex-col gap-2.5">
+                <div class="rounded-2xl p-4 transition-all ${cardBgClass} flex flex-col gap-2.5">
                   <div class="flex items-start justify-between gap-2">
                     <div class="flex items-center gap-2.5">
-                      <div class="w-8 h-8 rounded-xl bg-secondary/15 text-secondary flex items-center justify-center shrink-0">
-                        <span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">task_alt</span>
+                      <div class="w-8 h-8 rounded-xl ${iconBgClass} flex items-center justify-center shrink-0">
+                        <span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">${iconName}</span>
                       </div>
                       <div>
                         <div class="flex items-center gap-1.5">
                           <h4 class="font-label-md text-xs font-bold text-text-heading">${n.title}</h4>
-                          ${isUnread ? '<span class="w-2 h-2 rounded-full bg-secondary"></span>' : ''}
+                          ${isUnread ? `<span class="w-2 h-2 rounded-full ${unreadDotClass}"></span>` : ''}
                         </div>
                         <span class="text-[10px] text-text-body">${dateStr}</span>
                       </div>

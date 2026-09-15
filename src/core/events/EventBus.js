@@ -64,4 +64,5 @@ export const AppEvents = {
   SHOW_MODAL: 'notification:show_modal',
   CLOSE_MODAL: 'notification:close_modal',
   NOTIFICATIONS_UPDATED: 'notification:updated',
+  TRANSACTIONS_LOADED: 'wallet:transactions_loaded',
 };
