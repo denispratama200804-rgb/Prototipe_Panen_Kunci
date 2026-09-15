@@ -4,8 +4,8 @@
  * Arsitektur: Modern App Hub Dashboard + Responsive Desktop & Mobile Web
  */
 // ONE-TIME CACHE WIPE (Deployed to Vercel)
-if (!localStorage.getItem('panenkunci_wiped_v3')) {
-  console.log('🧹 Menjalankan pembersihan cache menyeluruh (V3)...');
+if (!localStorage.getItem('panenkunci_wiped_v4')) {
+  console.log('🧹 Menjalankan pembersihan cache menyeluruh (V4)...');
   const prefix = 'panenkunci:';
   const keysToRemove = [];
   for(let i=0; i<localStorage.length; i++){
@@ -35,7 +35,7 @@ if (!localStorage.getItem('panenkunci_wiped_v3')) {
       }
     } catch(e) {}
   }
-  localStorage.setItem('panenkunci_wiped_v3', 'true');
+  localStorage.setItem('panenkunci_wiped_v4', 'true');
   console.log('✅ Pembersihan selesai.');
 }
 
@@ -59,7 +59,23 @@ class AdminApp {
     this.currentViewInstance = null;
 
     this.navbar = new Navbar({
-      onRefresh: () => this.refreshCurrentView(true, false),
+      onRefresh: async () => {
+        try {
+          const icon = document.querySelector('#navbar-refresh-btn .material-symbols-outlined');
+          if (icon) icon.classList.add('animate-spin');
+          
+          await Promise.all([
+            adminDataService.fetchConfigFromSupabase().catch(()=>{}),
+            adminDataService.fetchUsersFromSupabase().catch(()=>{}),
+            adminDataService.fetchApiKeysFromSupabase().catch(()=>{}),
+            adminDataService.fetchTransactionsFromSupabase().catch(()=>{})
+          ]);
+          this.refreshCurrentView(true, false);
+        } catch (e) {
+          console.error(e);
+          toast.error('Gagal sinkronisasi data dari server');
+        }
+      },
       onNavigate: tab => this.navigate(tab),
       onSeed: () => this._handleSeedDemo(),
       onLogout: () => this._handleLogout()
