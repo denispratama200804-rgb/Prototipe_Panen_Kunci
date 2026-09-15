@@ -188,6 +188,16 @@ class AdminApp {
       }
     });
 
+    // Real-time listener: saat ada profil atau nickname pengguna yang diperbarui
+    adminDataService.on('users_updated', (data) => {
+      if (this.currentTab === 'users' || this.currentTab === 'dashboard') {
+        this.refreshCurrentView(false, false);
+      }
+      if (data && data.name) {
+        toast.info(`Nickname pengguna diperbarui menjadi "${data.name}"!`, 'Sinkronisasi Realtime');
+      }
+    });
+
     // Real-time listener: saat ada pesan chat baru dari user
     chatService.on('message_received', (msg) => {
       const navbarMount = document.getElementById('admin-navbar-mount');

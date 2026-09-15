@@ -521,6 +521,12 @@ export class UsersView {
                 </span>
               </div>
               <p class="text-xs text-slate-400">${user.email} • ${user.phone} • ID: <span class="font-mono text-indigo-300">${user.id}</span></p>
+              ${user.nicknameUpdatedAt ? `
+                <p class="text-[10px] text-indigo-400/90 mt-0.5 flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[13px]">schedule</span>
+                  <span>Nickname diubah: <strong>${new Date(user.nicknameUpdatedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
+                </p>
+              ` : ''}
             </div>
           </div>
 

@@ -52,6 +52,9 @@ export class AdminDataService {
           } else if (data.type === 'KEY_SUBMITTED' || data.type === 'KEY_DEPOSITED') {
             await this.fetchApiKeysFromSupabase();
             this.emit('key_received', data);
+          } else if (data.type === 'USER_NICKNAME_CHANGED' || data.type === 'USER_UPDATED') {
+            await this.fetchUsersFromSupabase();
+            this.emit('users_updated', data);
           }
         };
       } catch (e) {
@@ -72,8 +75,20 @@ export class AdminDataService {
             }
           )
           .subscribe();
+
+        this._supabaseUsersChannel = supabase
+          .channel('admin_users_realtime')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'users' },
+            async (payload) => {
+              await this.fetchUsersFromSupabase();
+              this.emit('users_updated', payload);
+            }
+          )
+          .subscribe();
       } catch (err) {
-        console.warn('[AdminDataService] Supabase realtime transactions error:', err.message);
+        console.warn('[AdminDataService] Supabase realtime error:', err.message);
       }
     }
   }
@@ -1399,6 +1414,7 @@ export class AdminDataService {
             createdAt: row.created_at || new Date().toISOString(),
             updatedAt: row.updated_at || null,
             avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : '',
+            nicknameUpdatedAt: row.nickname_updated_at || row.nicknameUpdatedAt || null,
             customBalance: balanceMap[row.id] !== undefined ? balanceMap[row.id] : undefined,
             manualBalance: manualMap[row.id] !== undefined ? manualMap[row.id] : undefined
           };

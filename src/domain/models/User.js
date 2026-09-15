@@ -17,6 +17,7 @@ export class User {
    * @param {boolean} [params.isVerified]
    * @param {string} [params.createdAt]
    * @param {string} [params.avatar]
+   * @param {string} [params.nicknameUpdatedAt]
    */
   constructor({
     id,
@@ -30,7 +31,8 @@ export class User {
     accountHolder = '',
     isVerified = false,
     createdAt = new Date().toISOString(),
-    avatar = ''
+    avatar = '',
+    nicknameUpdatedAt = null
   }) {
     this.id = id;
     this.name = name;
@@ -43,6 +45,7 @@ export class User {
     this.accountHolder = accountHolder || '';
     this.createdAt = createdAt;
     this.avatar = (avatar && avatar !== '/avatar.png') ? avatar : '';
+    this.nicknameUpdatedAt = nicknameUpdatedAt || null;
 
     // Akun terverifikasi jika sudah mendaftarkan rekening e-wallet atau merupakan administrator
     const hasPayment = this.hasPaymentDetails();
@@ -87,6 +90,38 @@ export class User {
   }
 
   /**
+   * Mengecek apakah pengguna diperbolehkan mengganti nickname (aturan: 1 bulan / 30 hari sekali)
+   * @returns {{ allowed: boolean, daysLeft: number, nextDate: Date | null }}
+   */
+  canChangeNickname() {
+    if (!this.nicknameUpdatedAt) {
+      return { allowed: true, daysLeft: 0, nextDate: null };
+    }
+
+    const lastTime = new Date(this.nicknameUpdatedAt).getTime();
+    if (isNaN(lastTime)) {
+      return { allowed: true, daysLeft: 0, nextDate: null };
+    }
+
+    const cooldownMs = 30 * 24 * 60 * 60 * 1000; // 30 hari dalam milidetik
+    const elapsed = Date.now() - lastTime;
+
+    if (elapsed >= cooldownMs) {
+      return { allowed: true, daysLeft: 0, nextDate: null };
+    }
+
+    const remainingMs = cooldownMs - elapsed;
+    const daysLeft = Math.max(1, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
+    const nextDate = new Date(lastTime + cooldownMs);
+
+    return {
+      allowed: false,
+      daysLeft,
+      nextDate
+    };
+  }
+
+  /**
    * Serialisasi ke object JSON
    * @returns {Object}
    */
@@ -103,7 +138,8 @@ export class User {
       accountHolder: this.accountHolder,
       isVerified: this.isVerified,
       createdAt: this.createdAt,
-      avatar: this.avatar
+      avatar: this.avatar,
+      nicknameUpdatedAt: this.nicknameUpdatedAt
     };
   }
 }

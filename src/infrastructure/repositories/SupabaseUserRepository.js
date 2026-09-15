@@ -253,7 +253,8 @@ export class SupabaseUserRepository extends IUserRepository {
       accountHolder: row.account_holder || '',
       isVerified: Boolean(row.is_verified),
       createdAt: row.created_at,
-      avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : (row.avatar_url && row.avatar_url !== '/avatar.png' ? row.avatar_url : '')
+      avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : (row.avatar_url && row.avatar_url !== '/avatar.png' ? row.avatar_url : ''),
+      nicknameUpdatedAt: row.nickname_updated_at || row.nicknameUpdatedAt || null
     });
   }
 }

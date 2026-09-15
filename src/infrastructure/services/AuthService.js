@@ -205,11 +205,15 @@ export class AuthService {
         this._userRepository.getByEmail(this._currentUser.email)
           .then(remote => {
             if (remote) {
+              const prevNicknameUpdatedAt = this._currentUser?.nicknameUpdatedAt;
               const isRemoteAdmin = (remote.role === 'admin') ||
                                     (remote.email === 'admin@panenkunci.id') ||
                                     (remote.email === 'admin@panenkunci.com');
               const validatedRole = isRemoteAdmin ? 'admin' : 'user';
               remote.role = validatedRole;
+              if (!remote.nicknameUpdatedAt && prevNicknameUpdatedAt) {
+                remote.nicknameUpdatedAt = prevNicknameUpdatedAt;
+              }
               this._currentUser = remote;
               this._saveSession(this._currentUser, validatedRole);
               this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
@@ -616,6 +620,145 @@ export class AuthService {
     }
 
     this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
+  }
+
+  /**
+   * Mengganti nickname pengguna dengan batasan 1 kali sebulan (30 hari).
+   * Sinkron secara realtime ke database Supabase (tabel users), Auth user_metadata, dan Admin Panel.
+   * @param {string} newNickname
+   * @returns {Promise<{ success: boolean, name: string, nicknameUpdatedAt: string }>}
+   */
+  async updateNickname(newNickname) {
+    if (!this._currentUser) {
+      throw new Error('Pengguna belum masuk akun.');
+    }
+
+    const trimmed = (newNickname || '').trim();
+    if (!trimmed) {
+      throw new Error('Nickname tidak boleh kosong.');
+    }
+    if (trimmed.length < 3) {
+      throw new Error('Nickname minimal terdiri dari 3 karakter.');
+    }
+    if (trimmed.length > 30) {
+      throw new Error('Nickname maksimal 30 karakter.');
+    }
+    if (trimmed.toLowerCase() === (this._currentUser.name || '').toLowerCase()) {
+      throw new Error('Nickname baru tidak boleh sama dengan nickname saat ini.');
+    }
+
+    // 1. Cek batasan cooldown 1 bulan (30 hari)
+    const check = this._currentUser.canChangeNickname();
+    if (!check.allowed) {
+      const formattedDate = check.nextDate ? check.nextDate.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      }) : '';
+      throw new Error(
+        `Nickname hanya dapat diganti sebulan sekali (30 hari). Anda dapat menggantinya kembali dalam ${check.daysLeft} hari${formattedDate ? ` (pada ${formattedDate})` : ''}.`
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    const oldName = this._currentUser.name;
+
+    // Update di model domain lokal & sesi
+    this._currentUser.name = trimmed;
+    this._currentUser.nicknameUpdatedAt = nowIso;
+    this._saveSession(this._currentUser, this._currentUser.role || 'user');
+
+    // 2. Simpan ke database Supabase dan Auth metadata
+    if (isSupabaseConfigured() && this._currentUser.id) {
+      let proxySuccess = false;
+      // A. Coba update via Server Proxy (action: 'update_nickname' yang meng-handle bypass RLS & metadata)
+      try {
+        const proxyRes = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update_nickname',
+            userId: this._currentUser.id,
+            name: trimmed,
+            nicknameUpdatedAt: nowIso
+          })
+        });
+        if (proxyRes.ok) {
+          const proxyJson = await proxyRes.json();
+          if (proxyJson.success) {
+            proxySuccess = true;
+          } else if (proxyJson.error) {
+            throw new Error(proxyJson.error);
+          }
+        }
+      } catch (proxyErr) {
+        console.warn('[AuthService] Server proxy update_nickname warning:', proxyErr.message);
+        if (proxyErr.message && proxyErr.message.includes('sebulan')) {
+          this._currentUser.name = oldName;
+          this._saveSession(this._currentUser, this._currentUser.role || 'user');
+          throw proxyErr;
+        }
+      }
+
+      // B. Fallback update langsung ke tabel users via supabase client jika proxy belum aktif
+      if (!proxySuccess && this._userRepository) {
+        try {
+          await this._userRepository.update(this._currentUser.id, { name: trimmed });
+        } catch (dbErr) {
+          console.warn('[AuthService] Direct users table update note:', dbErr.message);
+        }
+      }
+
+      // C. Simpan ke Supabase Auth user_metadata
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            name: trimmed,
+            full_name: trimmed,
+            nickname_updated_at: nowIso
+          }
+        });
+      } catch (authMetaErr) {
+        console.warn('[AuthService] Supabase auth updateUser metadata note:', authMetaErr.message);
+      }
+    }
+
+    // 3. Update cache akun lokal jika ada
+    const localAccounts = this._storage.get('registered_accounts') || [];
+    const accIdx = localAccounts.findIndex(acc => acc.id === this._currentUser.id || acc.email?.toLowerCase() === this._currentUser.email?.toLowerCase());
+    if (accIdx !== -1) {
+      localAccounts[accIdx] = {
+        ...localAccounts[accIdx],
+        name: trimmed,
+        nicknameUpdatedAt: nowIso
+      };
+      this._storage.set('registered_accounts', localAccounts);
+    }
+
+    // 4. Broadcast realtime ke tab lain & Admin Panel via BroadcastChannel
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('panenkunci_sync');
+        bc.postMessage({
+          type: 'USER_NICKNAME_CHANGED',
+          userId: this._currentUser.id,
+          name: trimmed,
+          nicknameUpdatedAt: nowIso
+        });
+        bc.close();
+      } catch (bcErr) {
+        console.warn('[AuthService] BroadcastChannel note:', bcErr);
+      }
+    }
+
+    // 5. Emit event update
+    this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
+
+    return {
+      success: true,
+      name: trimmed,
+      nicknameUpdatedAt: nowIso
+    };
   }
 
   /**

@@ -704,6 +704,87 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
+                  if (action === 'update_nickname') {
+                    if (adminSupabase) {
+                      const targetUserId = parsed.userId || parsed.id;
+                      const newNickname = (parsed.name || '').trim();
+                      const clientNicknameUpdatedAt = parsed.nicknameUpdatedAt || new Date().toISOString();
+
+                      if (!targetUserId || !newNickname) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: 'User ID dan nickname baru diperlukan.' }));
+                        return;
+                      }
+
+                      if (newNickname.length < 3 || newNickname.length > 30) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: 'Nickname harus antara 3 sampai 30 karakter.' }));
+                        return;
+                      }
+
+                      let lastChangeTime = null;
+                      try {
+                        const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
+                        if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
+                          lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
+                        }
+                      } catch (_) {}
+
+                      if (lastChangeTime && !isNaN(lastChangeTime)) {
+                        const cooldownMs = 30 * 24 * 60 * 60 * 1000;
+                        const elapsed = Date.now() - lastChangeTime;
+                        if (elapsed < cooldownMs) {
+                          const remainingDays = Math.max(1, Math.ceil((cooldownMs - elapsed) / (1000 * 60 * 60 * 24)));
+                          res.statusCode = 400;
+                          res.end(JSON.stringify({
+                            success: false,
+                            error: `Nickname hanya dapat diganti sebulan sekali (30 hari). Sisa waktu: ${remainingDays} hari.`
+                          }));
+                          return;
+                        }
+                      }
+
+                      const nowIso = clientNicknameUpdatedAt || new Date().toISOString();
+
+                      const { data: updatedUser, error: updateErr } = await adminSupabase
+                        .from('users')
+                        .update({ name: newNickname, updated_at: nowIso })
+                        .eq('id', targetUserId)
+                        .select()
+                        .single();
+
+                      if (updateErr) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: updateErr.message }));
+                        return;
+                      }
+
+                      try {
+                        await adminSupabase.auth.admin.updateUserById(targetUserId, {
+                          user_metadata: {
+                            name: newNickname,
+                            full_name: newNickname,
+                            nickname_updated_at: nowIso
+                          }
+                        });
+                      } catch (metaErr) {
+                        console.warn('[vite-proxy] Update auth metadata warning:', metaErr.message);
+                      }
+
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({
+                        success: true,
+                        data: updatedUser,
+                        name: newNickname,
+                        nicknameUpdatedAt: nowIso
+                      }));
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                    }
+                    return;
+                  }
+
                   if (action === 'update' && table === 'users' && id) {
                     const { data: updated, error } = await adminSupabase
                       .from('users')

@@ -720,6 +720,76 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: inserted });
     }
 
+    // 4b. Update nickname dengan batasan sebulan sekali (30 hari)
+    if (action === 'update_nickname') {
+      const targetUserId = body.userId || body.id;
+      const newNickname = (body.name || '').trim();
+      const clientNicknameUpdatedAt = body.nicknameUpdatedAt || new Date().toISOString();
+
+      if (!targetUserId || !newNickname) {
+        return res.status(400).json({ success: false, error: 'User ID dan nickname baru diperlukan.' });
+      }
+
+      if (newNickname.length < 3 || newNickname.length > 30) {
+        return res.status(400).json({ success: false, error: 'Nickname harus antara 3 sampai 30 karakter.' });
+      }
+
+      // 1. Cek riwayat pergantian sebelumnya dari auth user metadata
+      let lastChangeTime = null;
+      try {
+        const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
+        if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
+          lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
+        }
+      } catch (_) {}
+
+      if (lastChangeTime && !isNaN(lastChangeTime)) {
+        const cooldownMs = 30 * 24 * 60 * 60 * 1000;
+        const elapsed = Date.now() - lastChangeTime;
+        if (elapsed < cooldownMs) {
+          const remainingDays = Math.max(1, Math.ceil((cooldownMs - elapsed) / (1000 * 60 * 60 * 24)));
+          return res.status(400).json({
+            success: false,
+            error: `Nickname hanya dapat diganti sebulan sekali (30 hari). Sisa waktu: ${remainingDays} hari.`
+          });
+        }
+      }
+
+      const nowIso = clientNicknameUpdatedAt || new Date().toISOString();
+
+      // 2. Update kolom name di public.users
+      const { data: updatedUser, error: updateErr } = await adminSupabase
+        .from('users')
+        .update({ name: newNickname, updated_at: nowIso })
+        .eq('id', targetUserId)
+        .select()
+        .single();
+
+      if (updateErr) {
+        return res.status(400).json({ success: false, error: updateErr.message });
+      }
+
+      // 3. Update metadata di auth.users
+      try {
+        await adminSupabase.auth.admin.updateUserById(targetUserId, {
+          user_metadata: {
+            name: newNickname,
+            full_name: newNickname,
+            nickname_updated_at: nowIso
+          }
+        });
+      } catch (metaErr) {
+        console.warn('[supabase-proxy] Update auth metadata warning:', metaErr.message);
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: updatedUser,
+        name: newNickname,
+        nicknameUpdatedAt: nowIso
+      });
+    }
+
     // 5. Update record pengguna / API Key / Transaksi (bypass RLS)
     if (action === 'update' && table === 'users' && id) {
       const { data: updated, error } = await adminSupabase

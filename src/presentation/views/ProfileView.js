@@ -42,6 +42,9 @@ export class ProfileView extends IComponent {
 
     const lifetime = this._walletService.getLifetimeEarnings();
     const totalKeys = this._apiKeyService.getAllKeys().length;
+    const nicknameStatus = typeof user.canChangeNickname === 'function'
+      ? user.canChangeNickname()
+      : { allowed: true, daysLeft: 0, nextDate: null };
     const initials = (user.name || 'PK')
       .split(' ')
       .map(part => part[0])
@@ -123,7 +126,28 @@ export class ProfileView extends IComponent {
               <span>Hapus Foto</span>
             </button>
 
-            <h2 class="font-headline-md text-xl font-bold text-text-heading" id="profileNameDisplay">${user.name || 'Pengguna'}</h2>
+            <!-- Nickname & Tombol Edit -->
+            <div class="flex items-center justify-center gap-1.5 mt-1">
+              <h2 class="font-headline-md text-xl font-bold text-text-heading" id="profileNameDisplay">${user.name || 'Pengguna'}</h2>
+              <button
+                type="button"
+                id="btnEditNickname"
+                class="w-7 h-7 rounded-full text-text-body hover:text-primary hover:bg-primary/10 active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center border border-transparent hover:border-primary/20"
+                title="${nicknameStatus.allowed ? 'Ubah Nickname (1 Bulan Sekali)' : `Nickname dapat diganti ${nicknameStatus.daysLeft} hari lagi`}"
+                aria-label="Ubah Nickname"
+              >
+                <span class="material-symbols-outlined text-[17px]">edit</span>
+              </button>
+            </div>
+
+            <!-- Status batasan ganti nickname (sebulan sekali) -->
+            ${!nicknameStatus.allowed ? `
+              <div class="mt-0.5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container text-[10px] font-medium text-text-body/80 border border-surface-container" title="Batas ganti nickname 1 bulan sekali">
+                <span class="material-symbols-outlined text-[12px] text-amber-500">schedule</span>
+                <span>Ganti nickname lagi dalam <strong>${nicknameStatus.daysLeft} hari</strong></span>
+              </div>
+            ` : ''}
+
             <p class="text-xs text-text-body mt-0.5" id="profileEmailDisplay">${user.email || ''}</p>
 
             <!-- Role Badge: Hanya ditampilkan jika login sebagai Administrator -->
@@ -408,11 +432,146 @@ export class ProfileView extends IComponent {
       }
     });
 
+    const editNicknameBtn = container.querySelector('#btnEditNickname');
     const editBankBtn = container.querySelector('#btnEditBank');
     const resetPassBtn = container.querySelector('#btnResetPassword');
     const logoutBtn = container.querySelector('#btnLogout');
     const infoBtns = container.querySelectorAll('.btn-info-modal');
     const liveChatBtn = container.querySelector('#btnLiveChatAdmin');
+
+    // Handler Ganti Nickname Pengguna (Aturan: 1 Bulan Sekali)
+    editNicknameBtn?.addEventListener('click', () => {
+      const user = this._authService.getCurrentUser();
+      if (!user) return;
+
+      const check = typeof user.canChangeNickname === 'function'
+        ? user.canChangeNickname()
+        : { allowed: true, daysLeft: 0, nextDate: null };
+
+      // Jika belum melewati masa cooldown 30 hari
+      if (!check.allowed) {
+        const formattedDate = check.nextDate ? check.nextDate.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        }) : '';
+
+        this._notification.showModal({
+          title: 'Batas Ganti Nickname',
+          html: `
+            <div class="flex flex-col items-center text-center p-2">
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3 border border-amber-500/20">
+                <span class="material-symbols-outlined text-3xl">schedule</span>
+              </div>
+              <p class="text-sm font-bold text-text-heading">Belum Dapat Mengganti Nickname</p>
+              <p class="text-xs text-text-body mt-2 leading-relaxed">
+                Untuk menjaga ketertiban data dan keamanan transaksi, pengguna hanya dapat mengganti nickname <strong>1 kali dalam sebulan (30 hari)</strong>.
+              </p>
+              <div class="w-full bg-surface-container rounded-2xl p-3.5 mt-3 border border-surface-container-high text-left flex flex-col gap-2">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="text-text-body">Sisa Waktu Tunggu:</span>
+                  <span class="font-bold text-amber-500 font-mono bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">${check.daysLeft} Hari Lagi</span>
+                </div>
+                ${formattedDate ? `
+                <div class="flex justify-between items-center text-xs">
+                  <span class="text-text-body">Dapat Diganti Pada:</span>
+                  <span class="font-bold text-text-heading font-mono">${formattedDate}</span>
+                </div>
+                ` : ''}
+              </div>
+            </div>
+          `,
+          confirmText: 'Saya Mengerti',
+          showCancel: false,
+          type: 'warning'
+        });
+        return;
+      }
+
+      // Tampilkan Modal Form Ganti Nickname jika eligible
+      this._notification.showModal({
+        title: 'Ganti Nickname Akun',
+        html: `
+          <div class="flex flex-col gap-3 text-left">
+            <p class="text-xs text-text-body">
+              Masukkan nickname baru Anda. Nickname ini akan disinkronkan secara realtime ke database dan panel admin.
+            </p>
+            <div class="flex flex-col gap-1">
+              <label class="text-[11px] font-bold text-text-heading uppercase">Nickname Baru</label>
+              <input
+                type="text"
+                id="inputNewNickname"
+                class="w-full bg-bg-subtle text-sm p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none font-semibold text-text-heading"
+                placeholder="Masukkan nickname (3-30 karakter)"
+                value="${user.name || ''}"
+                maxlength="30"
+                minlength="3"
+                autocomplete="off"
+              />
+              <span class="text-[10px] text-text-body/70 mt-0.5">Minimal 3 karakter, maksimal 30 karakter.</span>
+            </div>
+            <div class="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 flex items-start gap-2.5">
+              <span class="material-symbols-outlined text-amber-600 text-lg shrink-0 mt-0.5">warning</span>
+              <p class="text-[11px] text-amber-800 dark:text-amber-300 leading-tight">
+                <strong>Ketentuan Penting:</strong> Anda hanya dapat mengganti nickname <strong>1 kali setiap sebulan (30 hari)</strong>. Pastikan ejaan nickname Anda sudah sesuai sebelum menyimpan.
+              </p>
+            </div>
+          </div>
+        `,
+        type: 'info',
+        confirmText: 'Simpan Nickname',
+        cancelText: 'Batal',
+        showCancel: true,
+        autoClose: false,
+        onConfirm: async ({ close, confirmBtn }) => {
+          const input = document.getElementById('inputNewNickname');
+          const newNick = (input?.value || '').trim();
+
+          if (!newNick) {
+            this._notification.error('Nickname tidak boleh kosong.');
+            return;
+          }
+          if (newNick.length < 3) {
+            this._notification.error('Nickname minimal 3 karakter.');
+            return;
+          }
+          if (newNick.length > 30) {
+            this._notification.error('Nickname maksimal 30 karakter.');
+            return;
+          }
+          if (newNick.toLowerCase() === (user.name || '').toLowerCase()) {
+            this._notification.error('Nickname baru tidak boleh sama dengan nickname saat ini.');
+            return;
+          }
+
+          const origContent = confirmBtn.innerHTML;
+          confirmBtn.disabled = true;
+          confirmBtn.classList.add('opacity-75', 'cursor-not-allowed');
+          confirmBtn.innerHTML = `
+            <span class="material-symbols-outlined text-sm animate-spin inline-block mr-1">progress_activity</span>
+            <span>Menyimpan...</span>
+          `;
+
+          try {
+            await this._authService.updateNickname(newNick);
+            this._notification.success(`Nickname berhasil diganti menjadi "${newNick}"!`);
+            close();
+
+            // Re-render konten tampilan profil saat ini
+            const viewRoot = document.getElementById('app-view-root');
+            if (viewRoot) {
+              viewRoot.innerHTML = this.render();
+              this.mount(viewRoot);
+            }
+          } catch (err) {
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+            confirmBtn.innerHTML = origContent;
+            this._notification.error(err.message || 'Gagal memperbarui nickname.');
+          }
+        }
+      });
+    });
 
     // Modal Edit Rekening / E-Wallet
     editBankBtn?.addEventListener('click', () => {
