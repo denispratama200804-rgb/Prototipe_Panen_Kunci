@@ -1056,6 +1056,13 @@ export class AuthService {
             if (proxyRes.ok) {
               const proxyData = await proxyRes.json();
               if (proxyData.success && proxyData.action_link) {
+                if (proxyData.emailSent) {
+                  return {
+                    success: true,
+                    isDirectLink: false,
+                    message: proxyData.message || 'Tautan reset kata sandi telah dikirim ke email Anda via SMTP server.'
+                  };
+                }
                 return {
                   success: true,
                   isDirectLink: true,
