@@ -1055,12 +1055,12 @@ export class AuthService {
             });
             if (proxyRes.ok) {
               const proxyData = await proxyRes.json();
-              if (proxyData.success && proxyData.action_link) {
+              if (proxyData.success) {
                 if (proxyData.emailSent) {
                   return {
                     success: true,
                     isDirectLink: false,
-                    message: proxyData.message || 'Tautan reset kata sandi telah dikirim ke email Anda via SMTP server.'
+                    message: proxyData.message || 'Email sudah dikirimkan melalui Gmail Anda.'
                   };
                 }
                 return {
@@ -1073,6 +1073,12 @@ export class AuthService {
             } else {
               const proxyErrJson = await proxyRes.json().catch(() => null);
               console.warn('[AuthService] Fallback recovery proxy status:', proxyRes.status, proxyErrJson);
+              if (proxyErrJson && proxyErrJson.error) {
+                return {
+                  success: false,
+                  message: proxyErrJson.error
+                };
+              }
             }
           } catch (proxyErr) {
             console.warn('[AuthService] Fallback recovery link proxy note:', proxyErr.message);
