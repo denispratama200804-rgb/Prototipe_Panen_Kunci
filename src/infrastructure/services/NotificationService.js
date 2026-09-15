@@ -245,31 +245,34 @@ export class NotificationService {
     );
 
     processedWithdrawals.forEach(tx => {
-      const exists = notifs.some(n =>
+      const existingIdx = notifs.findIndex(n =>
         n.transactionId === tx.id ||
         n.id === `notif_wd_${tx.id}`
       );
 
-      if (!exists) {
-        const isSuccess = tx.status === 'success';
-        const amt = Number(tx.amount || 0);
-        const formattedAmt = `Rp ${amt.toLocaleString('id-ID')}`;
+      const isSuccess = tx.status === 'success';
+      const amt = Number(tx.amount || 0);
+      const fee = Number(tx.fee !== undefined ? tx.fee : 1000);
+      const netPayout = Number(tx.net_payout || tx.netPayout || (amt - fee));
+      const formattedAmt = `Rp ${amt.toLocaleString('id-ID')}`;
 
-        let title = '';
-        let message = '';
-        if (isSuccess) {
-          title = 'Penarikan Saldo Diterima';
-          message = `Pencairan dana sebesar ${formattedAmt} ke ${tx.recipient || tx.method || 'rekening Anda'} telah berhasil dikirim oleh Admin.`;
-        } else {
-          title = 'Permintaan Penarikan Ditolak';
-          let reason = tx.rejectionReason || '';
-          if (!reason && tx.description && tx.description.includes('Ditolak:')) {
-            reason = tx.description.split('Ditolak:')[1].replace(')', '').trim();
-          }
-          if (!reason) reason = 'Data rekening tidak sesuai';
-          message = `Penarikan sebesar ${formattedAmt} ditolak (${reason}). Dana telah dikembalikan ke saldo aktif Anda.`;
-        }
+      let reason = tx.rejectionReason || '';
+      if (!reason && tx.description && tx.description.includes('Ditolak:')) {
+        reason = tx.description.split('Ditolak:')[1].replace(')', '').trim();
+      }
+      if (!reason && !isSuccess) reason = 'Data rekening tidak sesuai / tidak terdaftar';
 
+      let title = '';
+      let message = '';
+      if (isSuccess) {
+        title = 'Penarikan Saldo Diterima';
+        message = `Pencairan dana sebesar ${formattedAmt} ke ${tx.recipient || tx.method || 'rekening Anda'} telah berhasil dikirim oleh Admin.`;
+      } else {
+        title = 'Permintaan Penarikan Ditolak';
+        message = `Penarikan sebesar ${formattedAmt} ditolak (${reason}). Dana telah dikembalikan ke saldo aktif Anda.`;
+      }
+
+      if (existingIdx === -1) {
         const newNotif = {
           id: `notif_wd_${tx.id}`,
           transactionId: tx.id,
@@ -278,16 +281,37 @@ export class NotificationService {
           title,
           message,
           amount: amt,
+          fee,
+          netPayout,
           method: tx.method || '',
           recipient: tx.recipient || '',
-          proofImage: tx.proofImage || '',
-          proofNotes: tx.proofNotes || '',
+          proofImage: tx.proofImage || tx.proof_image || '',
+          proofNotes: tx.proofNotes || tx.proof_notes || '',
+          rejectionReason: !isSuccess ? reason : '',
           createdAt: tx.processedAt || tx.updatedAt || tx.updated_at || tx.createdAt || tx.created_at || new Date().toISOString(),
           isRead: false
         };
 
         notifs.unshift(newNotif);
         hasNew = true;
+      } else {
+        // Lengkapi data jika sebelumnya belum lengkap
+        const existing = notifs[existingIdx];
+        let changed = false;
+        if (!existing.amount && amt) { existing.amount = amt; changed = true; }
+        if (existing.fee === undefined) { existing.fee = fee; changed = true; }
+        if (existing.netPayout === undefined) { existing.netPayout = netPayout; changed = true; }
+        if (!existing.recipient && tx.recipient) { existing.recipient = tx.recipient; changed = true; }
+        if (!existing.method && tx.method) { existing.method = tx.method; changed = true; }
+        if (!existing.proofImage && (tx.proofImage || tx.proof_image)) {
+          existing.proofImage = tx.proofImage || tx.proof_image;
+          changed = true;
+        }
+        if (!existing.rejectionReason && !isSuccess && reason) {
+          existing.rejectionReason = reason;
+          changed = true;
+        }
+        if (changed) hasNew = true;
       }
     });
 

@@ -1,6 +1,7 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { AppEvents } from '../../core/events/EventBus.js';
 import { renderPaymentMethodIcon } from '../utils/PaymentMethodHelper.js';
+import { ReceiptHelper } from '../utils/ReceiptHelper.js';
 
 /**
  * HistoryView
@@ -180,14 +181,23 @@ export class HistoryView extends IComponent {
                 ${badgeHtml}
               </div>
             <span class="text-[11px] text-text-body">${w.description} • ${dateStr}</span>
-            ${w.proofImage ? `
+            ${isSuccess ? `
               <button
                 type="button"
                 data-proof-history="${w.id}"
-                class="mt-1 text-[11px] font-bold text-primary hover:underline flex items-center gap-1 w-fit"
+                class="mt-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 w-fit cursor-pointer"
               >
-                <span class="material-symbols-outlined text-[14px]">image</span>
-                <span>Lihat Bukti Foto Transfer</span>
+                <span class="material-symbols-outlined text-[15px]">receipt_long</span>
+                <span>Lihat Bukti Transfer & Rincian</span>
+              </button>
+            ` : isFailed ? `
+              <button
+                type="button"
+                data-reject-history="${w.id}"
+                class="mt-1.5 text-[11px] font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 w-fit cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-[15px]">info</span>
+                <span>Lihat Rincian Penolakan</span>
               </button>
             ` : ''}
             </div>
@@ -227,59 +237,24 @@ export class HistoryView extends IComponent {
   }
 
   _bindProofLightbox(container) {
+    // Tombol Lihat Bukti Transfer & Rincian
     container.querySelectorAll('[data-proof-history]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-proof-history');
         const w = this._walletService.getWithdrawals().find(item => item.id === id);
-        if (w && w.proofImage) {
-          document.body.style.overflow = 'hidden';
-          const lightbox = document.createElement('div');
-          lightbox.id = 'hist-proof-lightbox-overlay';
-          lightbox.className = 'fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200';
-          lightbox.innerHTML = `
-            <div class="max-w-md w-full bg-surface-card border border-surface-container rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-auto" style="max-height: calc(100vh - 2rem);">
-              <button type="button" id="btn-close-hist-lightbox" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-surface-container-high text-text-body hover:text-text-heading hover:bg-surface-container-highest flex items-center justify-center transition-colors" title="Tutup (Esc)">
-                <span class="material-symbols-outlined text-[20px]">close</span>
-              </button>
-              <div class="flex items-center gap-3 pr-8">
-                <div class="w-10 h-10 rounded-2xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0 shadow-xs">
-                  <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
-                </div>
-                <div>
-                  <h3 class="text-sm font-bold text-text-heading">Bukti Transfer Resmi</h3>
-                  <p class="text-[11px] text-text-body">Penarikan #${w.id}</p>
-                </div>
-              </div>
-              <div class="rounded-2xl overflow-hidden border border-surface-container bg-surface-container-low p-2 shadow-inner">
-                <img src="${w.proofImage}" alt="Bukti Transfer" class="w-full max-h-[50vh] object-contain rounded-xl shadow-xs" />
-              </div>
-              <div class="flex items-center gap-2.5 pt-1">
-                <a href="${w.proofImage}" download="bukti-transfer-${w.id}.png" class="flex-1 py-3 px-4 rounded-2xl bg-primary text-white text-xs font-bold text-center flex items-center justify-center gap-2 shadow-md shadow-primary/20 hover:bg-primary-container transition-all">
-                  <span class="material-symbols-outlined text-[18px]">download</span>
-                  <span>Unduh Foto Bukti</span>
-                </a>
-                <button type="button" id="btn-cancel-hist-lightbox" class="py-3 px-5 rounded-2xl bg-surface-container text-text-heading text-xs font-bold hover:bg-surface-container-high cursor-pointer transition-colors">Tutup</button>
-              </div>
-            </div>
-          `;
-          document.body.appendChild(lightbox);
+        if (w) {
+          ReceiptHelper.openProofLightbox(w);
+        }
+      });
+    });
 
-          const handleKeydown = (e) => {
-            if (e.key === 'Escape') close();
-          };
-          document.addEventListener('keydown', handleKeydown);
-
-          const close = () => {
-            document.removeEventListener('keydown', handleKeydown);
-            document.body.style.overflow = '';
-            lightbox.remove();
-          };
-
-          lightbox.querySelector('#btn-close-hist-lightbox').addEventListener('click', close);
-          lightbox.querySelector('#btn-cancel-hist-lightbox').addEventListener('click', close);
-          lightbox.addEventListener('click', (e) => {
-            if (e.target === lightbox) close();
-          });
+    // Tombol Lihat Rincian Penolakan
+    container.querySelectorAll('[data-reject-history]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-reject-history');
+        const w = this._walletService.getWithdrawals().find(item => item.id === id);
+        if (w) {
+          ReceiptHelper.openRejectLightbox(w);
         }
       });
     });

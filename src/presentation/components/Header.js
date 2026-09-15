@@ -1,4 +1,5 @@
 import { AppEvents } from '../../core/events/EventBus.js';
+import { ReceiptHelper } from '../utils/ReceiptHelper.js';
 
 /**
  * HeaderComponent
@@ -292,6 +293,7 @@ export class HeaderComponent {
                 ? (isFailed ? 'bg-red-500/5 border border-red-500/30 shadow-sm' : 'bg-emerald-500/5 border border-emerald-500/30 shadow-sm')
                 : 'bg-surface-container-lowest border border-surface-container';
               const unreadDotClass = isFailed ? 'bg-red-500' : 'bg-emerald-500';
+              const isWithdrawal = n.type === 'withdrawal_success' || n.type === 'withdrawal_failed' || n.transactionId || n.id?.startsWith('notif_wd_') || n.title?.toLowerCase().includes('penarikan');
 
               return `
                 <div class="rounded-2xl p-4 transition-all ${cardBgClass} flex flex-col gap-2.5">
@@ -312,41 +314,41 @@ export class HeaderComponent {
 
                   <p class="text-xs text-text-body leading-relaxed pl-10">${n.message}</p>
 
-                  <!-- Bukti Transfer Preview (Jika Ada) -->
+                  <!-- Bukti Transfer Preview (Jika Ada Gambar Langsung) -->
                   ${n.proofImage ? `
                     <div class="mt-1 pl-10">
-                      <div class="rounded-2xl p-3 bg-surface-container-low border border-surface-container flex flex-col gap-2">
-                        <div class="flex items-center justify-between">
-                          <span class="text-[11px] font-bold text-text-heading flex items-center gap-1">
-                            <span class="material-symbols-outlined text-[15px] text-secondary">image</span>
-                            <span>Bukti Foto Transfer Resmi</span>
-                          </span>
-                          <span class="text-[10px] text-secondary font-semibold">Terkonfirmasi</span>
+                      <div class="relative rounded-xl overflow-hidden border border-surface-container group cursor-pointer" data-view-proof="${n.id}">
+                        <img src="${n.proofImage}" alt="Bukti Transfer" class="w-full h-28 object-cover bg-slate-900 group-hover:scale-105 transition-transform duration-300" />
+                        <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-bold backdrop-blur-[1px]">
+                          <span class="material-symbols-outlined text-base">zoom_in</span>
+                          <span>Ketuk Untuk Memperbesar</span>
                         </div>
+                      </div>
+                    </div>
+                  ` : ''}
 
-                        <div class="relative rounded-xl overflow-hidden border border-surface-container group cursor-pointer" data-view-proof="${n.id}">
-                          <img src="${n.proofImage}" alt="Bukti Transfer" class="w-full h-32 object-cover bg-slate-900 group-hover:scale-105 transition-transform duration-300" />
-                          <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-bold backdrop-blur-[1px]">
-                            <span class="material-symbols-outlined text-base">zoom_in</span>
-                            <span>Ketuk Untuk Memperbesar</span>
-                          </div>
-                        </div>
-
-                        ${n.proofNotes ? `
-                          <div class="text-[10px] text-text-body italic bg-surface-card p-2 rounded-xl border border-surface-container/60">
-                            <strong>Pesan Admin:</strong> "${n.proofNotes}"
-                          </div>
-                        ` : ''}
-
+                  <!-- Tombol Aksi Detail Penarikan (Selalu Muncul untuk Transaksi Penarikan) -->
+                  ${isWithdrawal ? `
+                    <div class="pl-10 pt-1">
+                      ${isFailed ? `
+                        <button
+                          type="button"
+                          data-view-reject="${n.id}"
+                          class="w-full py-2.5 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] border border-red-500/25 cursor-pointer shadow-2xs"
+                        >
+                          <span class="material-symbols-outlined text-[16px]">info</span>
+                          <span>Lihat Rincian Penolakan</span>
+                        </button>
+                      ` : `
                         <button
                           type="button"
                           data-view-proof="${n.id}"
-                          class="w-full py-2 px-3 rounded-xl bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary-container transition-all active:scale-[0.98] shadow-sm cursor-pointer"
+                          class="w-full py-2.5 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] border border-emerald-500/25 cursor-pointer shadow-2xs"
                         >
-                          <span class="material-symbols-outlined text-[16px]">visibility</span>
-                          <span>Lihat Bukti Foto Transaksi</span>
+                          <span class="material-symbols-outlined text-[16px]">receipt_long</span>
+                          <span>Lihat Bukti Transfer & Rincian</span>
                         </button>
-                      </div>
+                      `}
                     </div>
                   ` : ''}
 
@@ -424,16 +426,32 @@ export class HeaderComponent {
       });
     });
 
-    // View Proof Lightbox
+    // View Proof Lightbox (Bukti Transfer & Rincian)
     mount.querySelectorAll('[data-view-proof]').forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = el.getAttribute('data-view-proof');
         const notif = notifs.find(n => n.id === id);
-        if (notif && notif.proofImage) {
+        if (notif) {
           if (this._notificationService && !notif.isRead) {
             this._notificationService.markAsRead(id);
           }
-          this._openProofLightbox(notif);
+          ReceiptHelper.openProofLightbox(notif);
+        }
+      });
+    });
+
+    // View Reject Lightbox (Rincian Penolakan)
+    mount.querySelectorAll('[data-view-reject]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = el.getAttribute('data-view-reject');
+        const notif = notifs.find(n => n.id === id);
+        if (notif) {
+          if (this._notificationService && !notif.isRead) {
+            this._notificationService.markAsRead(id);
+          }
+          ReceiptHelper.openRejectLightbox(notif);
         }
       });
     });
@@ -443,98 +461,6 @@ export class HeaderComponent {
    * Modal Lightbox Foto Bukti Transfer resolusi penuh dengan aksi Unduh
    */
   _openProofLightbox(notif) {
-    const lightboxMount = document.createElement('div');
-    lightboxMount.id = 'notif-proof-lightbox-modal';
-    document.body.appendChild(lightboxMount);
-
-    document.body.style.overflow = 'hidden';
-
-    lightboxMount.innerHTML = `
-      <div id="proof-lightbox-overlay" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto custom-scrollbar animate-in fade-in duration-200">
-        <div class="max-w-md w-full bg-surface-card border border-surface-container rounded-3xl p-5 relative shadow-2xl flex flex-col gap-4 my-auto" style="max-height: calc(100vh - 2rem);">
-          <!-- Close Button -->
-          <button
-            type="button"
-            id="btn-close-proof-lightbox"
-            class="absolute top-4 right-4 w-9 h-9 rounded-full bg-surface-container-high text-text-body hover:text-text-heading hover:bg-surface-container-highest flex items-center justify-center transition-colors"
-            title="Tutup (Esc)"
-          >
-            <span class="material-symbols-outlined text-[20px]">close</span>
-          </button>
-
-          <!-- Header -->
-          <div class="flex items-center gap-3 pr-8">
-            <div class="w-10 h-10 rounded-2xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0 shadow-xs">
-              <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
-            </div>
-            <div>
-              <h3 class="text-sm sm:text-base font-bold text-text-heading">Foto Bukti Transfer</h3>
-              <p class="text-[11px] text-text-body">Pencairan #${notif.transactionId || 'tx'}</p>
-            </div>
-          </div>
-
-          <!-- Image Container with Clean Look -->
-          <div class="rounded-2xl overflow-hidden border border-surface-container bg-surface-container-low flex items-center justify-center p-2 relative shadow-inner">
-            <img src="${notif.proofImage}" alt="Bukti Transfer Penuh" class="w-full max-h-[50vh] object-contain rounded-xl shadow-xs" />
-          </div>
-
-          <!-- Transaction Summary Info -->
-          <div class="p-3.5 bg-surface-container-low rounded-2xl border border-surface-container space-y-2 text-xs">
-            <div class="flex justify-between items-center text-text-body">
-              <span>Nominal Dicairkan:</span>
-              <span class="font-bold text-secondary text-sm font-mono">Rp ${(Number(notif.amount) || 0).toLocaleString('id-ID')}</span>
-            </div>
-            <div class="flex justify-between items-center text-text-body">
-              <span>Tujuan Transfer:</span>
-              <span class="font-semibold text-text-heading font-mono">${notif.recipient || notif.method || '-'}</span>
-            </div>
-            <div class="flex justify-between items-center text-text-body">
-              <span>Waktu Pengiriman:</span>
-              <span class="font-medium text-text-heading">${new Date(notif.createdAt).toLocaleString('id-ID')}</span>
-            </div>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex items-center gap-2.5 pt-1">
-            <a
-              href="${notif.proofImage}"
-              download="bukti-transfer-panenkunci-${notif.transactionId || 'tx'}.png"
-              id="btn-download-proof-img"
-              class="flex-1 py-3 px-4 rounded-2xl bg-primary text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-primary-container transition-all active:scale-[0.98] shadow-md shadow-primary/20"
-            >
-              <span class="material-symbols-outlined text-[18px]">download</span>
-              <span>Unduh Foto Bukti</span>
-            </a>
-            <button
-              type="button"
-              id="btn-dismiss-lightbox"
-              class="py-3 px-5 rounded-2xl bg-surface-container text-text-heading text-xs font-bold hover:bg-surface-container-high transition-colors"
-            >
-              Tutup
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-
-    const handleKeydown = (e) => {
-      if (e.key === 'Escape') closeLightbox();
-    };
-    document.addEventListener('keydown', handleKeydown);
-
-    const closeLightbox = () => {
-      document.removeEventListener('keydown', handleKeydown);
-      document.body.style.overflow = '';
-      lightboxMount.remove();
-    };
-
-    lightboxMount.querySelector('#btn-close-proof-lightbox').addEventListener('click', closeLightbox);
-    lightboxMount.querySelector('#btn-dismiss-lightbox').addEventListener('click', closeLightbox);
-    const overlay = lightboxMount.querySelector('#proof-lightbox-overlay');
-    if (overlay) {
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeLightbox();
-      });
-    }
+    ReceiptHelper.openProofLightbox(notif);
   }
 }
