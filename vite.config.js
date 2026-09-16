@@ -897,9 +897,23 @@ export default defineConfig(({ mode }) => {
                   const sendEmailVite = async ({ currentEnv, to, subject, html, text }) => {
                     const clean = (val) => (val || '').replace(/["']/g, '').trim();
 
-                    const brevoApiKey = clean(currentEnv.BREVO_API_KEY || process.env.BREVO_API_KEY || currentEnv.VITE_BREVO_API_KEY || currentEnv.BREVO_KEY);
-                    const brevoUsername = clean(currentEnv.BREVO_USERNAME || process.env.BREVO_USERNAME || currentEnv.BREVO_LOGIN);
-                    const brevoSenderEmail = clean(currentEnv.BREVO_SENDER_EMAIL || process.env.BREVO_SENDER_EMAIL || currentEnv.SMTP_EMAIL || 'no-reply@panenkunci.com');
+                    const brevoApiKey = clean(
+                      currentEnv.BREVO_API_KEY ||
+                      process.env.BREVO_API_KEY ||
+                      currentEnv.VITE_BREVO_API_KEY ||
+                      currentEnv.BREVO_KEY
+                    );
+                    const brevoUsername = clean(
+                      currentEnv.BREVO_USERNAME ||
+                      process.env.BREVO_USERNAME ||
+                      currentEnv.BREVO_LOGIN
+                    );
+                    const brevoSenderEmail = clean(
+                      currentEnv.BREVO_SENDER_EMAIL ||
+                      process.env.BREVO_SENDER_EMAIL ||
+                      currentEnv.SMTP_EMAIL ||
+                      'no-reply@panenkunci.com'
+                    );
                     const brevoSenderName = clean(currentEnv.BREVO_SENDER_NAME || 'Panen Kunci');
 
                     let brevoError = null;
@@ -940,8 +954,14 @@ export default defineConfig(({ mode }) => {
                       }
                     }
 
-                    // 2. Brevo SMTP Relay / Nodemailer SMTP
+                    // 2. Brevo SMTP Relay
                     const isBrevoSmtp = Boolean(brevoUsername || (brevoApiKey && brevoApiKey.startsWith('xsmtpsib-')));
+
+                    // Tolak konfigurasi legacy Gmail agar tidak memicu 535 Authentication failed
+                    const isLegacyGmail = String(currentEnv.SMTP_HOST || process.env.SMTP_HOST || '').includes('gmail.com');
+                    if (isLegacyGmail && !isBrevoSmtp) {
+                      throw new Error('Konfigurasi Gmail lama dinonaktifkan. Tambahkan BREVO_USERNAME dan BREVO_API_KEY di file .env.');
+                    }
 
                     const smtpHost = isBrevoSmtp
                       ? 'smtp-relay.brevo.com'
@@ -955,7 +975,7 @@ export default defineConfig(({ mode }) => {
                       ? (brevoApiKey || clean(currentEnv.SMTP_PASSWORD || process.env.SMTP_PASSWORD))
                       : clean(currentEnv.SMTP_PASSWORD || process.env.SMTP_PASSWORD);
 
-                    // Jika Brevo SMTP, prioritaskan port 2525 (terbukti bebas blokir port ISP)
+                    // Pada Brevo SMTP, prioritaskan port 2525 lalu 587
                     const defaultPort = isBrevoSmtp ? 2525 : 587;
                     const smtpPort = Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || defaultPort;
                     const senderEmail = isBrevoSmtp ? brevoSenderEmail : smtpUser;
@@ -987,16 +1007,26 @@ export default defineConfig(({ mode }) => {
                         console.log(`[ViteProxy] Email terkirim via SMTP (port ${smtpPort}) ke:`, to, 'messageId:', info.messageId);
                         return { success: true, method: 'smtp', messageId: info.messageId };
                       } catch (smtpErr) {
-                        if (isBrevoSmtp && smtpPort !== 2525) {
-                          console.warn(`[ViteProxy] Port ${smtpPort} gagal (${smtpErr.message}), mencoba port 2525...`);
+                        console.warn(`[ViteProxy] Percobaan port ${smtpPort} gagal (${smtpErr.message}), mencoba port alternatif...`);
+
+                        // Fallback 1: Port 587
+                        if (smtpPort !== 587) {
+                          try {
+                            const info = await trySendSmtp(587, false);
+                            console.log('[ViteProxy] Email berhasil terkirim via Brevo SMTP port 587 ke:', to, 'messageId:', info.messageId);
+                            return { success: true, method: 'smtp', messageId: info.messageId };
+                          } catch (_) {}
+                        }
+
+                        // Fallback 2: Port 2525
+                        if (smtpPort !== 2525) {
                           try {
                             const info = await trySendSmtp(2525, false);
                             console.log('[ViteProxy] Email berhasil terkirim via Brevo SMTP port 2525 ke:', to, 'messageId:', info.messageId);
                             return { success: true, method: 'smtp', messageId: info.messageId };
-                          } catch (port2525Err) {
-                            throw new Error(`Gagal mengirim via Brevo SMTP (Port ${smtpPort} & 2525): ${port2525Err.message}`);
-                          }
+                          } catch (_) {}
                         }
+
                         throw smtpErr;
                       }
                     }

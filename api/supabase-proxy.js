@@ -11,9 +11,21 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 async function sendEmailMessage({ to, subject, html, text }) {
   const clean = (val) => (val || '').replace(/["']/g, '').trim();
 
-  const brevoApiKey = clean(process.env.BREVO_API_KEY || process.env.VITE_BREVO_API_KEY || process.env.NEXT_PUBLIC_BREVO_API_KEY || process.env.BREVO_KEY);
-  const brevoUsername = clean(process.env.BREVO_USERNAME || process.env.BREVO_LOGIN);
-  const brevoSenderEmail = clean(process.env.BREVO_SENDER_EMAIL || process.env.SMTP_EMAIL || 'no-reply@panenkunci.com');
+  const brevoApiKey = clean(
+    process.env.BREVO_API_KEY ||
+    process.env.VITE_BREVO_API_KEY ||
+    process.env.NEXT_PUBLIC_BREVO_API_KEY ||
+    process.env.BREVO_KEY
+  );
+  const brevoUsername = clean(
+    process.env.BREVO_USERNAME ||
+    process.env.BREVO_LOGIN
+  );
+  const brevoSenderEmail = clean(
+    process.env.BREVO_SENDER_EMAIL ||
+    process.env.SMTP_EMAIL ||
+    'no-reply@panenkunci.com'
+  );
   const brevoSenderName = clean(process.env.BREVO_SENDER_NAME || 'Panen Kunci');
 
   let brevoError = null;
@@ -54,8 +66,14 @@ async function sendEmailMessage({ to, subject, html, text }) {
     }
   }
 
-  // 2. Brevo SMTP Relay / Nodemailer SMTP
+  // 2. Brevo SMTP Relay
   const isBrevoSmtp = Boolean(brevoUsername || (brevoApiKey && brevoApiKey.startsWith('xsmtpsib-')));
+
+  // Tolak konfigurasi legacy Gmail agar tidak memicu 535 Authentication failed
+  const isLegacyGmail = String(process.env.SMTP_HOST || '').includes('gmail.com');
+  if (isLegacyGmail && !isBrevoSmtp) {
+    throw new Error('Konfigurasi Gmail lama dinonaktifkan. Tambahkan BREVO_USERNAME dan BREVO_API_KEY di Environment Variables Vercel.');
+  }
 
   const smtpHost = isBrevoSmtp
     ? 'smtp-relay.brevo.com'
@@ -69,8 +87,8 @@ async function sendEmailMessage({ to, subject, html, text }) {
     ? (brevoApiKey || clean(process.env.SMTP_PASSWORD))
     : clean(process.env.SMTP_PASSWORD);
 
-  // Jika Brevo SMTP, port 2525 sangat dianjurkan untuk menghindari blokir port 587/465 ISP
-  const defaultPort = isBrevoSmtp ? 2525 : 587;
+  // Pada Brevo SMTP, prioritaskan port 587 dan port 2525
+  const defaultPort = 587;
   const smtpPort = Number(process.env.SMTP_PORT) || defaultPort;
   const senderEmail = isBrevoSmtp ? brevoSenderEmail : smtpUser;
 
@@ -104,16 +122,26 @@ async function sendEmailMessage({ to, subject, html, text }) {
       console.log(`[EmailService] Berhasil terkirim via SMTP (port ${smtpPort}) ke:`, to, 'messageId:', info.messageId);
       return { success: true, method: 'smtp', messageId: info.messageId };
     } catch (smtpErr) {
-      if (isBrevoSmtp && smtpPort !== 2525) {
-        console.warn(`[EmailService] Port ${smtpPort} gagal (${smtpErr.message}), mencoba fallback ke port 2525...`);
+      console.warn(`[EmailService] Percobaan port ${smtpPort} gagal (${smtpErr.message}), mencoba port alternatif...`);
+
+      // Fallback 1: Port 587
+      if (smtpPort !== 587) {
+        try {
+          const info = await trySendSmtp(587, false);
+          console.log('[EmailService] Berhasil terkirim via Brevo SMTP port 587 ke:', to, 'messageId:', info.messageId);
+          return { success: true, method: 'smtp', messageId: info.messageId };
+        } catch (_) {}
+      }
+
+      // Fallback 2: Port 2525
+      if (smtpPort !== 2525) {
         try {
           const info = await trySendSmtp(2525, false);
           console.log('[EmailService] Berhasil terkirim via Brevo SMTP port 2525 ke:', to, 'messageId:', info.messageId);
           return { success: true, method: 'smtp', messageId: info.messageId };
-        } catch (portErr) {
-          throw new Error(`Gagal mengirim via Brevo SMTP (Port ${smtpPort} & 2525): ${portErr.message}`);
-        }
+        } catch (_) {}
       }
+
       throw smtpErr;
     }
   }
