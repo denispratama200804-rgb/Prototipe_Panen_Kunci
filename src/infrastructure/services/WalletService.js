@@ -482,8 +482,6 @@ export class WalletService {
     let hasNewTx = false;
 
     userKeys.forEach(k => {
-      if (k.status !== 'valid' && k.status !== 'pending') return;
-
       const masked = k.keyString && k.keyString.length > 12
         ? `${k.keyString.slice(0, 9)}...${k.keyString.slice(-4)}`
         : (k.keyString || '');
@@ -498,8 +496,15 @@ export class WalletService {
          t.description?.includes(k.id))
       );
 
-      const isVerified = k.status === 'valid';
-      const reward = Number(k.rewardAmount) || 3000;
+      const isValid = k.status === 'valid';
+      const isPending = k.status === 'pending';
+      const isInvalid = !isValid && !isPending;
+      const reward = (isValid || isPending) ? (Number(k.rewardAmount) || 3000) : 0;
+
+      const title = isValid
+        ? 'Setoran API Key (Terverifikasi)'
+        : (isPending ? 'Setoran API Key (Pending)' : 'Setoran API Key (Invalid)');
+      const txStatus = isValid ? 'success' : (isPending ? 'pending' : 'failed');
 
       if (!existing) {
         const newTx = new Transaction({
@@ -507,9 +512,11 @@ export class WalletService {
           userId,
           type: 'deposit',
           amount: reward,
-          title: isVerified ? 'Setoran API Key (Terverifikasi)' : 'Setoran API Key',
-          description: isVerified ? `Terverifikasi oleh Admin: ${masked}` : `Menunggu verifikasi admin: ${masked}`,
-          status: isVerified ? 'success' : 'pending',
+          title,
+          description: isValid
+            ? `Terverifikasi oleh Admin: ${masked}`
+            : (isPending ? `Menunggu verifikasi admin: ${masked}` : (k.errorMessage || `API Key Invalid: ${masked}`)),
+          status: txStatus,
           createdAt: k.createdAt || new Date().toISOString()
         });
 
@@ -519,14 +526,27 @@ export class WalletService {
         if (this._transactionRepository) {
           this._transactionRepository.create(newTx).catch(() => {});
         }
-      } else if (isVerified && existing.status === 'pending') {
-        existing.status = 'success';
-        existing.title = 'Setoran API Key (Terverifikasi)';
-        existing.description = `Terverifikasi oleh Admin: ${masked}`;
-        hasNewTx = true;
+      } else {
+        if (isValid && existing.status !== 'success') {
+          existing.status = 'success';
+          existing.title = 'Setoran API Key (Terverifikasi)';
+          existing.description = `Terverifikasi oleh Admin: ${masked}`;
+          existing.amount = reward;
+          hasNewTx = true;
 
-        if (this._transactionRepository && existing.id && existing.id.includes('-')) {
-          this._transactionRepository.updateStatus(existing.id, 'success').catch(() => {});
+          if (this._transactionRepository && existing.id && existing.id.includes('-')) {
+            this._transactionRepository.updateStatus(existing.id, 'success').catch(() => {});
+          }
+        } else if (isInvalid && existing.status !== 'failed') {
+          existing.status = 'failed';
+          existing.title = 'Setoran API Key (Invalid)';
+          existing.description = k.errorMessage || `API Key Invalid: ${masked}`;
+          existing.amount = 0;
+          hasNewTx = true;
+
+          if (this._transactionRepository && existing.id && existing.id.includes('-')) {
+            this._transactionRepository.updateStatus(existing.id, 'failed').catch(() => {});
+          }
         }
       }
     });
@@ -841,6 +861,41 @@ export class WalletService {
       description: `Menunggu verifikasi admin: ${apiKey.getMaskedKey()}`,
       status: 'pending',
       createdAt: new Date().toISOString()
+    });
+
+    this._transactions.unshift(tx);
+    this._persist();
+
+    if (this._transactionRepository) {
+      this._transactionRepository.create(tx)
+        .then(saved => {
+          if (saved && saved.id) tx.id = saved.id;
+        })
+        .catch(err => console.warn('[WalletService] Supabase create tx fallback:', err.message));
+    }
+
+    this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+      balance: this._balance,
+      passiveBalance: this._passiveBalance,
+      lifetime: this._lifetimeEarnings
+    });
+  }
+
+  /**
+   * Menambahkan catatan riwayat setoran API key yang invalid / ditolak
+   * @param {import('../../domain/models/ApiKey.js').ApiKey} apiKey
+   */
+  addFailedDeposit(apiKey) {
+    const masked = typeof apiKey?.getMaskedKey === 'function' ? apiKey.getMaskedKey() : (apiKey?.keyString || 'API Key');
+    const tx = new Transaction({
+      id: 'tx_' + Math.random().toString(36).substring(2, 9),
+      userId: apiKey?.userId || this._getUserId() || 'usr_current',
+      type: 'deposit',
+      amount: 0,
+      title: 'Setoran API Key (Invalid)',
+      description: apiKey?.errorMessage || `Verifikasi gagal (Invalid): ${masked}`,
+      status: 'failed',
+      createdAt: apiKey?.createdAt || new Date().toISOString()
     });
 
     this._transactions.unshift(tx);

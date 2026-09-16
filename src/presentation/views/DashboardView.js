@@ -26,7 +26,7 @@ export class DashboardView extends IComponent {
     const balance = this._walletService.getBalance();
     const passiveBalance = this._walletService.getPassiveBalance();
     const todayKeysCount = this._apiKeyService.getTodayValidCount();
-    const recentTx = this._walletService.getTransactions().slice(0, 4);
+    const recentTx = this._getCombinedRecentActivities().slice(0, 5);
 
     const isDownloaded = localStorage.getItem('panenkunci:app_downloaded') === 'true'
       || (typeof window !== 'undefined' && (
@@ -197,10 +197,58 @@ export class DashboardView extends IComponent {
   }
 
   /**
+   * Menggabungkan seluruh data riwayat (Setoran API Key valid/pending/invalid & Penarikan Saldo)
+   * secara kronologis agar semua aktivitas riwayat tampil di Aktivitas Terkini Dashboard.
+   */
+  _getCombinedRecentActivities() {
+    const keys = this._apiKeyService?.getAllKeys() || [];
+    const withdrawals = this._walletService?.getWithdrawals() || [];
+
+    const keyActivities = keys.map(k => {
+      const isPending = k.status === 'pending';
+      const isValid = k.status === 'valid';
+      const isInvalid = !isPending && !isValid;
+      const masked = typeof k.getMaskedKey === 'function' ? k.getMaskedKey() : (k.keyString || 'API Key');
+
+      return {
+        id: k.id || `key_${k.keyString}`,
+        type: 'deposit',
+        status: isPending ? 'pending' : (isValid ? 'valid' : 'invalid'),
+        title: isValid ? 'Setoran API Key (Terverifikasi)' : (isPending ? 'Setoran API Key' : 'Setoran API Key'),
+        maskedKey: masked,
+        amount: (isValid || isPending) ? (Number(k.rewardAmount) || 3000) : 0,
+        createdAt: k.createdAt || new Date().toISOString(),
+        errorMessage: k.errorMessage || ''
+      };
+    });
+
+    const withdrawalActivities = withdrawals.map(w => {
+      const isPending = w.status === 'pending';
+      const isFailed = w.status === 'failed';
+      const isSuccess = !isPending && !isFailed;
+
+      return {
+        id: w.id,
+        type: 'withdrawal',
+        status: isPending ? 'pending' : (isFailed ? 'failed' : 'success'),
+        title: w.title || 'Penarikan Saldo',
+        maskedKey: w.description || '',
+        amount: Number(w.amount) || 0,
+        createdAt: w.createdAt || new Date().toISOString(),
+        errorMessage: ''
+      };
+    });
+
+    const combined = [...keyActivities, ...withdrawalActivities];
+    combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return combined;
+  }
+
+  /**
    * Helper HTML untuk daftar transaksi terkini di Dashboard
    */
-  _renderRecentTxHtml(recentTx) {
-    if (!recentTx || recentTx.length === 0) {
+  _renderRecentTxHtml(recentActivities) {
+    if (!recentActivities || recentActivities.length === 0) {
       return `
         <div class="bg-surface-card rounded-2xl p-8 text-center text-outline">
           <span class="material-symbols-outlined text-4xl mb-2 text-outline/50">inbox</span>
@@ -209,11 +257,13 @@ export class DashboardView extends IComponent {
       `;
     }
 
-    return recentTx.map(tx => {
+    return recentActivities.map(tx => {
       const isDeposit = tx.type === 'deposit';
       const isPending = tx.status === 'pending';
+      const isInvalid = tx.status === 'invalid';
       const isFailed = tx.status === 'failed';
-      const isSuccess = !isPending && !isFailed;
+      const isValidOrSuccess = tx.status === 'valid' || tx.status === 'success';
+
       const dateStr = new Date(tx.createdAt).toLocaleDateString('id-ID', {
         day: 'numeric',
         month: 'short',
@@ -223,21 +273,42 @@ export class DashboardView extends IComponent {
 
       let statusBadge = '';
       if (isPending) {
-        statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded font-medium border border-amber-500/20 inline-flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>Pending</span>';
+        statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded font-bold border border-amber-500/20 inline-flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>Pending</span>';
+      } else if (isInvalid) {
+        statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-error-container text-on-error-container rounded font-bold inline-flex items-center gap-0.5">Invalid</span>';
       } else if (isFailed) {
-        statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-error-container text-on-error-container rounded font-medium inline-flex items-center gap-1">Ditolak</span>';
+        statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-error-container text-on-error-container rounded font-bold inline-flex items-center gap-0.5">Ditolak</span>';
+      } else if (isValidOrSuccess && isDeposit) {
+        statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded font-bold inline-flex items-center gap-0.5">Valid</span>';
       }
 
-      let amountColor = isDeposit
-        ? (isPending ? 'text-amber-500' : 'text-secondary')
-        : (isFailed ? 'text-text-body line-through' : 'text-error-ruby');
+      const iconBg = isDeposit
+        ? (isInvalid ? 'bg-error-container text-error-ruby' : (isPending ? 'bg-amber-500/10 text-amber-600' : 'bg-secondary/10 text-secondary'))
+        : (isFailed ? 'bg-error-container text-error-ruby' : (isPending ? 'bg-amber-500/10 text-amber-600' : 'bg-primary/10 text-primary'));
+
+      const iconName = isDeposit
+        ? (isInvalid ? 'vpn_key_off' : 'vpn_key')
+        : 'account_balance_wallet';
+
+      const amountColor = isDeposit
+        ? (isPending ? 'text-amber-500' : (isInvalid ? 'text-text-body/50 line-through' : 'text-secondary'))
+        : (isFailed ? 'text-text-body/50 line-through' : (isPending ? 'text-amber-500' : 'text-error-ruby'));
+
+      let amountText = '';
+      if (isDeposit) {
+        amountText = isInvalid ? '+Rp 0' : `+Rp ${Number(tx.amount || 0).toLocaleString('id-ID')}`;
+      } else {
+        amountText = `-Rp ${Number(tx.amount || 0).toLocaleString('id-ID')}`;
+      }
+
+      const subtitle = tx.maskedKey || (isDeposit ? 'Setoran API Key' : 'Penarikan Saldo');
 
       return `
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm hover:bg-surface-container-low transition-colors">
           <div class="flex items-center gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-xl ${isDeposit ? 'bg-secondary/10 text-secondary' : (isFailed ? 'bg-error-container text-error-ruby' : 'bg-error/10 text-error-ruby')} flex items-center justify-center shrink-0">
+            <div class="w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0">
               <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">
-                ${isDeposit ? 'vpn_key' : 'account_balance_wallet'}
+                ${iconName}
               </span>
             </div>
             <div class="flex flex-col min-w-0">
@@ -245,11 +316,16 @@ export class DashboardView extends IComponent {
                 <span class="font-label-md text-xs font-bold text-text-heading truncate">${tx.title}</span>
                 ${statusBadge}
               </div>
-              <span class="text-[11px] text-text-body">${dateStr}</span>
+              <div class="flex items-center gap-1.5 text-[11px] text-text-body truncate">
+                <span>${dateStr}</span>
+                <span class="text-outline/40">•</span>
+                <span class="font-mono text-[10px] text-text-body/80 truncate">${subtitle}</span>
+              </div>
+              ${tx.errorMessage ? `<span class="text-[10px] text-error-ruby truncate mt-0.5">${tx.errorMessage}</span>` : ''}
             </div>
           </div>
           <span class="font-headline-md text-xs font-bold ${amountColor} shrink-0 pl-2">
-            ${tx.getFormattedAmount()}
+            ${amountText}
           </span>
         </div>
       `;
@@ -277,8 +353,8 @@ export class DashboardView extends IComponent {
       validCountEl.textContent = `${this._apiKeyService.getTodayValidCount()}`;
     }
     if (recentTxContainer) {
-      const recentTx = this._walletService.getTransactions().slice(0, 4);
-      recentTxContainer.innerHTML = this._renderRecentTxHtml(recentTx);
+      const recentActivities = this._getCombinedRecentActivities().slice(0, 5);
+      recentTxContainer.innerHTML = this._renderRecentTxHtml(recentActivities);
     }
   }
 

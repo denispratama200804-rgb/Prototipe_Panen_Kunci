@@ -322,6 +322,11 @@ export class ApiKeyService {
         this._apiKeyRepository.create(invalidEntry).catch(e => console.warn(e.message));
       }
 
+      // Catat ke riwayat transaksi agar invalid key juga masuk ke Aktivitas Terkini
+      if (this._walletService && typeof this._walletService.addFailedDeposit === 'function') {
+        this._walletService.addFailedDeposit(invalidEntry);
+      }
+
       return {
         success: false,
         message: 'Verifikasi server Kie.ai gagal: Secret key tidak aktif atau kuota 80 kredit tidak terpenuhi.'
