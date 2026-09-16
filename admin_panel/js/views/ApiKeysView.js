@@ -291,16 +291,17 @@ export class ApiKeysView {
 
         <!-- Table Container -->
         <div class="admin-card rounded-2xl overflow-hidden w-full max-w-full min-w-0 border border-slate-800/80 shadow-xl">
-          <div class="px-4 py-3 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-2">
+          <!-- Card Header (Satu baris rapi) -->
+          <div class="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2.5">
-              <div class="w-7 h-7 rounded-lg flex items-center justify-center ${
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center ${
                 this.currentFilter === 'pending'
                   ? 'bg-amber-500/20 text-amber-400'
                   : this.currentFilter === 'valid'
                   ? 'bg-emerald-500/20 text-emerald-400'
                   : 'bg-indigo-500/20 text-indigo-400'
               }">
-                <span class="material-symbols-outlined text-base">
+                <span class="material-symbols-outlined text-lg">
                   ${
                     this.currentFilter === 'pending'
                       ? 'hourglass_top'
@@ -311,8 +312,8 @@ export class ApiKeysView {
                 </span>
               </div>
               <div class="min-w-0">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="font-bold text-white text-xs sm:text-sm">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-bold text-white text-sm">
                     ${
                       this.currentFilter === 'pending'
                         ? 'Daftar Kunci Pasif (Perlu Verifikasi)'
@@ -321,47 +322,12 @@ export class ApiKeysView {
                         : 'Daftar Semua API Key'
                     }
                   </span>
-                  <span class="text-[11px] text-slate-400 font-mono whitespace-nowrap">(${keys.length} baris)</span>
+                  <span class="text-xs text-slate-400 font-mono">(${keys.length} baris)</span>
                 </div>
               </div>
             </div>
 
-          <div class="px-4 py-3 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2.5">
-              <div class="w-7 h-7 rounded-lg flex items-center justify-center ${
-                this.currentFilter === 'pending'
-                  ? 'bg-amber-500/20 text-amber-400'
-                  : this.currentFilter === 'valid'
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'bg-indigo-500/20 text-indigo-400'
-              }">
-                <span class="material-symbols-outlined text-base">
-                  ${
-                    this.currentFilter === 'pending'
-                      ? 'hourglass_top'
-                      : this.currentFilter === 'valid'
-                      ? 'verified'
-                      : 'dataset'
-                  }
-                </span>
-              </div>
-              <div class="min-w-0">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="font-bold text-white text-xs sm:text-sm">
-                    ${
-                      this.currentFilter === 'pending'
-                        ? 'Daftar Kunci Pasif (Perlu Verifikasi)'
-                        : this.currentFilter === 'valid'
-                        ? 'Daftar Kunci Aktif (Terverifikasi)'
-                        : 'Daftar Semua API Key'
-                    }
-                  </span>
-                  <span class="text-[11px] text-slate-400 font-mono whitespace-nowrap">(${keys.length} baris)</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Info Badge Kanan Header -->
+            <!-- Right Info Badge -->
             <div class="flex items-center gap-2">
               <span class="text-[11px] text-slate-400 font-mono bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 hidden sm:inline">
                 ${keys.length} data ditampilkan
@@ -369,18 +335,18 @@ export class ApiKeysView {
             </div>
           </div>
 
-          <!-- Tampilan Desktop & Tablet: Pas 100% Layar Tanpa Perlu Digeser -->
-          <div class="hidden md:block w-full overflow-hidden">
+          <!-- Table Wrapper (W-full, responsif, tidak terpotong) -->
+          <div class="w-full overflow-x-auto">
             <table class="w-full text-left admin-table">
               <thead>
                 <tr>
-                  <th class="pl-4 w-[23%]">API Key String</th>
-                  <th class="w-[19%]">Pemilik / User</th>
-                  <th class="w-[11%]">Status</th>
-                  <th class="w-[11%]">Kredit Kie</th>
-                  <th class="w-[11%]">Reward</th>
-                  <th class="w-[11%]">Waktu Setor</th>
-                  <th class="pr-4 w-[14%] text-right">Aksi</th>
+                  <th class="pl-5 whitespace-nowrap">API Key String</th>
+                  <th class="whitespace-nowrap">Pemilik / User</th>
+                  <th class="whitespace-nowrap">Status</th>
+                  <th class="whitespace-nowrap">Kredit Kie</th>
+                  <th class="whitespace-nowrap">Reward</th>
+                  <th class="whitespace-nowrap">Waktu Setor</th>
+                  <th class="text-right pr-5 whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -446,18 +412,18 @@ export class ApiKeysView {
 
                           let statusBadge = '';
                           if (k.status === 'valid') {
-                            statusBadge = '<span class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 whitespace-nowrap">Valid</span>';
+                            statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 whitespace-nowrap">Valid</span>';
                           } else if (k.status === 'pending') {
-                            statusBadge = '<span class="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-amber-500/15 text-amber-300 border-amber-500/40 inline-flex items-center gap-1 whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>Pending</span>';
+                            statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-amber-500/15 text-amber-300 border-amber-500/40 inline-flex items-center gap-1.5 whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>Perlu Verifikasi</span>';
                           } else if (k.status === 'used') {
-                            statusBadge = '<span class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold border bg-blue-500/10 text-blue-400 border-blue-500/30 whitespace-nowrap">Digunakan</span>';
+                            statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-blue-500/10 text-blue-400 border-blue-500/30 whitespace-nowrap">Digunakan</span>';
                           } else {
-                            statusBadge = '<span class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold border bg-rose-500/10 text-rose-400 border-rose-500/30 whitespace-nowrap">Invalid</span>';
+                            statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-rose-500/10 text-rose-400 border-rose-500/30 whitespace-nowrap">Invalid</span>';
                           }
 
                           return `
                     <tr data-key-id="${k.id}">
-                      <td class="pl-4">
+                      <td class="pl-5">
                         <div class="flex items-center gap-1.5 flex-nowrap">
                           <span class="font-mono text-xs font-semibold text-slate-200 select-all tracking-wider">${displayKey}</span>
                           <div class="flex items-center gap-0.5 shrink-0">
@@ -483,7 +449,7 @@ export class ApiKeysView {
                         </div>
                         ${
                           k.errorMessage
-                            ? `<div class="text-[10px] text-rose-400 mt-0.5 leading-tight flex items-center gap-1 truncate max-w-[200px]" title="${k.errorMessage}">
+                            ? `<div class="text-[11px] text-rose-400 mt-1 flex items-center gap-1 truncate max-w-[240px]" title="${k.errorMessage}">
                                 <span class="material-symbols-outlined text-xs shrink-0">info</span>
                                 <span class="truncate">${k.errorMessage}</span>
                               </div>`
@@ -491,22 +457,22 @@ export class ApiKeysView {
                         }
                       </td>
                       <td>
-                        <div class="font-bold text-xs text-white truncate max-w-[140px]">${k.userName || 'Pengguna'}</div>
-                        <div class="font-mono text-[11px] text-indigo-300 font-medium truncate max-w-[140px]" title="${k.userEmail || k.userId || ''}">${k.userEmail || k.userId || '-'}</div>
-                        ${k.id ? `<div class="text-[10px] text-slate-500 font-mono truncate max-w-[120px]" title="${k.id}">ID: ${k.id.slice(0, 8)}...</div>` : ''}
+                        <div class="font-bold text-xs text-white">${k.userName || 'Pengguna'}</div>
+                        <div class="font-mono text-[11px] text-indigo-300 font-medium truncate max-w-[170px]" title="${k.userEmail || k.userId || ''}">${k.userEmail || k.userId || '-'}</div>
+                        ${k.id ? `<div class="text-[10px] text-slate-500 font-mono truncate max-w-[140px]" title="${k.id}">ID: ${k.id.slice(0, 8)}...</div>` : ''}
                       </td>
                       <td>
                         ${statusBadge}
                       </td>
                       <td>
-                        <div class="flex items-center gap-1">
+                        <div class="flex items-center gap-1.5 whitespace-nowrap">
                           <span class="font-mono text-xs font-bold text-slate-200">${k.credits !== undefined ? k.credits : 80} cr</span>
                           <button
                             type="button"
                             data-action="sync-single-credit"
                             data-id="${k.id}"
                             data-keystring="${k.keyString}"
-                            title="Sinkronkan kredit dari Kie.ai"
+                            title="Sinkronkan kredit key ini langsung dari Kie.ai"
                             class="p-1 rounded text-sky-400 hover:text-sky-300 hover:bg-sky-500/15 active:scale-90 transition-all cursor-pointer"
                           >
                             <span class="material-symbols-outlined text-xs">sync</span>
@@ -514,21 +480,21 @@ export class ApiKeysView {
                         </div>
                       </td>
                       <td>
-                        <div class="font-mono text-xs font-semibold text-emerald-400">Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</div>
+                        <div class="font-mono text-xs font-semibold text-emerald-400 whitespace-nowrap">Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</div>
                       </td>
-                      <td>
-                        <div class="text-[11px] text-slate-300 leading-tight">${new Date(k.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                        <div class="text-[10px] text-slate-500">${new Date(k.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
+                      <td class="whitespace-nowrap">
+                        <div class="text-xs text-slate-300">${new Date(k.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                        <div class="text-[11px] text-slate-500">${new Date(k.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
                       </td>
-                      <td class="text-right pr-4">
-                        <div class="flex items-center justify-end gap-1 flex-nowrap">
+                      <td class="text-right pr-5 whitespace-nowrap">
+                        <div class="flex items-center justify-end gap-1.5 flex-nowrap">
                           <button
                             type="button"
                             data-action="sync-single-credit"
                             data-id="${k.id}"
                             data-keystring="${k.keyString}"
                             title="Cek & Sinkronkan Kredit ke Kie.ai"
-                            class="px-2 py-1 rounded text-[10px] font-semibold bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 text-sky-300 border border-sky-500/30 flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                            class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 text-sky-300 border border-sky-500/30 flex items-center gap-1 transition-all cursor-pointer shrink-0"
                           >
                             <span class="material-symbols-outlined text-xs">sync</span>
                             <span>Kie</span>
@@ -541,7 +507,7 @@ export class ApiKeysView {
                               data-action="approve-key"
                               data-id="${k.id}"
                               title="Setujui API Key & Cairkan ke Saldo Aktif"
-                              class="px-2 py-1 rounded text-[10px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-emerald-300 border border-emerald-500/40 flex items-center gap-0.5 transition-all shadow-sm cursor-pointer shrink-0"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 transition-all shadow-sm cursor-pointer shrink-0"
                             >
                               <span class="material-symbols-outlined text-xs">check_circle</span>
                               <span>Setujui</span>
@@ -551,7 +517,7 @@ export class ApiKeysView {
                               data-action="reject-key"
                               data-id="${k.id}"
                               title="Tolak API Key & Batalkan Saldo Pasif"
-                              class="px-2 py-1 rounded text-[10px] font-medium bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 border border-rose-500/30 flex items-center gap-0.5 transition-all cursor-pointer shrink-0"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 border border-rose-500/30 flex items-center gap-1 transition-all cursor-pointer shrink-0"
                             >
                               <span class="material-symbols-outlined text-xs">cancel</span>
                               <span>Tolak</span>
@@ -565,9 +531,9 @@ export class ApiKeysView {
                               data-id="${k.id}"
                               data-status="used"
                               title="Tandai Sudah Digunakan / Dijual"
-                              class="px-2 py-1 rounded text-[10px] font-semibold bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 text-blue-300 border border-blue-500/30 transition-all cursor-pointer shrink-0"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 text-blue-300 border border-blue-500/30 transition-all cursor-pointer shrink-0"
                             >
-                              Used
+                              Tandai Used
                             </button>
                           `
                               : k.status === 'used'
@@ -578,9 +544,9 @@ export class ApiKeysView {
                               data-id="${k.id}"
                               data-status="valid"
                               title="Kembalikan ke Valid"
-                              class="px-2 py-1 rounded text-[10px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer shrink-0"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer shrink-0"
                             >
-                              Reset
+                              Reset Valid
                             </button>
                           `
                               : ''
@@ -590,7 +556,7 @@ export class ApiKeysView {
                             data-action="delete-key"
                             data-id="${k.id}"
                             title="Hapus Kunci dari Database"
-                            class="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-colors cursor-pointer shrink-0"
+                            class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-colors cursor-pointer shrink-0"
                           >
                             <span class="material-symbols-outlined text-sm">delete</span>
                           </button>
@@ -603,172 +569,6 @@ export class ApiKeysView {
                 }
               </tbody>
             </table>
-          </div>
-
-          <!-- Tampilan Mobile (< 768px): Card Responsif Vertikal, Tanpa Perlu Geser Samping -->
-          <div class="block md:hidden divide-y divide-slate-800/70">
-            ${
-              keys.length === 0
-                ? `
-              <div class="text-center py-8 text-slate-400 px-4">
-                <span class="material-symbols-outlined text-3xl mb-1 text-slate-600 block">search_off</span>
-                <p class="text-xs font-medium text-slate-300">Tidak ada data API Key.</p>
-              </div>
-            `
-                : keys
-                    .map(k => {
-                      const isRevealed = this.revealedKeys.has(k.id);
-                      const displayKey = isRevealed
-                        ? k.keyString
-                        : k.keyString
-                        ? `${k.keyString.slice(0, 8)}••••••••••••${k.keyString.slice(-4)}`
-                        : '-';
-
-                      let statusBadge = '';
-                      if (k.status === 'valid') {
-                        statusBadge = '<span class="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">Valid</span>';
-                      } else if (k.status === 'pending') {
-                        statusBadge = '<span class="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-amber-500/15 text-amber-300 border-amber-500/40 inline-flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-amber-400 animate-pulse"></span>Pending</span>';
-                      } else if (k.status === 'used') {
-                        statusBadge = '<span class="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-blue-500/10 text-blue-400 border-blue-500/30">Used</span>';
-                      } else {
-                        statusBadge = '<span class="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-rose-500/10 text-rose-400 border-rose-500/30">Invalid</span>';
-                      }
-
-                      return `
-                <div class="p-3.5 space-y-2.5 bg-slate-900/30" data-key-id="${k.id}">
-                  <!-- Baris Atas: Kunci & Status -->
-                  <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-1 min-w-0">
-                      <span class="font-mono text-xs font-semibold text-slate-200 select-all tracking-wider truncate">${displayKey}</span>
-                      <button
-                        type="button"
-                        data-action="toggle-reveal"
-                        data-id="${k.id}"
-                        class="p-1 text-slate-400 hover:text-indigo-400 transition-colors"
-                        title="Tampilkan/Sembunyikan"
-                      >
-                        <span class="material-symbols-outlined text-sm">${isRevealed ? 'visibility_off' : 'visibility'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        data-action="copy-key"
-                        data-keystring="${k.keyString}"
-                        class="p-1 text-slate-400 hover:text-emerald-400 transition-colors"
-                        title="Salin"
-                      >
-                        <span class="material-symbols-outlined text-sm">content_copy</span>
-                      </button>
-                    </div>
-                    <div class="shrink-0">
-                      ${statusBadge}
-                    </div>
-                  </div>
-
-                  <!-- Baris Tengah: Info Pemilik & Finansial -->
-                  <div class="grid grid-cols-2 gap-2 text-xs bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/60">
-                    <div class="min-w-0">
-                      <span class="text-[9px] text-slate-400 uppercase tracking-wider block">Pemilik</span>
-                      <div class="font-bold text-slate-200 truncate">${k.userName || 'Pengguna'}</div>
-                      <div class="text-[10px] text-indigo-300 font-mono truncate" title="${k.userEmail || ''}">${k.userEmail || '-'}</div>
-                    </div>
-                    <div>
-                      <span class="text-[9px] text-slate-400 uppercase tracking-wider block">Kredit & Reward</span>
-                      <div class="font-bold text-slate-200 flex items-center gap-1">
-                        <span>${k.credits !== undefined ? k.credits : 80} cr</span>
-                        <button
-                          type="button"
-                          data-action="sync-single-credit"
-                          data-id="${k.id}"
-                          data-keystring="${k.keyString}"
-                          title="Sinkronkan"
-                          class="p-0.5 text-sky-400 hover:text-sky-300"
-                        >
-                          <span class="material-symbols-outlined text-xs">sync</span>
-                        </button>
-                      </div>
-                      <div class="text-[11px] text-emerald-400 font-semibold">Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</div>
-                    </div>
-                  </div>
-
-                  <!-- Baris Bawah: Waktu & Tombol Aksi -->
-                  <div class="flex items-center justify-between gap-2 pt-0.5">
-                    <div class="text-[10px] text-slate-500">
-                      ${new Date(k.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}, ${new Date(k.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                    <div class="flex items-center gap-1">
-                      <button
-                        type="button"
-                        data-action="sync-single-credit"
-                        data-id="${k.id}"
-                        data-keystring="${k.keyString}"
-                        title="Cek & Sinkronkan Kredit ke Kie.ai"
-                        class="px-2 py-1 rounded text-[10px] font-semibold bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-0.5"
-                      >
-                        <span class="material-symbols-outlined text-xs">sync</span>
-                        <span>Kie</span>
-                      </button>
-                      ${
-                        k.status === 'pending'
-                          ? `
-                        <button
-                          type="button"
-                          data-action="approve-key"
-                          data-id="${k.id}"
-                          class="px-2 py-1 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                        >
-                          Setujui
-                        </button>
-                        <button
-                          type="button"
-                          data-action="reject-key"
-                          data-id="${k.id}"
-                          class="px-2 py-1 rounded text-[10px] font-medium bg-rose-500/10 text-rose-300 border border-rose-500/30"
-                        >
-                          Tolak
-                        </button>
-                      `
-                          : k.status === 'valid'
-                          ? `
-                        <button
-                          type="button"
-                          data-action="set-status"
-                          data-id="${k.id}"
-                          data-status="used"
-                          class="px-2 py-1 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/30"
-                        >
-                          Used
-                        </button>
-                      `
-                          : k.status === 'used'
-                          ? `
-                        <button
-                          type="button"
-                          data-action="set-status"
-                          data-id="${k.id}"
-                          data-status="valid"
-                          class="px-2 py-1 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30"
-                        >
-                          Reset
-                        </button>
-                      `
-                          : ''
-                      }
-                      <button
-                        type="button"
-                        data-action="delete-key"
-                        data-id="${k.id}"
-                        class="p-1 rounded text-slate-500 hover:text-rose-400"
-                      >
-                        <span class="material-symbols-outlined text-sm">delete</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              `;
-                    })
-                    .join('')
-            }
           </div>
         </div>
       </div>
