@@ -161,11 +161,10 @@ export class LoginView extends IComponent {
         return;
       }
 
-      // Verifikasi Captcha sebelum masuk ke dashboard
+      // Verifikasi Google reCAPTCHA sebelum masuk ke dashboard
       const isCaptchaPassed = await CaptchaModal.show({
         title: 'Verifikasi Keamanan Masuk',
-        subtitle: 'Selesaikan kode captcha berikut untuk melanjutkan masuk ke akun Anda.',
-        confirmText: 'Verifikasi & Masuk'
+        subtitle: 'Centang kotak Google reCAPTCHA di bawah untuk melanjutkan masuk ke akun Anda.'
       });
 
       if (!isCaptchaPassed) {

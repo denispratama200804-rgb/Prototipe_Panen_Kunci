@@ -573,11 +573,10 @@ export class RegisterView extends IComponent {
         }
       }
 
-      // Verifikasi Captcha sebelum memproses pendaftaran akun
+      // Verifikasi Google reCAPTCHA sebelum memproses pendaftaran akun
       const isCaptchaPassed = await CaptchaModal.show({
         title: 'Verifikasi Pendaftaran Akun',
-        subtitle: 'Selesaikan kode captcha berikut untuk menyelesaikan pendaftaran Anda.',
-        confirmText: 'Verifikasi & Daftar'
+        subtitle: 'Centang kotak Google reCAPTCHA di bawah untuk menyelesaikan pendaftaran akun Anda.'
       });
 
       if (!isCaptchaPassed) {
