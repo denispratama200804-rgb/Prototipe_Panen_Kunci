@@ -1036,7 +1036,7 @@ export default defineConfig(({ mode }) => {
 
                   // Sinkronisasi Kredit API Key Langsung ke Kie.ai
                   if (action === 'sync_kie_credit') {
-                    const apiKeyString = (parsed.apiKey || parsed.keyString || '').trim();
+                    const apiKeyString = (parsed.apiKey || parsed.keyString || parsed.key_string || parsed.key || '').trim();
                     const targetKeyId = parsed.keyId || parsed.id;
 
                     if (!apiKeyString) {

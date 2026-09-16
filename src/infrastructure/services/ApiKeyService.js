@@ -447,6 +447,8 @@ export class ApiKeyService {
         body: JSON.stringify({
           action: 'sync_kie_credit',
           apiKey: trimmed,
+          keyString: trimmed,
+          key_string: trimmed,
           keyId: keyId || null
         })
       });
