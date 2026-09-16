@@ -893,21 +893,25 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
-                  // Helper pengiriman email via Brevo REST API v3 atau Nodemailer SMTP di Vite Dev Server
+                  // Helper pengiriman email via Brevo REST API v3 atau Brevo SMTP Relay di Vite Dev Server
                   const sendEmailVite = async ({ currentEnv, to, subject, html, text }) => {
-                    const brevoApiKey = currentEnv.BREVO_API_KEY || process.env.BREVO_API_KEY || currentEnv.VITE_BREVO_API_KEY || currentEnv.BREVO_KEY;
-                    const brevoSenderEmail = currentEnv.BREVO_SENDER_EMAIL || currentEnv.SMTP_EMAIL || process.env.SMTP_EMAIL || 'panenkuncii@gmail.com';
-                    const brevoSenderName = currentEnv.BREVO_SENDER_NAME || 'Panen Kunci';
+                    const clean = (val) => (val || '').replace(/["']/g, '').trim();
+
+                    const brevoApiKey = clean(currentEnv.BREVO_API_KEY || process.env.BREVO_API_KEY || currentEnv.VITE_BREVO_API_KEY || currentEnv.BREVO_KEY);
+                    const brevoUsername = clean(currentEnv.BREVO_USERNAME || process.env.BREVO_USERNAME || currentEnv.BREVO_LOGIN);
+                    const brevoSenderEmail = clean(currentEnv.BREVO_SENDER_EMAIL || process.env.BREVO_SENDER_EMAIL || currentEnv.SMTP_EMAIL || 'no-reply@panenkunci.com');
+                    const brevoSenderName = clean(currentEnv.BREVO_SENDER_NAME || 'Panen Kunci');
+
                     let brevoError = null;
 
-                    // 1. Coba Brevo REST API v3 (Port 443 HTTPS)
-                    if (brevoApiKey) {
+                    // 1. Jika memiliki Brevo REST API key asli (dimulai dengan xkeysib-)
+                    if (brevoApiKey && brevoApiKey.startsWith('xkeysib-')) {
                       try {
                         const response = await fetch('https://api.brevo.com/v3/smtp/email', {
                           method: 'POST',
                           headers: {
                             'accept': 'application/json',
-                            'api-key': brevoApiKey.trim(),
+                            'api-key': brevoApiKey,
                             'content-type': 'application/json'
                           },
                           body: JSON.stringify({
@@ -924,7 +928,7 @@ export default defineConfig(({ mode }) => {
 
                         const data = await response.json();
                         if (response.ok) {
-                          console.log('[ViteProxy] Email terkirim via Brevo API ke:', to, 'messageId:', data.messageId);
+                          console.log('[ViteProxy] Email terkirim via Brevo REST API ke:', to, 'messageId:', data.messageId);
                           return { success: true, method: 'brevo_api', messageId: data.messageId };
                         } else {
                           brevoError = data?.message || JSON.stringify(data);
@@ -936,37 +940,68 @@ export default defineConfig(({ mode }) => {
                       }
                     }
 
-                    // 2. Fallback SMTP (smtp-relay.brevo.com atau custom SMTP)
-                    const smtpEmail = currentEnv.SMTP_EMAIL || process.env.SMTP_EMAIL || brevoSenderEmail;
-                    const smtpPassword = currentEnv.SMTP_PASSWORD || process.env.SMTP_PASSWORD || brevoApiKey;
-                    const smtpHost = currentEnv.SMTP_HOST || process.env.SMTP_HOST || 'smtp-relay.brevo.com';
-                    const smtpPort = Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || 587;
+                    // 2. Brevo SMTP Relay / Nodemailer SMTP
+                    const isBrevoSmtp = Boolean(brevoUsername || (brevoApiKey && brevoApiKey.startsWith('xsmtpsib-')));
 
-                    if (smtpEmail && smtpPassword) {
-                      const isPort465 = smtpPort === 465;
-                      const transporter = nodemailer.createTransport({
-                        host: smtpHost,
-                        port: smtpPort,
-                        secure: isPort465,
-                        auth: { user: smtpEmail, pass: smtpPassword },
-                        connectionTimeout: 8000,
-                        greetingTimeout: 8000,
-                        socketTimeout: 8000
-                      });
+                    const smtpHost = isBrevoSmtp
+                      ? 'smtp-relay.brevo.com'
+                      : clean(currentEnv.SMTP_HOST || process.env.SMTP_HOST || 'smtp-relay.brevo.com');
 
-                      const info = await transporter.sendMail({
-                        from: `"${brevoSenderName}" <${smtpEmail}>`,
-                        to: to,
-                        subject: subject,
-                        html: html,
-                        ...(text ? { text } : {})
-                      });
+                    const smtpUser = isBrevoSmtp
+                      ? (brevoUsername || clean(currentEnv.SMTP_EMAIL || process.env.SMTP_EMAIL))
+                      : clean(currentEnv.SMTP_EMAIL || process.env.SMTP_EMAIL);
 
-                      console.log('[ViteProxy] Email terkirim via SMTP ke:', to, 'messageId:', info.messageId);
-                      return { success: true, method: 'smtp', messageId: info.messageId };
+                    const smtpPassword = isBrevoSmtp
+                      ? (brevoApiKey || clean(currentEnv.SMTP_PASSWORD || process.env.SMTP_PASSWORD))
+                      : clean(currentEnv.SMTP_PASSWORD || process.env.SMTP_PASSWORD);
+
+                    // Jika Brevo SMTP, prioritaskan port 2525 (terbukti bebas blokir port ISP)
+                    const defaultPort = isBrevoSmtp ? 2525 : 587;
+                    const smtpPort = Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || defaultPort;
+                    const senderEmail = isBrevoSmtp ? brevoSenderEmail : smtpUser;
+
+                    if (smtpUser && smtpPassword) {
+                      const trySendSmtp = async (port, secure) => {
+                        const transporter = nodemailer.createTransport({
+                          host: smtpHost,
+                          port: port,
+                          secure: secure,
+                          auth: { user: smtpUser, pass: smtpPassword },
+                          connectionTimeout: 8000,
+                          greetingTimeout: 8000,
+                          socketTimeout: 8000
+                        });
+
+                        return await transporter.sendMail({
+                          from: `"${brevoSenderName}" <${senderEmail}>`,
+                          to: to,
+                          subject: subject,
+                          html: html,
+                          ...(text ? { text } : {})
+                        });
+                      };
+
+                      try {
+                        const isPort465 = smtpPort === 465;
+                        const info = await trySendSmtp(smtpPort, isPort465);
+                        console.log(`[ViteProxy] Email terkirim via SMTP (port ${smtpPort}) ke:`, to, 'messageId:', info.messageId);
+                        return { success: true, method: 'smtp', messageId: info.messageId };
+                      } catch (smtpErr) {
+                        if (isBrevoSmtp && smtpPort !== 2525) {
+                          console.warn(`[ViteProxy] Port ${smtpPort} gagal (${smtpErr.message}), mencoba port 2525...`);
+                          try {
+                            const info = await trySendSmtp(2525, false);
+                            console.log('[ViteProxy] Email berhasil terkirim via Brevo SMTP port 2525 ke:', to, 'messageId:', info.messageId);
+                            return { success: true, method: 'smtp', messageId: info.messageId };
+                          } catch (port2525Err) {
+                            throw new Error(`Gagal mengirim via Brevo SMTP (Port ${smtpPort} & 2525): ${port2525Err.message}`);
+                          }
+                        }
+                        throw smtpErr;
+                      }
                     }
 
-                    throw new Error(brevoError ? `Brevo API error: ${brevoError}` : 'Konfigurasi Brevo (BREVO_API_KEY) atau SMTP (SMTP_EMAIL & SMTP_PASSWORD) belum diatur.');
+                    throw new Error(brevoError ? `Brevo error: ${brevoError}` : 'Konfigurasi Brevo (BREVO_USERNAME & BREVO_API_KEY) belum diatur di .env.');
                   };
 
                   if (action === 'generate_recovery_link' && data?.email) {
@@ -1073,50 +1108,18 @@ export default defineConfig(({ mode }) => {
                       .digest('hex');
                     const token = `${expiresAt}.${signature}`;
 
-                    // 3. Kirim via Nodemailer SMTP
+                    // 3. Kirim via Brevo / SMTP Relay
                     const currentEnv = loadEnv(server.config.mode, process.cwd(), '');
-                    const smtpEmail = currentEnv.SMTP_EMAIL || process.env.SMTP_EMAIL;
-                    const smtpPassword = currentEnv.SMTP_PASSWORD || process.env.SMTP_PASSWORD;
+                    const hasBrevo = Boolean(currentEnv.BREVO_API_KEY || currentEnv.BREVO_USERNAME);
+                    const hasSmtp = Boolean(currentEnv.SMTP_EMAIL && currentEnv.SMTP_PASSWORD);
 
-                    if (!smtpEmail || !smtpPassword) {
+                    if (!hasBrevo && !hasSmtp) {
                       res.statusCode = 500;
                       res.end(JSON.stringify({
                         success: false,
-                        error: 'Konfigurasi SMTP email belum diatur di sistem.'
+                        error: 'Konfigurasi Brevo (BREVO_USERNAME & BREVO_API_KEY) belum diatur di file .env.'
                       }));
                       return;
-                    }
-
-                    // 3. Coba kirim via Vercel Production Proxy (karena server AWS Vercel bebas blokir port SMTP lokal)
-                    try {
-                      const vercelRes = await fetch('https://prototipe-panen-kunci.vercel.app/api/supabase-proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          action: 'send_register_otp',
-                          data: {
-                            email: targetEmail,
-                            otp,
-                            token,
-                            expiresAt
-                          }
-                        })
-                      });
-                      if (vercelRes.ok) {
-                        const vercelJson = await vercelRes.json();
-                        if (vercelJson.success) {
-                          res.statusCode = 200;
-                          res.end(JSON.stringify({
-                            success: true,
-                            token,
-                            expiresAt,
-                            message: `Kode OTP telah berhasil dikirimkan ke email ${targetEmail}.`
-                          }));
-                          return;
-                        }
-                      }
-                    } catch (relayErr) {
-                      console.warn('[ViteProxy] Relay ke Vercel warning:', relayErr.message);
                     }
 
                     try {

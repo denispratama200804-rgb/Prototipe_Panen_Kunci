@@ -7,22 +7,25 @@ import crypto from 'node:crypto';
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Konfigurasi Pengiriman Email (Mendukung Brevo REST API v3 & Nodemailer SMTP)
+// Konfigurasi Pengiriman Email (Mendukung Brevo REST API v3 & Brevo SMTP Relay)
 async function sendEmailMessage({ to, subject, html, text }) {
-  const brevoApiKey = process.env.BREVO_API_KEY || process.env.VITE_BREVO_API_KEY || process.env.NEXT_PUBLIC_BREVO_API_KEY || process.env.BREVO_KEY;
-  const brevoSenderEmail = process.env.BREVO_SENDER_EMAIL || process.env.SMTP_EMAIL || 'panenkuncii@gmail.com';
-  const brevoSenderName = process.env.BREVO_SENDER_NAME || 'Panen Kunci';
+  const clean = (val) => (val || '').replace(/["']/g, '').trim();
+
+  const brevoApiKey = clean(process.env.BREVO_API_KEY || process.env.VITE_BREVO_API_KEY || process.env.NEXT_PUBLIC_BREVO_API_KEY || process.env.BREVO_KEY);
+  const brevoUsername = clean(process.env.BREVO_USERNAME || process.env.BREVO_LOGIN);
+  const brevoSenderEmail = clean(process.env.BREVO_SENDER_EMAIL || process.env.SMTP_EMAIL || 'no-reply@panenkunci.com');
+  const brevoSenderName = clean(process.env.BREVO_SENDER_NAME || 'Panen Kunci');
 
   let brevoError = null;
 
-  // 1. Prioritas Utama: Brevo REST API v3 (Port 443 HTTPS, bebas blokir port di Vercel/Cloud)
-  if (brevoApiKey) {
+  // 1. Jika memiliki Brevo REST API key asli (dimulai dengan xkeysib-)
+  if (brevoApiKey && brevoApiKey.startsWith('xkeysib-')) {
     try {
       const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: {
           'accept': 'application/json',
-          'api-key': brevoApiKey.trim(),
+          'api-key': brevoApiKey,
           'content-type': 'application/json'
         },
         body: JSON.stringify({
@@ -51,40 +54,71 @@ async function sendEmailMessage({ to, subject, html, text }) {
     }
   }
 
-  // 2. Fallback: Nodemailer SMTP (smtp-relay.brevo.com atau custom SMTP)
-  const smtpEmail = process.env.SMTP_EMAIL || brevoSenderEmail;
-  const smtpPassword = process.env.SMTP_PASSWORD || brevoApiKey;
-  const smtpHost = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
-  const smtpPort = Number(process.env.SMTP_PORT) || 587;
+  // 2. Brevo SMTP Relay / Nodemailer SMTP
+  const isBrevoSmtp = Boolean(brevoUsername || (brevoApiKey && brevoApiKey.startsWith('xsmtpsib-')));
 
-  if (smtpEmail && smtpPassword) {
-    const isPort465 = smtpPort === 465;
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: isPort465,
-      auth: {
-        user: smtpEmail,
-        pass: smtpPassword
-      },
-      connectionTimeout: 8000,
-      greetingTimeout: 8000,
-      socketTimeout: 8000
-    });
+  const smtpHost = isBrevoSmtp
+    ? 'smtp-relay.brevo.com'
+    : clean(process.env.SMTP_HOST || 'smtp-relay.brevo.com');
 
-    const info = await transporter.sendMail({
-      from: `"${brevoSenderName}" <${smtpEmail}>`,
-      to: to,
-      subject: subject,
-      html: html,
-      ...(text ? { text } : {})
-    });
+  const smtpUser = isBrevoSmtp
+    ? (brevoUsername || clean(process.env.SMTP_EMAIL))
+    : clean(process.env.SMTP_EMAIL);
 
-    console.log('[EmailService] Berhasil terkirim via SMTP ke:', to, 'messageId:', info.messageId);
-    return { success: true, method: 'smtp', messageId: info.messageId };
+  const smtpPassword = isBrevoSmtp
+    ? (brevoApiKey || clean(process.env.SMTP_PASSWORD))
+    : clean(process.env.SMTP_PASSWORD);
+
+  // Jika Brevo SMTP, port 2525 sangat dianjurkan untuk menghindari blokir port 587/465 ISP
+  const defaultPort = isBrevoSmtp ? 2525 : 587;
+  const smtpPort = Number(process.env.SMTP_PORT) || defaultPort;
+  const senderEmail = isBrevoSmtp ? brevoSenderEmail : smtpUser;
+
+  if (smtpUser && smtpPassword) {
+    const trySendSmtp = async (port, secure) => {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: port,
+        secure: secure,
+        auth: {
+          user: smtpUser,
+          pass: smtpPassword
+        },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 8000
+      });
+
+      return await transporter.sendMail({
+        from: `"${brevoSenderName}" <${senderEmail}>`,
+        to: to,
+        subject: subject,
+        html: html,
+        ...(text ? { text } : {})
+      });
+    };
+
+    try {
+      const isPort465 = smtpPort === 465;
+      const info = await trySendSmtp(smtpPort, isPort465);
+      console.log(`[EmailService] Berhasil terkirim via SMTP (port ${smtpPort}) ke:`, to, 'messageId:', info.messageId);
+      return { success: true, method: 'smtp', messageId: info.messageId };
+    } catch (smtpErr) {
+      if (isBrevoSmtp && smtpPort !== 2525) {
+        console.warn(`[EmailService] Port ${smtpPort} gagal (${smtpErr.message}), mencoba fallback ke port 2525...`);
+        try {
+          const info = await trySendSmtp(2525, false);
+          console.log('[EmailService] Berhasil terkirim via Brevo SMTP port 2525 ke:', to, 'messageId:', info.messageId);
+          return { success: true, method: 'smtp', messageId: info.messageId };
+        } catch (portErr) {
+          throw new Error(`Gagal mengirim via Brevo SMTP (Port ${smtpPort} & 2525): ${portErr.message}`);
+        }
+      }
+      throw smtpErr;
+    }
   }
 
-  throw new Error(brevoError ? `Brevo API error: ${brevoError}` : 'Sistem email belum dikonfigurasi. Harap tambahkan BREVO_API_KEY atau SMTP_EMAIL & SMTP_PASSWORD.');
+  throw new Error(brevoError ? `Brevo error: ${brevoError}` : 'Sistem email belum dikonfigurasi. Harap tambahkan BREVO_USERNAME & BREVO_API_KEY di .env.');
 }
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bmuthjyibkrcqyygjcxe.supabase.co';
