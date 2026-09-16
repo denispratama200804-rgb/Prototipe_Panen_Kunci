@@ -1,5 +1,6 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { getPaymentMethodMetadata } from '../utils/PaymentMethodHelper.js';
+import { User } from '../../domain/models/User.js';
 
 /**
  * ProfileView
@@ -51,6 +52,10 @@ export class ProfileView extends IComponent {
       .slice(0, 2)
       .join('')
       .toUpperCase();
+
+    const referralCode = user.referralCode || User.generateReferralCode(user.id || user.email || user.name);
+    const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://panenkunci.com';
+    const referralLink = `${origin}/#/register?ref=${referralCode}`;
 
     return `
       <div class="flex flex-col w-full min-h-screen bg-background pb-28 pt-20">
@@ -185,6 +190,92 @@ export class ProfileView extends IComponent {
               </div>
             </div>
           </div>
+
+          <!-- Referral Code Section -->
+          <section class="flex flex-col gap-2">
+            <div class="flex items-center justify-between px-1">
+              <h3 class="font-headline-md text-xs font-bold text-text-heading uppercase tracking-wider flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px] text-primary">loyalty</span>
+                <span>Kode Referral Saya</span>
+              </h3>
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30">
+                <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+                <span>Aktif & Unik</span>
+              </span>
+            </div>
+
+            <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-4 relative overflow-hidden">
+              <!-- Decorative background glow -->
+              <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none"></div>
+
+              <!-- Referral Code Box -->
+              <div class="bg-gradient-to-br from-primary/10 via-surface-container-low to-secondary/5 rounded-2xl p-4 border border-primary/20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-xs">
+                <div class="flex flex-col">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-text-body">Kode Rujukan Akun Anda</span>
+                  <div class="flex items-center gap-2 mt-1">
+                    <span class="font-mono text-xl sm:text-2xl font-extrabold tracking-widest text-primary selection:bg-primary/20" id="profileReferralCodeDisplay">${referralCode}</span>
+                    <span class="px-2 py-0.5 rounded-md bg-primary/15 text-primary text-[10px] font-extrabold uppercase">Permanen</span>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    id="btnCopyReferralCode"
+                    class="flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl bg-primary text-white font-label-md text-xs font-bold shadow-sm hover:bg-primary-container active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="Salin Kode Referral"
+                  >
+                    <span class="material-symbols-outlined text-[16px]" id="iconCopyReferralCode">content_copy</span>
+                    <span id="textCopyReferralCode">Salin Kode</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="btnShareReferralLink"
+                    class="px-3.5 py-2.5 rounded-xl bg-surface-card hover:bg-surface-container text-text-heading border border-surface-container font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="Bagikan Link Referral"
+                  >
+                    <span class="material-symbols-outlined text-[16px] text-primary">share</span>
+                    <span>Bagikan</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Referral Link Box -->
+              <div class="flex flex-col gap-1.5">
+                <span class="text-[11px] font-semibold text-text-body">Tautan Registrasi Langsung:</span>
+                <div class="flex items-center bg-surface-container-low rounded-xl border border-surface-container p-1.5 pl-3 gap-2">
+                  <input
+                    type="text"
+                    readonly
+                    id="profileReferralLinkInput"
+                    value="${referralLink}"
+                    class="w-full bg-transparent text-xs text-text-heading font-mono select-all focus:outline-none truncate"
+                  />
+                  <button
+                    type="button"
+                    id="btnCopyReferralLinkSmall"
+                    class="px-2.5 py-1.5 rounded-lg bg-surface-container hover:bg-primary/10 hover:text-primary text-text-body text-xs font-bold transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+                    title="Salin tautan"
+                  >
+                    <span class="material-symbols-outlined text-[14px]">link</span>
+                    <span>Salin</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Benefit Highlights -->
+              <div class="bg-surface-container-low rounded-2xl p-3.5 border border-surface-container/60 flex items-start gap-2.5">
+                <div class="w-7 h-7 rounded-lg bg-secondary/15 text-secondary flex items-center justify-center shrink-0 mt-0.5">
+                  <span class="material-symbols-outlined text-[16px]">featured_seasonal_and_gifts</span>
+                </div>
+                <div class="flex flex-col text-[11px] leading-relaxed text-text-body">
+                  <span class="font-bold text-text-heading">Keuntungan Program Referral:</span>
+                  <span>Ajak teman bergabung menggunakan kode referral unik Anda. Dapatkan komisi saldo pasif dari setiap setoran API key rekan Anda yang berhasil disetujui!</span>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <!-- Bank Account / E-Wallet Info Section -->
           <section class="flex flex-col gap-2">
@@ -429,6 +520,89 @@ export class ProfileView extends IComponent {
         this._notification.success('Foto profil berhasil dihapus.');
       } catch (err) {
         this._notification.error('Gagal menghapus foto profil: ' + err.message);
+      }
+    });
+
+    // Handler Referral Code (Salin Kode, Salin Link, dan Bagikan)
+    const btnCopyReferralCode = container.querySelector('#btnCopyReferralCode');
+    const iconCopyReferralCode = container.querySelector('#iconCopyReferralCode');
+    const textCopyReferralCode = container.querySelector('#textCopyReferralCode');
+    const btnCopyReferralLinkSmall = container.querySelector('#btnCopyReferralLinkSmall');
+    const btnShareReferralLink = container.querySelector('#btnShareReferralLink');
+    const profileReferralLinkInput = container.querySelector('#profileReferralLinkInput');
+    const profileReferralCodeDisplay = container.querySelector('#profileReferralCodeDisplay');
+
+    const copyTextToClipboard = async (text, successMessage) => {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+        }
+        this._notification.success(successMessage);
+        return true;
+      } catch (err) {
+        console.error('Copy to clipboard failed:', err);
+        this._notification.error('Gagal menyalin: ' + (err.message || 'Izin clipboard ditolak'));
+        return false;
+      }
+    };
+
+    btnCopyReferralCode?.addEventListener('click', async () => {
+      const code = (profileReferralCodeDisplay?.textContent || '').trim();
+      if (!code) return;
+
+      const ok = await copyTextToClipboard(code, `Kode referral ${code} berhasil disalin!`);
+      if (ok && iconCopyReferralCode && textCopyReferralCode) {
+        const originalIcon = iconCopyReferralCode.textContent;
+        const originalText = textCopyReferralCode.textContent;
+        iconCopyReferralCode.textContent = 'check';
+        textCopyReferralCode.textContent = 'Tersalin!';
+        btnCopyReferralCode.classList.add('bg-secondary');
+        btnCopyReferralCode.classList.remove('bg-primary');
+
+        setTimeout(() => {
+          iconCopyReferralCode.textContent = originalIcon;
+          textCopyReferralCode.textContent = originalText;
+          btnCopyReferralCode.classList.remove('bg-secondary');
+          btnCopyReferralCode.classList.add('bg-primary');
+        }, 2000);
+      }
+    });
+
+    btnCopyReferralLinkSmall?.addEventListener('click', async () => {
+      const link = profileReferralLinkInput?.value || '';
+      if (!link) return;
+      await copyTextToClipboard(link, 'Tautan referral pendaftaran berhasil disalin!');
+    });
+
+    btnShareReferralLink?.addEventListener('click', async () => {
+      const code = (profileReferralCodeDisplay?.textContent || '').trim();
+      const link = profileReferralLinkInput?.value || `${window.location.origin}/#/register?ref=${code}`;
+      const shareTitle = 'Daftar Panen Kunci - Raih Saldo dari API Key';
+      const shareText = `Halo! Yuk gabung di Panen Kunci dan hasilkan uang dari API Key Anda! Gunakan kode referral saya: ${code}`;
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: shareTitle,
+            text: shareText,
+            url: link
+          });
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            await copyTextToClipboard(link, 'Tautan referral berhasil disalin ke clipboard!');
+          }
+        }
+      } else {
+        await copyTextToClipboard(link, 'Tautan referral berhasil disalin ke clipboard! Bagikan tautan ini ke rekan Anda.');
       }
     });
 

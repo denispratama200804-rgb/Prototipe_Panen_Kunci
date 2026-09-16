@@ -18,6 +18,7 @@ export class User {
    * @param {string} [params.createdAt]
    * @param {string} [params.avatar]
    * @param {string} [params.nicknameUpdatedAt]
+   * @param {string} [params.referralCode]
    */
   constructor({
     id,
@@ -32,7 +33,8 @@ export class User {
     isVerified = false,
     createdAt = new Date().toISOString(),
     avatar = '',
-    nicknameUpdatedAt = null
+    nicknameUpdatedAt = null,
+    referralCode = ''
   }) {
     this.id = id;
     this.name = name;
@@ -46,6 +48,7 @@ export class User {
     this.createdAt = createdAt;
     this.avatar = (avatar && avatar !== '/avatar.png') ? avatar : '';
     this.nicknameUpdatedAt = nicknameUpdatedAt || null;
+    this.referralCode = referralCode || User.generateReferralCode(id || email || name);
 
     // Akun terverifikasi jika sudah mendaftarkan rekening e-wallet atau merupakan administrator
     const hasPayment = this.hasPaymentDetails();
@@ -122,6 +125,36 @@ export class User {
   }
 
   /**
+   * Menghasilkan kode referral deterministik unik berformat PK-XXXXXX
+   * @param {string} identifier
+   * @returns {string}
+   */
+  static generateReferralCode(identifier) {
+    if (!identifier) return 'PK-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const str = String(identifier).trim().toLowerCase();
+    let h1 = 0x811c9dc5;
+    let h2 = 5381;
+    for (let i = 0; i < str.length; i++) {
+      const c = str.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 0x01000193);
+      h2 = ((h2 << 5) + h2) ^ c;
+    }
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let code = '';
+    let n1 = Math.abs(h1);
+    let n2 = Math.abs(h2);
+    for (let i = 0; i < 3; i++) {
+      code += chars[n1 % chars.length];
+      n1 = Math.floor(n1 / chars.length);
+    }
+    for (let i = 0; i < 3; i++) {
+      code += chars[n2 % chars.length];
+      n2 = Math.floor(n2 / chars.length);
+    }
+    return `PK-${code}`;
+  }
+
+  /**
    * Serialisasi ke object JSON
    * @returns {Object}
    */
@@ -139,7 +172,8 @@ export class User {
       isVerified: this.isVerified,
       createdAt: this.createdAt,
       avatar: this.avatar,
-      nicknameUpdatedAt: this.nicknameUpdatedAt
+      nicknameUpdatedAt: this.nicknameUpdatedAt,
+      referralCode: this.referralCode
     };
   }
 }

@@ -99,7 +99,8 @@ export class SupabaseUserRepository extends IUserRepository {
       account_number: userData.accountNumber || '',
       account_holder: userData.accountHolder || '',
       is_verified: userData.isVerified ?? false,
-      avatar: (userData.avatar && userData.avatar !== '/avatar.png') ? userData.avatar : ''
+      avatar: (userData.avatar && userData.avatar !== '/avatar.png') ? userData.avatar : '',
+      referral_code: userData.referralCode || User.generateReferralCode(userData.id || userData.email || userData.name)
     };
 
     if (userData.id && userData.id.includes('-')) {
@@ -107,11 +108,23 @@ export class SupabaseUserRepository extends IUserRepository {
     }
 
     // 1. Coba simpan langsung via Supabase client
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from(this.tableName)
       .insert(payload)
       .select()
       .single();
+
+    // Jika kolom referral_code belum ada di database Supabase, fallback tanpa kolom tersebut
+    if (error && error.message && error.message.includes('referral_code')) {
+      delete payload.referral_code;
+      const retry = await supabase
+        .from(this.tableName)
+        .insert(payload)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (!error && data) {
       return this._toDomain(data);
@@ -168,14 +181,28 @@ export class SupabaseUserRepository extends IUserRepository {
     if (updates.accountHolder !== undefined) payload.account_holder = updates.accountHolder;
     if (updates.isVerified !== undefined) payload.is_verified = updates.isVerified;
     if (updates.avatar !== undefined) payload.avatar = (updates.avatar && updates.avatar !== '/avatar.png') ? updates.avatar : '';
+    if (updates.referralCode !== undefined) payload.referral_code = updates.referralCode;
 
     // 1. Coba update langsung via Supabase client
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from(this.tableName)
       .update(payload)
       .eq('id', id)
       .select()
       .single();
+
+    // Fallback jika kolom referral_code belum ada di tabel users
+    if (error && error.message && error.message.includes('referral_code')) {
+      delete payload.referral_code;
+      const retry = await supabase
+        .from(this.tableName)
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (!error && data) {
       return this._toDomain(data);
@@ -254,7 +281,8 @@ export class SupabaseUserRepository extends IUserRepository {
       isVerified: Boolean(row.is_verified),
       createdAt: row.created_at,
       avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : (row.avatar_url && row.avatar_url !== '/avatar.png' ? row.avatar_url : ''),
-      nicknameUpdatedAt: row.nickname_updated_at || row.nicknameUpdatedAt || null
+      nicknameUpdatedAt: row.nickname_updated_at || row.nicknameUpdatedAt || null,
+      referralCode: row.referral_code || row.referralCode || User.generateReferralCode(row.id || row.email || row.name)
     });
   }
 }

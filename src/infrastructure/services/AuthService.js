@@ -488,7 +488,8 @@ export class AuthService {
           bankName: '',
           accountNumber: '',
           accountHolder: name.toUpperCase(),
-          isVerified: false
+          isVerified: false,
+          referralCode: User.generateReferralCode(authUserId || email || name)
         };
 
         if (authUserId) {
@@ -1039,7 +1040,8 @@ export class AuthService {
               accountNumber: '',
               accountHolder: fullName.toUpperCase(),
               isVerified: false,
-              avatar: avatarUrl
+              avatar: avatarUrl,
+              referralCode: User.generateReferralCode(authUser.id || email || fullName)
             };
 
             userRecord = await this._userRepository.create(newUserData);
