@@ -231,7 +231,10 @@ export class SetorApiKeyView extends IComponent {
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm relative overflow-hidden">
           <div class="absolute left-0 top-0 bottom-0 w-1 ${borderClass}"></div>
           <div class="flex flex-col gap-0.5 pl-2">
-            <div class="font-mono text-xs font-semibold text-text-heading">${k.getMaskedKey()}</div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-mono text-xs font-semibold text-text-heading">${k.getMaskedKey()}</span>
+              <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-600 border border-sky-500/20">${k.credits !== undefined ? k.credits : 80} cr</span>
+            </div>
             <div class="text-[11px] text-text-body">${dateStr}</div>
           </div>
           <div class="flex items-center gap-2">

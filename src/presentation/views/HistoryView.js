@@ -134,7 +134,7 @@ export class HistoryView extends IComponent {
               ${(isPending || isValid) ? `+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}` : '+Rp 0'}
             </span>
             <span class="text-[10px] ${isPending ? 'text-amber-500 font-semibold' : 'text-outline font-semibold'}">
-              ${isPending ? 'Saldo Pasif' : 'Kie.ai 80 Kredit'}
+              ${isPending ? `Saldo Pasif (${k.credits !== undefined ? k.credits : 80} cr)` : `Kie.ai ${k.credits !== undefined ? k.credits : 80} Kredit`}
             </span>
           </div>
         </div>

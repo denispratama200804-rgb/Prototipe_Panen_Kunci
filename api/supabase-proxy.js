@@ -694,6 +694,137 @@ export default async function handler(req, res) {
       });
     }
 
+    // 2e. Sinkronisasi kuota kredit API Key langsung ke server Kie.ai (https://api.kie.ai/api/v1/chat/credit)
+    if (action === 'sync_kie_credit') {
+      const keyString = (body.keyString || body.key_string || data?.keyString || data?.key_string || '').trim();
+      const keyId = body.keyId || body.id || data?.keyId || data?.id;
+
+      if (!keyString) {
+        return res.status(400).json({ success: false, error: 'Parameter keyString wajib disertakan.' });
+      }
+
+      try {
+        const kieRes = await fetch('https://api.kie.ai/api/v1/chat/credit', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${keyString}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const kieJson = await kieRes.json().catch(() => null);
+
+        if (!kieRes.ok || !kieJson || kieJson.code !== 200) {
+          const errMsg = kieJson?.msg || kieJson?.message || `Gagal memeriksa kredit di Kie.ai (Status ${kieRes.status})`;
+          const isAuthError = kieRes.status === 401 || (kieJson && (kieJson.code === 401 || String(kieJson.msg).toLowerCase().includes('unauthorized')));
+
+          return res.status(200).json({
+            success: false,
+            isValidKey: false,
+            code: kieJson?.code || kieRes.status,
+            credit: 0,
+            error: isAuthError ? 'API Key tidak valid atau otentikasi gagal di Kie.ai.' : errMsg,
+            raw: kieJson
+          });
+        }
+
+        const creditAmount = typeof kieJson.data === 'number' ? kieJson.data : (Number(kieJson.data) || 0);
+
+        // Jika ada keyId dan adminSupabase aktif, perbarui kolom credits di Supabase
+        if (keyId && adminSupabase) {
+          try {
+            await adminSupabase
+              .from('api_keys')
+              .update({ credits: creditAmount })
+              .eq('id', keyId);
+          } catch (dbErr) {
+            console.warn('[SupabaseProxy] Gagal update credits di db:', dbErr.message);
+          }
+        }
+
+        return res.status(200).json({
+          success: true,
+          isValidKey: true,
+          credit: creditAmount,
+          message: `Kredit Kie.ai berhasil disinkronkan: ${creditAmount} cr`,
+          raw: kieJson
+        });
+      } catch (netErr) {
+        console.error('[SupabaseProxy] Gagal fetch ke Kie.ai:', netErr.message);
+        return res.status(500).json({
+          success: false,
+          error: 'Gagal terhubung ke server Kie.ai: ' + netErr.message
+        });
+      }
+    }
+
+    // 2f. Batch Sync: Sinkronisasi seluruh kredit API Key sekaligus
+    if (action === 'sync_all_kie_credits') {
+      let targetKeys = Array.isArray(body.keys) ? body.keys : [];
+
+      if (targetKeys.length === 0 && adminSupabase) {
+        try {
+          const { data: dbKeys } = await adminSupabase
+            .from('api_keys')
+            .select('id, key_string, status, credits');
+          if (Array.isArray(dbKeys)) {
+            targetKeys = dbKeys.map(k => ({ id: k.id, keyString: k.key_string, status: k.status }));
+          }
+        } catch (_) {}
+      }
+
+      if (targetKeys.length === 0) {
+        return res.status(200).json({ success: true, updatedCount: 0, results: [] });
+      }
+
+      const results = [];
+      for (const item of targetKeys) {
+        const keyString = (item.keyString || item.key_string || '').trim();
+        const keyId = item.id;
+        if (!keyString) continue;
+
+        try {
+          const kieRes = await fetch('https://api.kie.ai/api/v1/chat/credit', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${keyString}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          });
+          const kieJson = await kieRes.json().catch(() => null);
+
+          if (kieRes.ok && kieJson && kieJson.code === 200) {
+            const creditAmount = typeof kieJson.data === 'number' ? kieJson.data : (Number(kieJson.data) || 0);
+            if (keyId && adminSupabase) {
+              await adminSupabase.from('api_keys').update({ credits: creditAmount }).eq('id', keyId);
+            }
+            results.push({ id: keyId, success: true, credit: creditAmount, status: 'valid' });
+          } else {
+            const isAuthError = kieRes.status === 401 || (kieJson && (kieJson.code === 401 || String(kieJson.msg).toLowerCase().includes('unauthorized')));
+            results.push({
+              id: keyId,
+              success: false,
+              credit: 0,
+              error: kieJson?.msg || 'Gagal sinkronisasi',
+              isAuthError
+            });
+          }
+        } catch (itemErr) {
+          results.push({ id: keyId, success: false, error: itemErr.message });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      return res.status(200).json({
+        success: true,
+        total: targetKeys.length,
+        updatedCount: successCount,
+        results
+      });
+    }
+
     // 3. Pembuatan tautan pemulihan kata sandi (Recovery Link)
     if (action === 'generate_recovery_link' && data?.email) {
       const host = req.headers['x-forwarded-host'] || req.headers.host || '';
@@ -901,6 +1032,176 @@ export default async function handler(req, res) {
         verifiedToken,
         message: 'Email berhasil diverifikasi!'
       });
+    }
+
+    // 3c. Sinkronisasi Kredit API Key Langsung ke Kie.ai
+    // Endpoint Resmi Kie.ai: GET https://api.kie.ai/api/v1/chat/credit
+    if (action === 'sync_kie_credit') {
+      const apiKeyString = (body.apiKey || body.keyString || '').trim();
+      const targetKeyId = body.keyId || body.id;
+
+      if (!apiKeyString) {
+        return res.status(400).json({ success: false, error: 'API key string tidak boleh kosong' });
+      }
+
+      try {
+        const kieResponse = await fetch('https://api.kie.ai/api/v1/chat/credit', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${apiKeyString}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const resData = await kieResponse.json().catch(() => ({}));
+        const httpStatus = kieResponse.status;
+        const code = resData.code !== undefined ? resData.code : httpStatus;
+
+        // Kode 200 = Sukses, data berisi integer kredit
+        if (code === 200) {
+          const creditVal = typeof resData.data === 'number' ? resData.data : (Number(resData.data) || 0);
+
+          // Jika ada keyId, perbarui kolom credits di Supabase
+          if (targetKeyId) {
+            await adminSupabase
+              .from('api_keys')
+              .update({
+                credits: creditVal,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', targetKeyId);
+          }
+
+          return res.status(200).json({
+            success: true,
+            isValidKey: true,
+            credit: creditVal,
+            message: resData.msg || 'Berhasil sinkronisasi kredit Kie.ai',
+            raw: resData
+          });
+        }
+
+        // Jika unauthorized (401) atau invalid key
+        const isUnauthorized = code === 401 || httpStatus === 401;
+        const errorMsg = resData.msg || (isUnauthorized ? 'API key tidak valid atau tidak diizinkan oleh Kie.ai' : `Gagal memeriksa kredit (${httpStatus})`);
+
+        if (targetKeyId && isUnauthorized) {
+          await adminSupabase
+            .from('api_keys')
+            .update({
+              status: 'invalid',
+              credits: 0,
+              error_message: errorMsg,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', targetKeyId);
+        }
+
+        return res.status(200).json({
+          success: false,
+          isValidKey: false,
+          credit: 0,
+          error: errorMsg,
+          code: code,
+          raw: resData
+        });
+      } catch (err) {
+        console.error('[supabase-proxy] Error sync_kie_credit:', err);
+        return res.status(500).json({
+          success: false,
+          error: `Koneksi ke Kie.ai gagal: ${err.message}`
+        });
+      }
+    }
+
+    // 3d. Sinkronisasi Semua Kredit API Key ke Kie.ai (Batch)
+    if (action === 'sync_all_kie_credits') {
+      try {
+        const { data: allKeys, error } = await adminSupabase
+          .from('api_keys')
+          .select('id, key_string, status, credits')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          return res.status(400).json({ success: false, error: error.message });
+        }
+
+        const keysToSync = (allKeys || []).filter(k => k.key_string && k.key_string.trim());
+        const results = [];
+
+        for (const item of keysToSync) {
+          try {
+            const trimmed = item.key_string.trim();
+            const kieRes = await fetch('https://api.kie.ai/api/v1/chat/credit', {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${trimmed}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              }
+            });
+
+            const resJson = await kieRes.json().catch(() => ({}));
+            const code = resJson.code !== undefined ? resJson.code : kieRes.status;
+
+            if (code === 200) {
+              const creditVal = typeof resJson.data === 'number' ? resJson.data : (Number(resJson.data) || 0);
+              await adminSupabase
+                .from('api_keys')
+                .update({
+                  credits: creditVal,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', item.id);
+
+              results.push({
+                id: item.id,
+                success: true,
+                credit: creditVal,
+                message: 'Sukses'
+              });
+            } else {
+              const isUnauth = code === 401 || kieRes.status === 401;
+              if (isUnauth) {
+                await adminSupabase
+                  .from('api_keys')
+                  .update({
+                    status: 'invalid',
+                    credits: 0,
+                    error_message: resJson.msg || 'API Key Tidak Sah (Kie.ai 401)',
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', item.id);
+              }
+              results.push({
+                id: item.id,
+                success: false,
+                credit: 0,
+                code: code,
+                message: resJson.msg || 'Gagal sinkron'
+              });
+            }
+          } catch (itemErr) {
+            results.push({
+              id: item.id,
+              success: false,
+              message: itemErr.message
+            });
+          }
+        }
+
+        const successCount = results.filter(r => r.success).length;
+        return res.status(200).json({
+          success: true,
+          total: keysToSync.length,
+          updatedCount: successCount,
+          results
+        });
+      } catch (err) {
+        console.error('[supabase-proxy] Error sync_all_kie_credits:', err);
+        return res.status(500).json({ success: false, error: err.message });
+      }
     }
 
     // 4. Insert record pengguna / API Key / Transaksi (bypass RLS)

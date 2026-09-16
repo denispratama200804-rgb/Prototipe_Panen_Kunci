@@ -14,6 +14,7 @@ export class ApiKeysView {
     this.revealedKeys = new Set();
     this.hasSynced = false;
     this.isSyncing = false;
+    this.isSyncingKie = false;
   }
 
   destroy() {
@@ -257,8 +258,20 @@ export class ApiKeysView {
               }
             </div>
 
-            <!-- Right: Status Database & Tombol Sinkronkan Supabase -->
-            <div class="flex items-center gap-2.5">
+            <!-- Right: Status Database, Tombol Sinkronkan Supabase & Tombol Sinkron Kie.ai -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                id="btn-sync-all-kie-credits"
+                title="Sinkronkan kredit semua API Key langsung ke server resmi Kie.ai"
+                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 text-sky-300 border border-sky-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                  this.isSyncingKie ? 'opacity-70 cursor-not-allowed' : ''
+                }"
+                ${this.isSyncingKie ? 'disabled' : ''}
+              >
+                <span class="material-symbols-outlined text-sm ${this.isSyncingKie ? 'animate-spin text-sky-400' : ''}">sync_saved_locally</span>
+                <span>${this.isSyncingKie ? 'Sinkron Kie.ai...' : '🔄 Sinkronkan Semua Kredit'}</span>
+              </button>
               <button
                 type="button"
                 id="btn-sync-supabase-keys"
@@ -463,7 +476,19 @@ export class ApiKeysView {
                         ${statusBadge}
                       </td>
                       <td>
-                        <div class="font-mono text-xs font-bold text-slate-200">${k.credits !== undefined ? k.credits : 80} cr</div>
+                        <div class="flex items-center gap-1.5">
+                          <span class="font-mono text-xs font-bold text-slate-200">${k.credits !== undefined ? k.credits : 80} cr</span>
+                          <button
+                            type="button"
+                            data-action="sync-single-credit"
+                            data-id="${k.id}"
+                            data-keystring="${k.keyString}"
+                            title="Sinkronkan kredit key ini langsung dari Kie.ai"
+                            class="p-1 rounded text-sky-400 hover:text-sky-300 hover:bg-sky-500/15 active:scale-90 transition-all cursor-pointer"
+                          >
+                            <span class="material-symbols-outlined text-xs">sync</span>
+                          </button>
+                        </div>
                       </td>
                       <td>
                         <div class="font-mono text-xs font-semibold text-emerald-400">Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</div>
@@ -474,6 +499,17 @@ export class ApiKeysView {
                       </td>
                       <td class="text-right">
                         <div class="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            data-action="sync-single-credit"
+                            data-id="${k.id}"
+                            data-keystring="${k.keyString}"
+                            title="Cek & Sinkronkan Kredit ke Kie.ai"
+                            class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 text-sky-300 border border-sky-500/30 flex items-center gap-1 transition-all cursor-pointer"
+                          >
+                            <span class="material-symbols-outlined text-xs">sync</span>
+                            <span>Kie</span>
+                          </button>
                           ${
                             k.status === 'pending'
                               ? `
@@ -559,15 +595,19 @@ export class ApiKeysView {
       });
     }
 
-    // Tombol Sinkronkan Supabase
-    const syncBtn = container.querySelector('#btn-sync-supabase-keys');
-    if (syncBtn) {
-      syncBtn.addEventListener('click', async () => {
-        this.isSyncing = true;
+    // Tombol Sinkronkan Semua Kredit ke Kie.ai
+    const syncKieBtn = container.querySelector('#btn-sync-all-kie-credits');
+    if (syncKieBtn) {
+      syncKieBtn.addEventListener('click', async () => {
+        this.isSyncingKie = true;
         refreshCallback();
-        const keys = await this.dataService.fetchApiKeysFromSupabase();
-        this.isSyncing = false;
-        this.toast.success(`Berhasil menyinkronkan ${keys.length} API Key dari database Supabase!`, 'Supabase Terhubung');
+        const res = await this.dataService.syncAllKieCredits();
+        this.isSyncingKie = false;
+        if (res.success) {
+          this.toast.success(res.message, 'Kie.ai Tersinkron');
+        } else {
+          this.toast.error(res.message, 'Gagal Sinkron Kie.ai');
+        }
         refreshCallback();
       });
     }
@@ -726,6 +766,25 @@ export class ApiKeysView {
             refreshCallback();
           }
         }
+      });
+    });
+
+    // Sinkronkan Kredit Single Key ke Kie.ai
+    container.querySelectorAll('[data-action="sync-single-credit"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        const keyString = btn.getAttribute('data-keystring');
+        btn.disabled = true;
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">progress_activity</span>';
+
+        const res = await this.dataService.syncKieCredit(id, keyString);
+        if (res.success) {
+          this.toast.success(`Kredit Key: ${res.credit} cr berhasil disinkronkan dari Kie.ai!`, 'Sinkron Berhasil');
+        } else {
+          this.toast.error(res.message || 'Gagal sinkron kredit dari Kie.ai', 'Gagal');
+        }
+        refreshCallback();
       });
     });
   }

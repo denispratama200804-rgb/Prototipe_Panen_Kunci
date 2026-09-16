@@ -932,6 +932,99 @@ export class AdminDataService {
   }
 
   /**
+   * Melakukan sinkronisasi kredit API Key langsung ke server Kie.ai
+   * @param {string} keyId
+   * @param {string} [keyString]
+   * @returns {Promise<{ success: boolean, isValidKey?: boolean, credit?: number, message?: string }>}
+   */
+  async syncKieCredit(keyId, keyString = '') {
+    const keys = this.getApiKeys();
+    const key = keys.find(k => k.id === keyId);
+    const targetKeyString = (keyString || key?.keyString || '').trim();
+
+    if (!targetKeyString) {
+      return { success: false, message: 'String API Key tidak ditemukan' };
+    }
+
+    try {
+      const res = await fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sync_kie_credit',
+          apiKey: targetKeyString,
+          keyId: keyId || null
+        })
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        if (key) {
+          key.credits = json.credit;
+          this._set('api_keys', keys);
+        }
+        await this.fetchApiKeysFromSupabase();
+        return {
+          success: true,
+          isValidKey: true,
+          credit: json.credit,
+          message: json.message || 'Kredit berhasil disinkronkan langsung dari Kie.ai'
+        };
+      } else {
+        if (key && json.isValidKey === false) {
+          key.credits = 0;
+          key.status = 'invalid';
+          key.errorMessage = json.error || 'API Key Tidak Sah (Kie.ai 401)';
+          this._set('api_keys', keys);
+        }
+        await this.fetchApiKeysFromSupabase();
+        return {
+          success: false,
+          isValidKey: json.isValidKey !== undefined ? json.isValidKey : false,
+          credit: 0,
+          message: json.error || json.message || 'Gagal sinkronisasi kredit dari Kie.ai'
+        };
+      }
+    } catch (err) {
+      console.error('[AdminDataService] syncKieCredit error:', err);
+      return { success: false, message: err.message };
+    }
+  }
+
+  /**
+   * Melakukan sinkronisasi batch semua API Key langsung ke server Kie.ai
+   * @returns {Promise<{ success: boolean, total: number, updatedCount: number, message: string }>}
+   */
+  async syncAllKieCredits() {
+    try {
+      const res = await fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sync_all_kie_credits' })
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        await this.fetchApiKeysFromSupabase();
+        return {
+          success: true,
+          total: json.total || 0,
+          updatedCount: json.updatedCount || 0,
+          message: `Berhasil sinkronisasi ${json.updatedCount} dari ${json.total} API Key ke Kie.ai!`
+        };
+      }
+
+      return {
+        success: false,
+        message: json.error || 'Gagal melakukan sinkronisasi massal ke Kie.ai'
+      };
+    } catch (err) {
+      console.error('[AdminDataService] syncAllKieCredits error:', err);
+      return { success: false, message: err.message };
+    }
+  }
+
+  /**
    * Ekspor API Keys ke berbagai format file
    */
   exportApiKeys(format = 'txt', statusFilter = 'valid') {

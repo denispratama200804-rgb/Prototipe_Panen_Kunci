@@ -300,11 +300,11 @@ export class ApiKeyService {
       };
     }
 
-    // 3. Simulasi Verifikasi Ping ke Server Kie.ai (kuota kredit & keaktifan key)
-    await new Promise(res => setTimeout(res, 1200));
+    // 3. Verifikasi Kredit Langsung ke Server Kie.ai (https://api.kie.ai/api/v1/chat/credit)
+    let liveCredit = 80;
+    const isMockTestFail = trimmed.toLowerCase().includes('invalid') || trimmed.toLowerCase().includes('expired');
 
-    // Simulasi penolakan jika key mengandung keyword test penolakan
-    if (trimmed.toLowerCase().includes('invalid') || trimmed.toLowerCase().includes('expired')) {
+    if (isMockTestFail) {
       const invalidEntry = new ApiKey({
         id: 'key_' + Math.random().toString(36).substring(2, 9),
         keyString: trimmed,
@@ -312,7 +312,7 @@ export class ApiKeyService {
         status: 'invalid',
         rewardAmount: 0,
         credits: 0,
-        errorMessage: 'Verifikasi server Kie.ai gagal: Secret key tidak aktif atau kuota 80 kredit tidak terpenuhi.',
+        errorMessage: 'Verifikasi server Kie.ai gagal: Secret key tidak aktif atau kuota kredit tidak terpenuhi.',
         createdAt: new Date().toISOString()
       });
       this._keys.unshift(invalidEntry);
@@ -322,18 +322,56 @@ export class ApiKeyService {
         this._apiKeyRepository.create(invalidEntry).catch(e => console.warn(e.message));
       }
 
-      // Catat ke riwayat transaksi agar invalid key juga masuk ke Aktivitas Terkini
       if (this._walletService && typeof this._walletService.addFailedDeposit === 'function') {
         this._walletService.addFailedDeposit(invalidEntry);
       }
 
       return {
         success: false,
-        message: 'Verifikasi server Kie.ai gagal: Secret key tidak aktif atau kuota 80 kredit tidak terpenuhi.'
+        message: 'Verifikasi server Kie.ai gagal: Secret key tidak aktif atau kuota kredit tidak terpenuhi.'
       };
     }
 
-    // 4. Sukses: Kuota 80 kredit terverifikasi
+    try {
+      const kieSync = await this.syncKieCredit(trimmed);
+      if (kieSync.isValidKey === false) {
+        const errorReason = kieSync.message || 'Verifikasi server Kie.ai gagal: API Key tidak sah atau tidak diizinkan.';
+        const invalidEntry = new ApiKey({
+          id: 'key_' + Math.random().toString(36).substring(2, 9),
+          keyString: trimmed,
+          userId,
+          status: 'invalid',
+          rewardAmount: 0,
+          credits: 0,
+          errorMessage: errorReason,
+          createdAt: new Date().toISOString()
+        });
+        this._keys.unshift(invalidEntry);
+        this._persist();
+
+        if (this._apiKeyRepository) {
+          this._apiKeyRepository.create(invalidEntry).catch(e => console.warn(e.message));
+        }
+
+        if (this._walletService && typeof this._walletService.addFailedDeposit === 'function') {
+          this._walletService.addFailedDeposit(invalidEntry);
+        }
+
+        return {
+          success: false,
+          message: errorReason
+        };
+      }
+
+      if (kieSync.success && typeof kieSync.credit === 'number') {
+        liveCredit = kieSync.credit;
+      }
+    } catch (verifErr) {
+      console.warn('[ApiKeyService] Verifikasi Kie.ai fallback:', verifErr.message);
+      liveCredit = 80;
+    }
+
+    // 4. Sukses: Kuota kredit terverifikasi dari Kie.ai
     const config = this._storage.get('admin_config');
     const rewardAmount = (config && config.rewardPerKey && !isNaN(Number(config.rewardPerKey)))
       ? Number(config.rewardPerKey)
@@ -345,7 +383,7 @@ export class ApiKeyService {
       userId,
       status: 'pending',
       rewardAmount,
-      credits: 80,
+      credits: liveCredit,
       createdAt: new Date().toISOString()
     });
 
@@ -388,5 +426,71 @@ export class ApiKeyService {
       reward: rewardAmount,
       message: `API Key valid dan telah disetorkan ke Saldo Pasif! Menunggu verifikasi dari Admin untuk dicairkan ke Saldo Aktif.`
     };
+  }
+
+  /**
+   * Melakukan sinkronisasi kredit API key langsung ke Kie.ai
+   * @param {string} keyString
+   * @param {string} [keyId]
+   * @returns {Promise<{ success: boolean, isValidKey: boolean, credit: number, message: string }>}
+   */
+  async syncKieCredit(keyString, keyId = null) {
+    const trimmed = (keyString || '').trim();
+    if (!trimmed) {
+      return { success: false, isValidKey: false, credit: 0, message: 'API Key kosong.' };
+    }
+
+    try {
+      const response = await fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sync_kie_credit',
+          apiKey: trimmed,
+          keyId: keyId || null
+        })
+      });
+
+      const resJson = await response.json().catch(() => ({}));
+      if (response.ok && resJson.success) {
+        // Update local memory jika ada keyId atau keyString yang cocok
+        const target = this._keys.find(k => (keyId && k.id === keyId) || k.keyString === trimmed);
+        if (target) {
+          target.credits = resJson.credit;
+          this._persist();
+          this._eventBus.emit(AppEvents.API_KEY_STATUS_UPDATED, { apiKey: target });
+        }
+        return {
+          success: true,
+          isValidKey: true,
+          credit: resJson.credit,
+          message: resJson.message || 'Kredit berhasil disinkronkan'
+        };
+      } else {
+        const isUnauthorized = resJson.isValidKey === false || resJson.code === 401;
+        if (isUnauthorized) {
+          const target = this._keys.find(k => (keyId && k.id === keyId) || k.keyString === trimmed);
+          if (target) {
+            target.credits = 0;
+            this._persist();
+            this._eventBus.emit(AppEvents.API_KEY_STATUS_UPDATED, { apiKey: target });
+          }
+        }
+        return {
+          success: false,
+          isValidKey: resJson.isValidKey !== undefined ? resJson.isValidKey : false,
+          credit: 0,
+          message: resJson.error || resJson.message || 'Gagal sinkronisasi kredit dari Kie.ai'
+        };
+      }
+    } catch (err) {
+      console.warn('[ApiKeyService] syncKieCredit error:', err.message);
+      return {
+        success: false,
+        isValidKey: false,
+        credit: 0,
+        message: `Koneksi ke Kie.ai gagal: ${err.message}`
+      };
+    }
   }
 }
