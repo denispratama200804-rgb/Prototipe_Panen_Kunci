@@ -160,7 +160,7 @@ export class TarikSaldoView extends IComponent {
                 Rp ${balance.toLocaleString('id-ID')}
               </span>
             </div>
-            <a href="#/riwayat" class="bg-surface-container-low text-primary px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 hover:bg-surface-container transition-colors">
+            <a href="#/riwayat?tab=penarikan" class="bg-surface-container-low text-primary px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 hover:bg-surface-container transition-colors" title="Lihat riwayat penarikan dana">
               <span class="material-symbols-outlined text-[16px]">history</span>
               <span>Riwayat</span>
             </a>

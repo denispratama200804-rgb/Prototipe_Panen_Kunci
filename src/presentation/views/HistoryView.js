@@ -22,6 +22,19 @@ export class HistoryView extends IComponent {
   }
 
   render() {
+    // Deteksi tab aktif dari query string hash (#/riwayat?tab=penarikan) atau sessionStorage
+    const currentHash = window.location.hash || '';
+    if (
+      currentHash.includes('tab=penarikan') ||
+      currentHash.includes('type=penarikan') ||
+      sessionStorage.getItem('panenkunci:history_tab') === 'penarikan'
+    ) {
+      this._activeTab = 'penarikan';
+      sessionStorage.removeItem('panenkunci:history_tab');
+    } else if (currentHash.includes('tab=setoran')) {
+      this._activeTab = 'setoran';
+    }
+
     const keys = this._apiKeyService.getAllKeys();
     const withdrawals = this._walletService.getWithdrawals();
 
@@ -268,6 +281,9 @@ export class HistoryView extends IComponent {
 
     tabBtnSetoran?.addEventListener('click', () => {
       this._activeTab = 'setoran';
+      try {
+        history.replaceState(null, '', '#/riwayat?tab=setoran');
+      } catch (e) {}
       tabBtnSetoran.className = 'flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 bg-surface-card text-primary shadow-sm';
       tabBtnPenarikan.className = 'flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 text-on-surface-variant hover:text-on-surface';
       contentSetoran.classList.remove('hidden');
@@ -276,6 +292,9 @@ export class HistoryView extends IComponent {
 
     tabBtnPenarikan?.addEventListener('click', () => {
       this._activeTab = 'penarikan';
+      try {
+        history.replaceState(null, '', '#/riwayat?tab=penarikan');
+      } catch (e) {}
       tabBtnPenarikan.className = 'flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 bg-surface-card text-primary shadow-sm';
       tabBtnSetoran.className = 'flex-1 py-3 px-3 rounded-xl font-label-md text-xs font-bold transition-all duration-200 text-on-surface-variant hover:text-on-surface';
       contentPenarikan.classList.remove('hidden');

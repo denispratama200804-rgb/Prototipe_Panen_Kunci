@@ -111,7 +111,7 @@ export class SaldoDetailView extends IComponent {
           <section class="flex flex-col gap-3">
             <div class="flex justify-between items-center px-1">
               <h3 class="font-headline-md text-base font-bold text-text-heading">Riwayat Penarikan Terakhir</h3>
-              <a href="#/riwayat" class="text-xs font-semibold text-primary hover:underline flex items-center gap-0.5">
+              <a href="#/riwayat?tab=penarikan" class="text-xs font-semibold text-primary hover:underline flex items-center gap-0.5" title="Lihat semua riwayat penarikan dana">
                 <span>Lihat Semua</span>
                 <span class="material-symbols-outlined text-[16px]">chevron_right</span>
               </a>
