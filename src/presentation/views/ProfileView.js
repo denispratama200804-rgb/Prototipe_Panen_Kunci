@@ -657,6 +657,14 @@ export class ProfileView extends IComponent {
       });
     });
 
+    // Auto-open modal edit rekening jika diarahkan dari petunjuk verifikasi dashboard
+    if (sessionStorage.getItem('panenkunci:auto_open_bank') === 'true') {
+      sessionStorage.removeItem('panenkunci:auto_open_bank');
+      setTimeout(() => {
+        editBankBtn?.click();
+      }, 350);
+    }
+
     // Reset password info modal
     resetPassBtn?.addEventListener('click', () => {
       const user = this._authService.getCurrentUser();
