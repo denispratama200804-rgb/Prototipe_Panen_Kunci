@@ -20,16 +20,20 @@ export class ApiKeyValidator extends IValidator {
 
     const trimmed = apiKey.trim();
 
-    // Minimal panjang string key
-    if (trimmed.length < 15) {
-      errors.push('Format API Key terlalu pendek. Pastikan menyalin key lengkap dari Kie.ai.');
+    // Cek jika mengandung spasi
+    if (/\s/.test(trimmed)) {
+      errors.push('API Key tidak boleh mengandung spasi.');
+      return { isValid: false, errors };
     }
 
-    // Format prefix standar: sk-kie- atau sk- atau kie_
-    const validPrefixes = ['sk-kie-', 'sk-', 'kie_', 'kie-'];
-    const hasValidPrefix = validPrefixes.some(p => trimmed.startsWith(p));
-    if (!hasValidPrefix && !trimmed.includes('kie')) {
-      errors.push('Format API Key tidak sesuai standar Kie.ai (contoh: sk-kie-xxxxxxxxxxxx).');
+    // Minimal panjang string key yang wajar untuk API Key resmi Kie.ai
+    if (trimmed.length < 8) {
+      errors.push('Format API Key terlalu pendek. Pastikan menyalin key lengkap dari akun Kie.ai Anda.');
+    }
+
+    // Hanya izinkan karakter token yang valid (alfanumerik, tanda hubung, underscore, dll)
+    if (/[<>"'`\\$]/.test(trimmed)) {
+      errors.push('API Key mengandung karakter yang tidak valid.');
     }
 
     return {

@@ -138,7 +138,7 @@ export class SetorApiKeyView extends IComponent {
                 <input
                   id="inputApiKey"
                   type="text"
-                  placeholder="${!isVerified ? 'Terkunci - Harap verifikasi akun Anda terlebih dahulu' : 'sk-kie-...'}"
+                  placeholder="${!isVerified ? 'Terkunci - Harap verifikasi akun Anda terlebih dahulu' : 'Tempel API Key resmi Kie.ai di sini...'}"
                   ${!isVerified ? 'disabled' : ''}
                   class="w-full bg-surface-container-low rounded-2xl py-3.5 pl-4 pr-12 text-sm text-text-heading font-mono border border-surface-container focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all ${!isVerified ? 'opacity-60 cursor-not-allowed' : ''}"
                 />
