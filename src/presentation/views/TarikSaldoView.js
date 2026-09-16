@@ -261,15 +261,17 @@ export class TarikSaldoView extends IComponent {
                 <input
                   id="withdrawAmount"
                   type="number"
+                  readonly
+                  inputmode="none"
                   placeholder="${minWithdrawal.toLocaleString('id-ID')}"
                   min="${minWithdrawal}"
                   step="1000"
                   value="${isLocked ? '' : minWithdrawal}"
-                  ${isLocked ? 'disabled readonly' : ''}
-                  class="w-full rounded-2xl py-3.5 pl-12 pr-28 text-lg font-bold border font-mono transition-all ${
+                  ${isLocked ? 'disabled' : ''}
+                  class="w-full rounded-2xl py-3.5 pl-12 pr-28 text-lg font-bold border font-mono transition-all cursor-default select-none ${
                     isLocked
-                      ? 'bg-surface-container-low/50 text-outline border-surface-container cursor-not-allowed select-none'
-                      : 'bg-surface-container-low text-text-heading border-surface-container focus:outline-none focus:ring-2 focus:ring-primary/40'
+                      ? 'bg-surface-container-low/50 text-outline border-surface-container cursor-not-allowed'
+                      : 'bg-surface-container-low text-text-heading border-surface-container focus:outline-none'
                   }"
                 />
                 <button
@@ -290,20 +292,25 @@ export class TarikSaldoView extends IComponent {
               <div class="grid grid-cols-4 gap-2 mt-1" id="quickAmountsContainer">
                 ${uniqueQuick
                   .map(
-                    amt => `
+                    amt => {
+                      const isDefaultSelected = !isLocked && amt === minWithdrawal;
+                      return `
                   <button
                     type="button"
-                    class="btn-quick-amount py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+                    class="btn-quick-amount py-1.5 rounded-xl border text-xs font-semibold transition-all ${
                       isLocked
                         ? 'bg-surface-container-low/40 border-surface-container/60 text-outline/40 cursor-not-allowed pointer-events-none'
-                        : 'bg-surface-container-low border-surface-container text-text-heading hover:bg-primary-fixed'
+                        : isDefaultSelected
+                          ? 'bg-primary text-white border-primary shadow-xs'
+                          : 'bg-surface-container-low border-surface-container text-text-heading hover:bg-primary-fixed'
                     }"
                     data-amount="${amt}"
                     ${isLocked ? 'disabled' : ''}
                   >
                     ${formatChip(amt)}
                   </button>
-                `
+                `;
+                    }
                   )
                   .join('')}
               </div>
@@ -311,7 +318,7 @@ export class TarikSaldoView extends IComponent {
                 ${
                   isLocked
                     ? `Penarikan terkunci: Saldo minimal penarikan adalah Rp ${minWithdrawal.toLocaleString('id-ID')}.`
-                    : `Batas minimal penarikan adalah Rp ${minWithdrawal.toLocaleString('id-ID')}.`
+                    : `Pilih nominal penarikan di atas atau tekan Tarik Semua (Batas minimal Rp ${minWithdrawal.toLocaleString('id-ID')}).`
                 }
               </p>
             </div>
@@ -525,6 +532,30 @@ export class TarikSaldoView extends IComponent {
       if (summaryTotal) summaryTotal.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
     };
 
+    // Kunci pengetikan manual agar user hanya memilih melalui tombol chip atau Tarik Semua
+    amountInput?.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') {
+        e.preventDefault();
+      }
+    });
+    amountInput?.addEventListener('paste', (e) => {
+      e.preventDefault();
+    });
+
+    // Helper untuk update styling chip aktif
+    const highlightChip = (amount) => {
+      quickAmountBtns.forEach(b => {
+        const chipAmount = Number(b.getAttribute('data-amount'));
+        if (chipAmount === Number(amount)) {
+          b.classList.remove('bg-surface-container-low', 'border-surface-container', 'text-text-heading');
+          b.classList.add('bg-primary', 'text-white', 'border-primary', 'shadow-xs');
+        } else {
+          b.classList.remove('bg-primary', 'text-white', 'border-primary', 'shadow-xs');
+          b.classList.add('bg-surface-container-low', 'border-surface-container', 'text-text-heading');
+        }
+      });
+    };
+
     // Listen amount input change
     amountInput?.addEventListener('input', updateBreakdown);
 
@@ -538,6 +569,7 @@ export class TarikSaldoView extends IComponent {
       }
       if (amountInput) {
         amountInput.value = balance;
+        highlightChip(balance);
         updateBreakdown();
       }
     });
@@ -552,7 +584,9 @@ export class TarikSaldoView extends IComponent {
           return;
         }
         if (amountInput) {
-          amountInput.value = btn.getAttribute('data-amount');
+          const chosen = btn.getAttribute('data-amount');
+          amountInput.value = chosen;
+          highlightChip(chosen);
           updateBreakdown();
         }
       });
