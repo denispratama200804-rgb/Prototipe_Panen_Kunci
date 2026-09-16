@@ -54,8 +54,6 @@ export class ProfileView extends IComponent {
       .toUpperCase();
 
     const referralCode = user.referralCode || User.generateReferralCode(user.id || user.email || user.name);
-    const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://panenkunci.com';
-    const referralLink = `${origin}/#/register?ref=${referralCode}`;
 
     return `
       <div class="flex flex-col w-full min-h-screen bg-background pb-28 pt-20">
@@ -252,29 +250,6 @@ export class ProfileView extends IComponent {
                   >
                     <span class="material-symbols-outlined text-[16px] text-primary">share</span>
                     <span>Bagikan</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Referral Link Box -->
-              <div class="flex flex-col gap-1.5">
-                <span class="text-[11px] font-semibold text-text-body">Tautan Registrasi Langsung:</span>
-                <div class="flex items-center bg-surface-container-low rounded-xl border border-surface-container p-1 pl-3 gap-2 overflow-hidden">
-                  <input
-                    type="text"
-                    readonly
-                    id="profileReferralLinkInput"
-                    value="${referralLink}"
-                    class="w-full bg-transparent text-xs text-text-heading font-mono select-all focus:outline-none truncate min-w-0"
-                  />
-                  <button
-                    type="button"
-                    id="btnCopyReferralLinkSmall"
-                    class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-primary/10 hover:text-primary text-text-body text-xs font-bold transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
-                    title="Salin tautan"
-                  >
-                    <span class="material-symbols-outlined text-[14px]">link</span>
-                    <span>Salin</span>
                   </button>
                 </div>
               </div>
@@ -538,13 +513,11 @@ export class ProfileView extends IComponent {
       }
     });
 
-    // Handler Referral Code (Salin Kode, Salin Link, dan Bagikan)
+    // Handler Referral Code (Salin Kode dan Bagikan)
     const btnCopyReferralCode = container.querySelector('#btnCopyReferralCode');
     const iconCopyReferralCode = container.querySelector('#iconCopyReferralCode');
     const textCopyReferralCode = container.querySelector('#textCopyReferralCode');
-    const btnCopyReferralLinkSmall = container.querySelector('#btnCopyReferralLinkSmall');
     const btnShareReferralLink = container.querySelector('#btnShareReferralLink');
-    const profileReferralLinkInput = container.querySelector('#profileReferralLinkInput');
     const profileReferralCodeDisplay = container.querySelector('#profileReferralCodeDisplay');
 
     const copyTextToClipboard = async (text, successMessage) => {
@@ -602,15 +575,10 @@ export class ProfileView extends IComponent {
     });
     boxReferralCodeContainer?.addEventListener('click', handleCopyCodeAction);
 
-    btnCopyReferralLinkSmall?.addEventListener('click', async () => {
-      const link = profileReferralLinkInput?.value || '';
-      if (!link) return;
-      await copyTextToClipboard(link, 'Tautan referral pendaftaran berhasil disalin!');
-    });
-
     btnShareReferralLink?.addEventListener('click', async () => {
       const code = (profileReferralCodeDisplay?.textContent || '').trim();
-      const link = profileReferralLinkInput?.value || `${window.location.origin}/#/register?ref=${code}`;
+      const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://panenkunci.com';
+      const shareUrl = `${origin}/#/register?ref=${code}`;
       const shareTitle = 'Daftar Panen Kunci - Raih Saldo dari API Key';
       const shareText = `Halo! Yuk gabung di Panen Kunci dan hasilkan uang dari API Key Anda! Gunakan kode referral saya: ${code}`;
 
@@ -619,15 +587,15 @@ export class ProfileView extends IComponent {
           await navigator.share({
             title: shareTitle,
             text: shareText,
-            url: link
+            url: shareUrl
           });
         } catch (err) {
           if (err.name !== 'AbortError') {
-            await copyTextToClipboard(link, 'Tautan referral berhasil disalin ke clipboard!');
+            await copyTextToClipboard(code, `Kode referral ${code} berhasil disalin!`);
           }
         }
       } else {
-        await copyTextToClipboard(link, 'Tautan referral berhasil disalin ke clipboard! Bagikan tautan ini ke rekan Anda.');
+        await copyTextToClipboard(code, `Kode referral ${code} berhasil disalin! Bagikan kode ini ke rekan Anda.`);
       }
     });
 
