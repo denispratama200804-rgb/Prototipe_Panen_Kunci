@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import crypto from 'node:crypto';
 
 // Kunci Supabase Role Service yang digunakan untuk operasi admin yang by-pass RLS (PENTING!)
 // Kunci ini TIDAK BOLEH dieskspos ke klien frontend!
@@ -7,8 +8,8 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL ||
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Konfigurasi SMTP Nodemailer (untuk pengiriman email)
-const smtpEmail = process.env.SMTP_EMAIL || '';
-const smtpPassword = process.env.SMTP_PASSWORD || '';
+const smtpEmail = process.env.SMTP_EMAIL || 'panenkuncii@gmail.com';
+const smtpPassword = process.env.SMTP_PASSWORD || 'xverztdffhkyxteq';
 const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
 const smtpPort = Number(process.env.SMTP_PORT) || 465;
 
@@ -628,6 +629,160 @@ export default async function handler(req, res) {
       return res.status(400).json({
         success: false,
         error: 'Sistem email belum dikonfigurasi di Vercel. Harap tambahkan SMTP_EMAIL dan SMTP_PASSWORD di dashboard Vercel lalu klik Redeploy.'
+      });
+    }
+
+    // 3b. Pengiriman dan Verifikasi Kode OTP Pendaftaran Akun
+    if (action === 'send_register_otp') {
+      const targetEmail = (data?.email || body.email || '').toLowerCase().trim();
+      if (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
+        return res.status(400).json({ success: false, error: 'Format alamat email tidak valid.' });
+      }
+
+      // 1. Cek apakah email sudah terdaftar di Supabase
+      if (adminSupabase) {
+        try {
+          const { data: existingUser } = await adminSupabase
+            .from('users')
+            .select('id')
+            .eq('email', targetEmail)
+            .maybeSingle();
+
+          if (existingUser) {
+            return res.status(400).json({
+              success: false,
+              error: 'Alamat email ini sudah terdaftar. Silakan langsung masuk ke akun Anda.'
+            });
+          }
+        } catch (dbErr) {
+          console.warn('[SupabaseProxy] Cek email users note:', dbErr.message);
+        }
+      }
+
+      // 2. Buat atau gunakan kode OTP 6 digit dan token HMAC
+      const otp = (data?.otp || body?.otp) ? String(data?.otp || body?.otp).trim() : String(crypto.randomInt(100000, 999999));
+      const expiresAt = (data?.expiresAt || body?.expiresAt) ? Number(data?.expiresAt || body?.expiresAt) : (Date.now() + 10 * 60 * 1000);
+      const otpSecret = SUPABASE_SECRET_KEY || 'panenkunci-otp-secret-key-2026';
+      const signature = crypto.createHmac('sha256', otpSecret)
+        .update(`${targetEmail}:${otp}:${expiresAt}`)
+        .digest('hex');
+      const token = `${expiresAt}.${signature}`;
+
+      if (!transporter) {
+        return res.status(500).json({
+          success: false,
+          error: 'Sistem email belum dikonfigurasi di server Vercel. Harap tambahkan SMTP_EMAIL dan SMTP_PASSWORD.'
+        });
+      }
+
+      try {
+        await transporter.sendMail({
+          from: `"Panen Kunci" <${smtpEmail}>`,
+          to: targetEmail,
+          subject: `[Panen Kunci] Kode OTP Verifikasi Pendaftaran: ${otp}`,
+          html: `
+            <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+              <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 28px 24px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Panen Kunci</h1>
+                <p style="color: #e0e7ff; margin: 6px 0 0 0; font-size: 13px;">Platform Jual Beli & Konversi API Key</p>
+              </div>
+              <div style="padding: 28px 24px;">
+                <h2 style="color: #0f172a; margin: 0 0 10px 0; font-size: 18px; font-weight: 600;">Verifikasi Alamat Email Anda</h2>
+                <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+                  Halo,<br>
+                  Terima kasih telah mendaftar di <strong>Panen Kunci</strong>. Gunakan kode OTP 6 digit berikut untuk memverifikasi akun email Anda:
+                </p>
+                <div style="background-color: #f8fafc; border: 2px dashed #94a3b8; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 20px;">
+                  <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #1e3a8a; display: inline-block;">${otp}</span>
+                </div>
+                <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px;">
+                  <p style="color: #1e40af; font-size: 12px; margin: 0; line-height: 1.5;">
+                    ⏰ <strong>Masa berlaku:</strong> Kode OTP ini hanya berlaku selama <strong>10 menit</strong>. Jangan berikan kode ini kepada siapa pun demi keamanan akun Anda.
+                  </p>
+                </div>
+                <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">
+                  Jika Anda tidak meminta kode verifikasi ini, silakan abaikan email ini dengan aman.
+                </p>
+              </div>
+              <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+                <p style="color: #64748b; font-size: 11px; margin: 0;">
+                  &copy; 2026 Panen Kunci. Hak Cipta Dilindungi.
+                </p>
+              </div>
+            </div>
+          `
+        });
+
+        return res.status(200).json({
+          success: true,
+          token,
+          expiresAt,
+          message: `Kode OTP berhasil dikirimkan ke ${targetEmail}.`
+        });
+      } catch (mailErr) {
+        console.error('[SupabaseProxy] Gagal mengirim OTP email via Nodemailer:', mailErr);
+        return res.status(500).json({
+          success: false,
+          error: 'Gagal mengirim email OTP. Silakan periksa koneksi internet atau coba beberapa saat lagi.'
+        });
+      }
+    }
+
+    if (action === 'verify_register_otp') {
+      const targetEmail = (data?.email || body.email || '').toLowerCase().trim();
+      const inputOtp = (data?.otp || body.otp || '').trim();
+      const token = (data?.token || body.token || '').trim();
+
+      if (!targetEmail || !inputOtp || !token) {
+        return res.status(400).json({
+          success: false,
+          error: 'Email, kode OTP, dan token verifikasi wajib disertakan.'
+        });
+      }
+
+      const [expiresAtStr, sig] = token.split('.');
+      const expiresAt = Number(expiresAtStr);
+
+      if (!expiresAt || !sig || isNaN(expiresAt)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Token verifikasi OTP tidak valid.'
+        });
+      }
+
+      if (Date.now() > expiresAt) {
+        return res.status(400).json({
+          success: false,
+          error: 'Kode OTP telah kedaluwarsa. Silakan minta kode OTP baru.'
+        });
+      }
+
+      const otpSecret = SUPABASE_SECRET_KEY || 'panenkunci-otp-secret-key-2026';
+      const expectedSig = crypto.createHmac('sha256', otpSecret)
+        .update(`${targetEmail}:${inputOtp}:${expiresAtStr}`)
+        .digest('hex');
+
+      const sigBuf = Buffer.from(sig, 'utf8');
+      const expectedBuf = Buffer.from(expectedSig, 'utf8');
+
+      if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Kode OTP yang Anda masukkan salah. Silakan periksa kembali.'
+        });
+      }
+
+      // Buat verifiedToken untuk dikirim saat registrasi akun
+      const verifiedSig = crypto.createHmac('sha256', otpSecret)
+        .update(`${targetEmail}:VERIFIED:${expiresAtStr}`)
+        .digest('hex');
+      const verifiedToken = `${expiresAtStr}.${verifiedSig}`;
+
+      return res.status(200).json({
+        success: true,
+        verified: true,
+        verifiedToken,
+        message: 'Email berhasil diverifikasi!'
       });
     }
 

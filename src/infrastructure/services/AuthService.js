@@ -1135,6 +1135,130 @@ export class AuthService {
   }
 
   /**
+   * Mengirim kode OTP ke email calon pengguna untuk verifikasi pendaftaran
+   * @param {string} emailInput
+   * @returns {Promise<{ success: boolean, message: string, token?: string, expiresAt?: number, debugOtp?: string }>}
+   */
+  async sendRegisterOtp(emailInput) {
+    if (!emailInput) {
+      return { success: false, message: 'Alamat email wajib diisi.' };
+    }
+
+    const email = emailInput.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return { success: false, message: 'Format alamat email tidak valid.' };
+    }
+
+    // 1. Cek apakah email sudah terdaftar di repository lokal / database
+    if (this._userRepository) {
+      try {
+        const existing = await this._userRepository.getByEmail(email);
+        if (existing) {
+          return {
+            success: false,
+            message: 'Alamat email ini sudah terdaftar. Silakan langsung masuk ke akun Anda.'
+          };
+        }
+      } catch (_) {}
+    }
+
+    const localAccounts = this._storage.get('registered_accounts') || [];
+    if (localAccounts.some(acc => acc.email?.toLowerCase() === email)) {
+      return {
+        success: false,
+        message: 'Alamat email ini sudah terdaftar. Silakan langsung masuk ke akun Anda.'
+      };
+    }
+
+    // 2. Kirim permintaan OTP ke server backend proxy
+    try {
+      const res = await fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_register_otp',
+          data: { email }
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          token: data.token,
+          expiresAt: data.expiresAt,
+          debugOtp: data.debugOtp,
+          message: data.message || `Kode OTP berhasil dikirimkan ke ${email}.`
+        };
+      } else {
+        return {
+          success: false,
+          message: data.error || 'Gagal mengirim kode OTP ke email.'
+        };
+      }
+    } catch (err) {
+      console.error('[AuthService] sendRegisterOtp error:', err);
+      return {
+        success: false,
+        message: 'Terjadi kesalahan jaringan saat mengirim kode OTP.'
+      };
+    }
+  }
+
+  /**
+   * Memverifikasi kecocokan kode OTP yang dimasukkan calon pengguna
+   * @param {string} emailInput
+   * @param {string} otp
+   * @param {string} token
+   * @returns {Promise<{ success: boolean, verified?: boolean, verifiedToken?: string, message: string }>}
+   */
+  async verifyRegisterOtp(emailInput, otp, token) {
+    if (!emailInput || !otp || !token) {
+      return { success: false, message: 'Email, kode OTP, dan token verifikasi wajib disertakan.' };
+    }
+
+    const email = emailInput.trim().toLowerCase();
+    const cleanOtp = otp.trim();
+
+    try {
+      const res = await fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify_register_otp',
+          data: {
+            email,
+            otp: cleanOtp,
+            token
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          verified: true,
+          verifiedToken: data.verifiedToken,
+          message: data.message || 'Email berhasil diverifikasi!'
+        };
+      } else {
+        return {
+          success: false,
+          message: data.error || 'Kode OTP salah atau kedaluwarsa.'
+        };
+      }
+    } catch (err) {
+      console.error('[AuthService] verifyRegisterOtp error:', err);
+      return {
+        success: false,
+        message: 'Terjadi kesalahan jaringan saat memverifikasi kode OTP.'
+      };
+    }
+  }
+
+  /**
    * Mengirim email reset kata sandi kepada pengguna
    * @param {string} emailInput
    * @returns {Promise<{ success: boolean, message: string, code?: string }>}

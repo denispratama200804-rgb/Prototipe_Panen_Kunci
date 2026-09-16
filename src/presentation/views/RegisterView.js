@@ -16,6 +16,11 @@ export class RegisterView extends IComponent {
     this._authService = container.resolve('AuthService');
     this._authValidator = container.resolve('AuthValidator');
     this._notification = container.resolve('NotificationService');
+    this._otpToken = null;
+    this._isOtpVerified = false;
+    this._verifiedEmail = '';
+    this._verifiedToken = null;
+    this._countdownTimer = null;
   }
 
   render() {
@@ -67,9 +72,53 @@ export class RegisterView extends IComponent {
                   placeholder="nama@email.com"
                   required
                   autocomplete="email"
-                  class="w-full bg-bg-subtle text-text-heading font-body-md text-sm rounded-xl py-3 pl-11 pr-4 border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
+                  class="w-full bg-bg-subtle text-text-heading font-body-md text-sm rounded-xl py-3 pl-11 pr-28 border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
                 />
+                <button
+                  type="button"
+                  id="btnSendOtp"
+                  class="absolute right-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary active:scale-95 font-label-sm font-semibold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span class="material-symbols-outlined text-[16px]" id="iconSendOtp">send</span>
+                  <span id="textSendOtp">Kirim OTP</span>
+                </button>
               </div>
+            </div>
+
+            <!-- Kode OTP Email -->
+            <div class="flex flex-col gap-1" id="regOtpContainer">
+              <div class="flex items-center justify-between">
+                <label class="font-label-sm text-xs text-text-heading font-semibold uppercase tracking-wider" for="regOtp">
+                  Kode OTP Email
+                </label>
+                <span id="badgeOtpStatus" class="text-[11px] font-medium text-outline flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-outline/60"></span>
+                  <span id="textOtpStatus">Belum diverifikasi</span>
+                </span>
+              </div>
+              <div class="relative flex items-center">
+                <span class="material-symbols-outlined absolute left-3.5 text-outline text-[20px]">pin</span>
+                <input
+                  id="regOtp"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="6"
+                  placeholder="6 Digit Kode OTP"
+                  autocomplete="one-time-code"
+                  class="w-full bg-bg-subtle text-text-heading font-body-md text-sm rounded-xl py-3 pl-11 pr-28 border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all tracking-widest font-mono"
+                />
+                <button
+                  type="button"
+                  id="btnVerifyOtp"
+                  class="absolute right-1.5 px-3 py-1.5 bg-primary hover:bg-primary-container text-on-primary active:scale-95 font-label-sm font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span class="material-symbols-outlined text-[16px]" id="iconVerifyOtp">verified_user</span>
+                  <span id="textVerifyOtp">Verifikasi</span>
+                </button>
+              </div>
+              <p class="text-[11px] text-text-body/70 mt-0.5" id="helpOtpText">
+                Masukkan email lalu klik <strong>"Kirim OTP"</strong> untuk menerima kode verifikasi.
+              </p>
             </div>
 
             <!-- Password -->
@@ -194,10 +243,213 @@ export class RegisterView extends IComponent {
     const passIcon = container.querySelector('#iconRegPassword');
     const submitBtn = container.querySelector('#btnRegSubmit');
 
+    const btnSendOtp = container.querySelector('#btnSendOtp');
+    const iconSendOtp = container.querySelector('#iconSendOtp');
+    const textSendOtp = container.querySelector('#textSendOtp');
+
+    const otpInput = container.querySelector('#regOtp');
+    const btnVerifyOtp = container.querySelector('#btnVerifyOtp');
+    const iconVerifyOtp = container.querySelector('#iconVerifyOtp');
+    const textVerifyOtp = container.querySelector('#textVerifyOtp');
+    const badgeOtpStatus = container.querySelector('#badgeOtpStatus');
+    const helpOtpText = container.querySelector('#helpOtpText');
+
     const s1 = container.querySelector('#str1');
     const s2 = container.querySelector('#str2');
     const s3 = container.querySelector('#str3');
     const strLabel = container.querySelector('#strLabel');
+
+    // ── Logika Verifikasi OTP Email ──
+    const doVerify = async () => {
+      const email = emailInput.value.trim().toLowerCase();
+      const otp = otpInput.value.trim();
+
+      if (!email) {
+        this._notification.error('Harap masukkan alamat email terlebih dahulu.');
+        emailInput.focus();
+        return false;
+      }
+
+      if (!this._otpToken) {
+        this._notification.error('Harap klik "Kirim OTP" ke email Anda terlebih dahulu.');
+        btnSendOtp?.focus();
+        return false;
+      }
+
+      if (!otp || otp.length < 6) {
+        this._notification.error('Harap masukkan 6 digit kode OTP yang diterima.');
+        otpInput.focus();
+        return false;
+      }
+
+      btnVerifyOtp.disabled = true;
+      iconVerifyOtp.textContent = 'progress_activity';
+      iconVerifyOtp.classList.add('animate-spin');
+      textVerifyOtp.textContent = 'Cek...';
+
+      const res = await this._authService.verifyRegisterOtp(email, otp, this._otpToken);
+
+      if (res.success && res.verified) {
+        this._isOtpVerified = true;
+        this._verifiedEmail = email;
+        this._verifiedToken = res.verifiedToken;
+
+        badgeOtpStatus.className = 'text-[11px] font-semibold text-secondary flex items-center gap-1 bg-secondary/10 px-2 py-0.5 rounded-full';
+        badgeOtpStatus.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span><span id="textOtpStatus">Terverifikasi</span>';
+
+        otpInput.classList.remove('border-outline-variant/40');
+        otpInput.classList.add('border-secondary', 'bg-secondary/5');
+
+        btnVerifyOtp.disabled = true;
+        btnVerifyOtp.className = 'absolute right-1.5 px-3 py-1.5 bg-secondary text-white font-label-sm font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-default';
+        iconVerifyOtp.classList.remove('animate-spin');
+        iconVerifyOtp.textContent = 'check';
+        textVerifyOtp.textContent = 'Sesuai';
+
+        helpOtpText.className = 'text-[11px] text-secondary font-medium mt-0.5';
+        helpOtpText.innerHTML = '✓ Alamat email berhasil diverifikasi. Silakan lanjutkan pendaftaran Anda.';
+
+        this._notification.success('Email berhasil diverifikasi!');
+        return true;
+      } else {
+        btnVerifyOtp.disabled = false;
+        btnVerifyOtp.className = 'absolute right-1.5 px-3 py-1.5 bg-primary hover:bg-primary-container text-on-primary active:scale-95 font-label-sm font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
+        iconVerifyOtp.classList.remove('animate-spin');
+        iconVerifyOtp.textContent = 'verified_user';
+        textVerifyOtp.textContent = 'Verifikasi';
+
+        this._notification.error(res.message || 'Kode OTP yang Anda masukkan salah.');
+        otpInput.focus();
+        return false;
+      }
+    };
+
+    // Tombol Kirim OTP
+    btnSendOtp?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = emailInput.value.trim().toLowerCase();
+
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        this._notification.error('Harap masukkan format alamat email yang valid.');
+        emailInput.focus();
+        return;
+      }
+
+      btnSendOtp.disabled = true;
+      iconSendOtp.textContent = 'progress_activity';
+      iconSendOtp.classList.add('animate-spin');
+      textSendOtp.textContent = 'Kirim...';
+
+      const res = await this._authService.sendRegisterOtp(email);
+
+      if (!res.success) {
+        btnSendOtp.disabled = false;
+        iconSendOtp.textContent = 'send';
+        iconSendOtp.classList.remove('animate-spin');
+        textSendOtp.textContent = 'Kirim OTP';
+        this._notification.error(res.message || 'Gagal mengirim kode OTP.');
+        return;
+      }
+
+      // Berhasil kirim
+      this._otpToken = res.token;
+      this._isOtpVerified = false;
+      this._verifiedEmail = '';
+      this._verifiedToken = null;
+
+      otpInput.value = '';
+      otpInput.classList.remove('border-secondary', 'bg-secondary/5');
+      otpInput.classList.add('border-outline-variant/40');
+      btnVerifyOtp.disabled = false;
+      btnVerifyOtp.className = 'absolute right-1.5 px-3 py-1.5 bg-primary hover:bg-primary-container text-on-primary active:scale-95 font-label-sm font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
+      iconVerifyOtp.textContent = 'verified_user';
+      textVerifyOtp.textContent = 'Verifikasi';
+
+      badgeOtpStatus.className = 'text-[11px] font-medium text-primary flex items-center gap-1';
+      badgeOtpStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span><span id="textOtpStatus">OTP Terkirim</span>';
+
+      helpOtpText.className = 'text-[11px] text-text-body mt-0.5';
+      helpOtpText.innerHTML = `Kode 6 digit telah dikirim ke <strong>${email}</strong>. Periksa Kotak Masuk atau Spam.`;
+
+      // Cooldown timer 60 detik
+      if (this._countdownTimer) clearInterval(this._countdownTimer);
+      let countdown = 60;
+      iconSendOtp.classList.remove('animate-spin');
+      iconSendOtp.textContent = 'timer';
+      textSendOtp.textContent = `${countdown}s`;
+
+      this._countdownTimer = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+          clearInterval(this._countdownTimer);
+          this._countdownTimer = null;
+          btnSendOtp.disabled = false;
+          iconSendOtp.textContent = 'send';
+          textSendOtp.textContent = 'Kirim Ulang';
+        } else {
+          textSendOtp.textContent = `${countdown}s`;
+        }
+      }, 1000);
+
+      otpInput.focus();
+
+      this._notification.success(res.message || `Kode OTP verifikasi telah dikirimkan ke email ${email}. Silakan periksa Kotak Masuk atau folder Spam Anda.`);
+    });
+
+    // Validasi input angka OTP & auto-verify saat 6 digit
+    otpInput?.addEventListener('input', (e) => {
+      const raw = e.target.value;
+      const clean = raw.replace(/\D/g, '').slice(0, 6);
+      if (raw !== clean) {
+        e.target.value = clean;
+      }
+
+      if (this._isOtpVerified && clean.length < 6) {
+        this._isOtpVerified = false;
+        this._verifiedEmail = '';
+        this._verifiedToken = null;
+        badgeOtpStatus.className = 'text-[11px] font-medium text-outline flex items-center gap-1';
+        badgeOtpStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-outline/60"></span><span id="textOtpStatus">Belum diverifikasi</span>';
+        otpInput.classList.remove('border-secondary', 'bg-secondary/5');
+        otpInput.classList.add('border-outline-variant/40');
+        btnVerifyOtp.disabled = false;
+        btnVerifyOtp.className = 'absolute right-1.5 px-3 py-1.5 bg-primary hover:bg-primary-container text-on-primary active:scale-95 font-label-sm font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
+        iconVerifyOtp.textContent = 'verified_user';
+        textVerifyOtp.textContent = 'Verifikasi';
+      }
+
+      if (clean.length === 6 && !this._isOtpVerified && this._otpToken) {
+        doVerify();
+      }
+    });
+
+    // Tombol Verifikasi OTP manual
+    btnVerifyOtp?.addEventListener('click', (e) => {
+      e.preventDefault();
+      doVerify();
+    });
+
+    // Reset status verifikasi jika user mengganti email yang sudah diverifikasi
+    emailInput?.addEventListener('input', () => {
+      const currentVal = emailInput.value.trim().toLowerCase();
+      if (this._isOtpVerified && currentVal !== this._verifiedEmail) {
+        this._isOtpVerified = false;
+        this._verifiedEmail = '';
+        this._verifiedToken = null;
+        this._otpToken = null;
+        otpInput.value = '';
+        badgeOtpStatus.className = 'text-[11px] font-medium text-outline flex items-center gap-1';
+        badgeOtpStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-outline/60"></span><span id="textOtpStatus">Belum diverifikasi</span>';
+        otpInput.classList.remove('border-secondary', 'bg-secondary/5');
+        otpInput.classList.add('border-outline-variant/40');
+        btnVerifyOtp.disabled = false;
+        btnVerifyOtp.className = 'absolute right-1.5 px-3 py-1.5 bg-primary hover:bg-primary-container text-on-primary active:scale-95 font-label-sm font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
+        iconVerifyOtp.textContent = 'verified_user';
+        textVerifyOtp.textContent = 'Verifikasi';
+        helpOtpText.className = 'text-[11px] text-text-body/70 mt-0.5';
+        helpOtpText.innerHTML = 'Alamat email berubah. Silakan klik <strong>"Kirim OTP"</strong> untuk verifikasi ulang.';
+      }
+    });
 
     // Toggle password
     togglePassBtn?.addEventListener('click', () => {
@@ -291,24 +543,52 @@ export class RegisterView extends IComponent {
       e.preventDefault();
 
       const name = nameInput.value.trim();
-      const email = emailInput.value.trim();
+      const email = emailInput.value.trim().toLowerCase();
       const password = passInput.value;
       const confirmPassword = confirmInput.value;
       const agreeTerms = agreeTermsInput ? agreeTermsInput.checked : false;
 
-      // Validasi persetujuan Syarat & Ketentuan Layanan (Langkah 2 & 3 QA)
+      // Validasi persetujuan Syarat & Ketentuan Layanan
       if (!agreeTerms) {
         this._notification.error('Harap centang dan setujui Syarat & Ketentuan Layanan sebelum melanjutkan pendaftaran.');
         agreeTermsInput?.focus();
         return;
       }
 
+      // Validasi verifikasi kode OTP Email
+      if (!this._isOtpVerified || this._verifiedEmail !== email) {
+        const currentOtp = otpInput.value.trim();
+        if (currentOtp.length === 6 && this._otpToken) {
+          const verified = await doVerify();
+          if (!verified) return;
+        } else {
+          this._notification.error('Harap verifikasi alamat email Anda dengan kode OTP terlebih dahulu.');
+          if (!this._otpToken) {
+            btnSendOtp?.focus();
+          } else {
+            otpInput?.focus();
+          }
+          return;
+        }
+      }
+
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Proses</span>';
 
-      const res = await this._authService.register({ name, email, password, confirmPassword, agreeTerms });
+      const res = await this._authService.register({
+        name,
+        email,
+        password,
+        confirmPassword,
+        agreeTerms,
+        verifiedToken: this._verifiedToken
+      });
 
       if (res.success) {
+        if (this._countdownTimer) {
+          clearInterval(this._countdownTimer);
+          this._countdownTimer = null;
+        }
         this._notification.showModal({
           title: 'Pendaftaran Berhasil!',
           message: res.message || 'Pendaftaran Anda telah berhasil! Silahkan setor Key API dan hasilkan uang sebanyak banyak nya!',

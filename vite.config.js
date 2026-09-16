@@ -3,6 +3,7 @@ import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 import dns from 'node:dns';
+import crypto from 'node:crypto';
 
 // Fix local IPv6 ENETUNREACH issue
 dns.setDefaultResultOrder('ipv4first');
@@ -965,6 +966,236 @@ export default defineConfig(({ mode }) => {
                       res.statusCode = 500;
                       res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
                     }
+                    return;
+                  }
+
+                  if (action === 'send_register_otp') {
+                    const targetEmail = (data?.email || parsed.email || '').toLowerCase().trim();
+                    if (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: 'Format alamat email tidak valid.' }));
+                      return;
+                    }
+
+                    // 1. Cek apakah email sudah terdaftar di Supabase
+                    if (adminSupabase) {
+                      try {
+                        const { data: existingUser } = await adminSupabase
+                          .from('users')
+                          .select('id')
+                          .eq('email', targetEmail)
+                          .maybeSingle();
+
+                        if (existingUser) {
+                          res.statusCode = 400;
+                          res.end(JSON.stringify({
+                            success: false,
+                            error: 'Alamat email ini sudah terdaftar. Silakan langsung masuk ke akun Anda.'
+                          }));
+                          return;
+                        }
+                      } catch (dbErr) {
+                        console.warn('[ViteProxy] Cek email users note:', dbErr.message);
+                      }
+                    }
+
+                    // 2. Buat kode OTP 6 digit dan token HMAC
+                    const otp = String(crypto.randomInt(100000, 999999));
+                    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 menit
+                    const otpSecret = SUPABASE_SECRET_KEY || 'panenkunci-otp-secret-key-2026';
+                    const signature = crypto.createHmac('sha256', otpSecret)
+                      .update(`${targetEmail}:${otp}:${expiresAt}`)
+                      .digest('hex');
+                    const token = `${expiresAt}.${signature}`;
+
+                    // 3. Kirim via Nodemailer SMTP
+                    const currentEnv = loadEnv(server.config.mode, process.cwd(), '');
+                    const smtpEmail = currentEnv.SMTP_EMAIL || process.env.SMTP_EMAIL;
+                    const smtpPassword = currentEnv.SMTP_PASSWORD || process.env.SMTP_PASSWORD;
+
+                    if (!smtpEmail || !smtpPassword) {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({
+                        success: false,
+                        error: 'Konfigurasi SMTP email belum diatur di sistem.'
+                      }));
+                      return;
+                    }
+
+                    // 3. Coba kirim via Vercel Production Proxy (karena server AWS Vercel bebas blokir port SMTP lokal)
+                    try {
+                      const vercelRes = await fetch('https://prototipe-panen-kunci.vercel.app/api/supabase-proxy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          action: 'send_register_otp',
+                          data: {
+                            email: targetEmail,
+                            otp,
+                            token,
+                            expiresAt
+                          }
+                        })
+                      });
+                      if (vercelRes.ok) {
+                        const vercelJson = await vercelRes.json();
+                        if (vercelJson.success) {
+                          res.statusCode = 200;
+                          res.end(JSON.stringify({
+                            success: true,
+                            token,
+                            expiresAt,
+                            message: `Kode OTP telah berhasil dikirimkan ke email ${targetEmail}.`
+                          }));
+                          return;
+                        }
+                      }
+                    } catch (relayErr) {
+                      console.warn('[ViteProxy] Relay ke Vercel warning:', relayErr.message);
+                    }
+
+                    try {
+                      const transporter = nodemailer.createTransport({
+                        host: currentEnv.SMTP_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+                        port: Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || 465,
+                        secure: (Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || 465) === 465,
+                        auth: { user: smtpEmail, pass: smtpPassword },
+                        connectionTimeout: 4000,
+                        greetingTimeout: 4000,
+                        socketTimeout: 4000
+                      });
+
+                      await transporter.sendMail({
+                        from: `"Panen Kunci" <${smtpEmail}>`,
+                        to: targetEmail,
+                        subject: `[Panen Kunci] Kode OTP Verifikasi Pendaftaran: ${otp}`,
+                        html: `
+                          <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+                            <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 28px 24px; text-align: center;">
+                              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Panen Kunci</h1>
+                              <p style="color: #e0e7ff; margin: 6px 0 0 0; font-size: 13px;">Platform Jual Beli & Konversi API Key</p>
+                            </div>
+                            <div style="padding: 28px 24px;">
+                              <h2 style="color: #0f172a; margin: 0 0 10px 0; font-size: 18px; font-weight: 600;">Verifikasi Alamat Email Anda</h2>
+                              <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+                                Halo,<br>
+                                Terima kasih telah mendaftar di <strong>Panen Kunci</strong>. Gunakan kode OTP 6 digit berikut untuk memverifikasi akun email Anda:
+                              </p>
+                              <div style="background-color: #f8fafc; border: 2px dashed #94a3b8; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 20px;">
+                                <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #1e3a8a; display: inline-block;">${otp}</span>
+                              </div>
+                              <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px;">
+                                <p style="color: #1e40af; font-size: 12px; margin: 0; line-height: 1.5;">
+                                  ⏰ <strong>Masa berlaku:</strong> Kode OTP ini hanya berlaku selama <strong>10 menit</strong>. Jangan berikan kode ini kepada siapa pun demi keamanan akun Anda.
+                                </p>
+                              </div>
+                              <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">
+                                Jika Anda tidak meminta kode verifikasi ini, silakan abaikan email ini dengan aman.
+                              </p>
+                            </div>
+                            <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+                              <p style="color: #64748b; font-size: 11px; margin: 0;">
+                                &copy; 2026 Panen Kunci. Hak Cipta Dilindungi.
+                              </p>
+                            </div>
+                          </div>
+                        `
+                      });
+
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({
+                        success: true,
+                        token,
+                        expiresAt,
+                        message: `Kode OTP berhasil dikirimkan ke ${targetEmail}.`
+                      }));
+                      return;
+                    } catch (mailErr) {
+                      console.warn('[ViteProxy] SMTP lokal terhalang jaringan/ISP:', mailErr.message);
+                      console.log('\n==========================================');
+                      console.log('🔑 [PANEN KUNCI LOCAL DEV OTP]:', otp);
+                      console.log('📧 Untuk email:', targetEmail);
+                      console.log('==========================================\n');
+                      
+                      // Fallback dev lokal agar pengembang tetap dapat mengetes alur OTP secara mulus jika ISP memblokir port SMTP
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({
+                        success: true,
+                        token,
+                        expiresAt,
+                        debugOtp: otp,
+                        isLocalSimulated: true,
+                        message: `Kode OTP dikirim! (Mode dev: ${otp})`
+                      }));
+                      return;
+                    }
+                  }
+
+                  if (action === 'verify_register_otp') {
+                    const targetEmail = (data?.email || parsed.email || '').toLowerCase().trim();
+                    const inputOtp = (data?.otp || parsed.otp || '').trim();
+                    const token = (data?.token || parsed.token || '').trim();
+
+                    if (!targetEmail || !inputOtp || !token) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({
+                        success: false,
+                        error: 'Email, kode OTP, dan token verifikasi wajib disertakan.'
+                      }));
+                      return;
+                    }
+
+                    const [expiresAtStr, sig] = token.split('.');
+                    const expiresAt = Number(expiresAtStr);
+
+                    if (!expiresAt || !sig || isNaN(expiresAt)) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({
+                        success: false,
+                        error: 'Token verifikasi OTP tidak valid.'
+                      }));
+                      return;
+                    }
+
+                    if (Date.now() > expiresAt) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({
+                        success: false,
+                        error: 'Kode OTP telah kedaluwarsa. Silakan minta kode OTP baru.'
+                      }));
+                      return;
+                    }
+
+                    const otpSecret = SUPABASE_SECRET_KEY || 'panenkunci-otp-secret-key-2026';
+                    const expectedSig = crypto.createHmac('sha256', otpSecret)
+                      .update(`${targetEmail}:${inputOtp}:${expiresAtStr}`)
+                      .digest('hex');
+
+                    const sigBuf = Buffer.from(sig, 'utf8');
+                    const expectedBuf = Buffer.from(expectedSig, 'utf8');
+
+                    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({
+                        success: false,
+                        error: 'Kode OTP yang Anda masukkan salah. Silakan periksa kembali.'
+                      }));
+                      return;
+                    }
+
+                    // Buat verifiedToken untuk dikirim saat registrasi akun
+                    const verifiedSig = crypto.createHmac('sha256', otpSecret)
+                      .update(`${targetEmail}:VERIFIED:${expiresAtStr}`)
+                      .digest('hex');
+                    const verifiedToken = `${expiresAtStr}.${verifiedSig}`;
+
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({
+                      success: true,
+                      verified: true,
+                      verifiedToken,
+                      message: 'Email berhasil diverifikasi!'
+                    }));
                     return;
                   }
 
