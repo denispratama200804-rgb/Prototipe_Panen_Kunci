@@ -333,6 +333,15 @@ export class ApiKeysView {
               <span class="text-[11px] text-slate-400 hidden sm:inline mr-1">Geser kolom:</span>
               <button
                 type="button"
+                id="btn-keys-scroll-reset"
+                title="Kembalikan posisi tabel ke awal (kiri)"
+                class="h-8 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-300 hover:text-white border border-slate-700/80 flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95 text-xs font-medium"
+              >
+                <span class="material-symbols-outlined text-sm">first_page</span>
+                <span class="hidden md:inline">Awal</span>
+              </button>
+              <button
+                type="button"
                 id="btn-keys-scroll-left"
                 title="Geser tabel ke kiri"
                 class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95"
@@ -350,16 +359,16 @@ export class ApiKeysView {
             </div>
           </div>
           <div class="overflow-x-auto custom-scrollbar w-full max-w-full min-w-0 pb-2 cursor-grab" id="keys-table-scroll">
-            <table class="w-full text-left admin-table select-none" style="min-width: 820px;">
+            <table class="w-full text-left admin-table select-none min-w-[1020px]">
               <thead>
                 <tr>
-                  <th>API Key String</th>
-                  <th>Pemilik / User</th>
-                  <th>Status</th>
-                  <th>Kredit Kie.ai</th>
-                  <th>Reward Terbayar</th>
-                  <th>Waktu Setor</th>
-                  <th class="text-right">Aksi</th>
+                  <th class="pl-6 whitespace-nowrap min-w-[210px]">API Key String</th>
+                  <th class="whitespace-nowrap min-w-[160px]">Pemilik / User</th>
+                  <th class="whitespace-nowrap min-w-[110px]">Status</th>
+                  <th class="whitespace-nowrap min-w-[100px]">Kredit Kie.ai</th>
+                  <th class="whitespace-nowrap min-w-[110px]">Reward Terbayar</th>
+                  <th class="whitespace-nowrap min-w-[110px]">Waktu Setor</th>
+                  <th class="text-right pr-6 whitespace-nowrap min-w-[180px]">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -436,7 +445,7 @@ export class ApiKeysView {
 
                           return `
                     <tr data-key-id="${k.id}">
-                      <td>
+                      <td class="pl-6">
                         <div class="flex items-center gap-2">
                           <span class="font-mono text-xs font-semibold text-slate-200 select-all tracking-wider">${displayKey}</span>
                           <button
@@ -476,7 +485,7 @@ export class ApiKeysView {
                         ${statusBadge}
                       </td>
                       <td>
-                        <div class="flex items-center gap-1.5">
+                        <div class="flex items-center gap-1.5 whitespace-nowrap">
                           <span class="font-mono text-xs font-bold text-slate-200">${k.credits !== undefined ? k.credits : 80} cr</span>
                           <button
                             type="button"
@@ -491,21 +500,21 @@ export class ApiKeysView {
                         </div>
                       </td>
                       <td>
-                        <div class="font-mono text-xs font-semibold text-emerald-400">Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</div>
+                        <div class="font-mono text-xs font-semibold text-emerald-400 whitespace-nowrap">Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</div>
                       </td>
-                      <td>
+                      <td class="whitespace-nowrap">
                         <div class="text-xs text-slate-300">${new Date(k.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
                         <div class="text-[11px] text-slate-500">${new Date(k.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
                       </td>
-                      <td class="text-right">
-                        <div class="flex items-center justify-end gap-1.5">
+                      <td class="text-right pr-6 whitespace-nowrap">
+                        <div class="flex items-center justify-end gap-1 flex-nowrap">
                           <button
                             type="button"
                             data-action="sync-single-credit"
                             data-id="${k.id}"
                             data-keystring="${k.keyString}"
                             title="Cek & Sinkronkan Kredit ke Kie.ai"
-                            class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 text-sky-300 border border-sky-500/30 flex items-center gap-1 transition-all cursor-pointer"
+                            class="px-2 py-1 rounded-lg text-[10px] font-semibold bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 text-sky-300 border border-sky-500/30 flex items-center gap-1 transition-all cursor-pointer shrink-0"
                           >
                             <span class="material-symbols-outlined text-xs">sync</span>
                             <span>Kie</span>
@@ -518,7 +527,7 @@ export class ApiKeysView {
                               data-action="approve-key"
                               data-id="${k.id}"
                               title="Setujui API Key & Cairkan ke Saldo Aktif"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 transition-all shadow-sm cursor-pointer"
+                              class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 transition-all shadow-sm cursor-pointer shrink-0"
                             >
                               <span class="material-symbols-outlined text-xs">check_circle</span>
                               <span>Setujui</span>
@@ -528,7 +537,7 @@ export class ApiKeysView {
                               data-action="reject-key"
                               data-id="${k.id}"
                               title="Tolak API Key & Batalkan Saldo Pasif"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 border border-rose-500/30 flex items-center gap-1 transition-all cursor-pointer"
+                              class="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 border border-rose-500/30 flex items-center gap-1 transition-all cursor-pointer shrink-0"
                             >
                               <span class="material-symbols-outlined text-xs">cancel</span>
                               <span>Tolak</span>
@@ -542,7 +551,7 @@ export class ApiKeysView {
                               data-id="${k.id}"
                               data-status="used"
                               title="Tandai Sudah Digunakan / Dijual"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 text-blue-300 border border-blue-500/30 transition-all cursor-pointer"
+                              class="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 text-blue-300 border border-blue-500/30 transition-all cursor-pointer shrink-0"
                             >
                               Tandai Used
                             </button>
@@ -555,7 +564,7 @@ export class ApiKeysView {
                               data-id="${k.id}"
                               data-status="valid"
                               title="Kembalikan ke Valid"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer"
+                              class="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer shrink-0"
                             >
                               Reset Valid
                             </button>
@@ -567,7 +576,7 @@ export class ApiKeysView {
                             data-action="delete-key"
                             data-id="${k.id}"
                             title="Hapus Kunci dari Database"
-                            class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-colors cursor-pointer"
+                            class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-colors cursor-pointer shrink-0"
                           >
                             <span class="material-symbols-outlined text-sm">delete</span>
                           </button>
@@ -636,7 +645,7 @@ export class ApiKeysView {
     }
 
     // Quick Table Horizontal Scroll & Drag Navigation
-    setupTableScroll(container, 'keys-table-scroll', 'btn-keys-scroll-left', 'btn-keys-scroll-right');
+    setupTableScroll(container, 'keys-table-scroll', 'btn-keys-scroll-left', 'btn-keys-scroll-right', 'btn-keys-scroll-reset');
 
     // Search Input & Search Trigger Button
     const searchInput = container.querySelector('#keys-search-input');
