@@ -21,12 +21,47 @@ export class SetorApiKeyView extends IComponent {
   }
 
   render() {
+    const user = this._authService.getCurrentUser();
+    const isVerified = Boolean(user?.isVerified);
     const keys = this._apiKeyService.getAllKeys().slice(0, 5);
 
     return `
       <div class="flex flex-col w-full min-h-screen bg-background pb-28 pt-20">
         <div class="px-margin-mobile max-w-md mx-auto w-full flex flex-col gap-5">
           
+          ${!isVerified ? `
+            <!-- Locked Account Banner -->
+            <div class="bg-surface-card border-2 border-amber-500/40 rounded-3xl p-5 shadow-lg flex flex-col items-center text-center gap-3.5 relative overflow-hidden">
+              <div class="absolute -right-8 -top-8 w-28 h-28 bg-amber-500/10 rounded-full blur-xl pointer-events-none"></div>
+              
+              <div class="w-14 h-14 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center border border-amber-500/30 shadow-inner mt-1">
+                <span class="material-symbols-outlined text-[30px]" style="font-variation-settings: 'FILL' 1;">shield_lock</span>
+              </div>
+
+              <div class="flex flex-col items-center gap-1.5 w-full">
+                <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/20">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  Akun Belum Terverifikasi
+                </span>
+                <h2 class="font-headline-md text-base font-bold text-text-heading mt-0.5">
+                  Fitur Setor Key Terkunci
+                </h2>
+                <p class="font-body-md text-xs text-text-body leading-relaxed max-w-xs mx-auto">
+                  Anda belum dapat menyetor API Key. Harap lengkapi rekening atau e-wallet pencairan di profil Anda untuk memverifikasi akun.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                id="btnVerifyFromSetor"
+                class="w-full bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-bold text-xs py-3.5 px-4 rounded-xl shadow-md shadow-amber-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-[18px]">verified_user</span>
+                <span>Verifikasi Akun Sekarang</span>
+              </button>
+            </div>
+          ` : ''}
+
           <!-- Mini Tutorial Steps Dropdown -->
           <section class="flex flex-col">
             <!-- Dropdown Toggle Button -->
@@ -94,21 +129,24 @@ export class SetorApiKeyView extends IComponent {
           <!-- Input Section -->
           <section class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-4">
             <div class="flex flex-col gap-2">
-              <label for="inputApiKey" class="font-label-md text-xs font-bold text-text-heading">
-                Masukkan API Key Kie.ai Anda
+              <label for="inputApiKey" class="font-label-md text-xs font-bold text-text-heading flex items-center justify-between">
+                <span>Masukkan API Key Kie.ai Anda</span>
+                ${!isVerified ? '<span class="text-amber-500 text-[11px] font-semibold flex items-center gap-0.5"><span class="material-symbols-outlined text-[13px]">lock</span> Terkunci</span>' : ''}
               </label>
               
               <div class="relative flex items-center">
                 <input
                   id="inputApiKey"
                   type="text"
-                  placeholder="sk-kie-..."
-                  class="w-full bg-surface-container-low rounded-2xl py-3.5 pl-4 pr-12 text-sm text-text-heading font-mono border border-surface-container focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
+                  placeholder="${!isVerified ? 'Terkunci - Harap verifikasi akun Anda terlebih dahulu' : 'sk-kie-...'}"
+                  ${!isVerified ? 'disabled' : ''}
+                  class="w-full bg-surface-container-low rounded-2xl py-3.5 pl-4 pr-12 text-sm text-text-heading font-mono border border-surface-container focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all ${!isVerified ? 'opacity-60 cursor-not-allowed' : ''}"
                 />
                 <button
                   type="button"
                   id="btnPasteKey"
-                  class="absolute right-2.5 p-2 text-outline hover:text-primary transition-colors"
+                  ${!isVerified ? 'disabled' : ''}
+                  class="absolute right-2.5 p-2 text-outline hover:text-primary transition-colors ${!isVerified ? 'opacity-40 cursor-not-allowed' : ''}"
                   title="Tempel dari Clipboard"
                 >
                   <span class="material-symbols-outlined text-[20px]">content_paste</span>
@@ -117,32 +155,35 @@ export class SetorApiKeyView extends IComponent {
 
               <p class="text-[11px] text-outline flex items-center gap-1 mt-0.5">
                 <span class="material-symbols-outlined text-[14px]">lock</span>
-                <span>API Key disimpan secara aman dan dienkripsi.</span>
+                <span>${!isVerified ? 'Verifikasi akun di profil untuk membuka setoran API Key.' : 'API Key disimpan secara aman dan dienkripsi.'}</span>
               </p>
             </div>
 
             <!-- Quick Key Generators for Testing/Demo -->
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-[10px] text-outline font-semibold uppercase">Coba Contoh:</span>
-              <button type="button" class="btn-mock-key px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-[11px] font-mono text-primary border border-surface-container transition-colors" data-key="sk-kie-8f92a1bc3d4e5f6g7h8i">
-                Key Valid
-              </button>
-              <button type="button" class="btn-mock-key px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-[11px] font-mono text-primary border border-surface-container transition-colors" data-key="sk-kie-duplicate_test_12345">
-                Key Duplikat
-              </button>
-              <button type="button" class="btn-mock-key px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-[11px] font-mono text-primary border border-surface-container transition-colors" data-key="sk-kie-invalid_quota_00000">
-                Key Invalid
-              </button>
-            </div>
+            ${isVerified ? `
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[10px] text-outline font-semibold uppercase">Coba Contoh:</span>
+                <button type="button" class="btn-mock-key px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-[11px] font-mono text-primary border border-surface-container transition-colors" data-key="sk-kie-8f92a1bc3d4e5f6g7h8i">
+                  Key Valid
+                </button>
+                <button type="button" class="btn-mock-key px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-[11px] font-mono text-primary border border-surface-container transition-colors" data-key="sk-kie-duplicate_test_12345">
+                  Key Duplikat
+                </button>
+                <button type="button" class="btn-mock-key px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-[11px] font-mono text-primary border border-surface-container transition-colors" data-key="sk-kie-invalid_quota_00000">
+                  Key Invalid
+                </button>
+              </div>
+            ` : ''}
 
             <!-- Submit Button & Feedback -->
             <button
               type="button"
               id="btnSubmitKey"
-              class="w-full bg-primary text-on-primary rounded-full py-3.5 font-label-md text-sm font-bold shadow-md shadow-primary/25 hover:bg-primary-container transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-1"
+              class="w-full ${!isVerified ? 'bg-surface-container text-outline cursor-not-allowed border border-surface-container-high' : 'bg-primary text-on-primary shadow-md shadow-primary/25 hover:bg-primary-container active:scale-[0.98] cursor-pointer'} rounded-full py-3.5 font-label-md text-sm font-bold transition-all flex items-center justify-center gap-2 mt-1"
+              ${!isVerified ? 'disabled' : ''}
             >
-              <span>Setor API Key</span>
-              <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+              <span class="material-symbols-outlined text-[20px]">${!isVerified ? 'lock' : 'arrow_forward'}</span>
+              <span>${!isVerified ? 'Setor Key Terkunci (Perlu Verifikasi)' : 'Setor API Key'}</span>
             </button>
           </section>
 
@@ -290,8 +331,35 @@ export class SetorApiKeyView extends IComponent {
       });
     });
 
+    // Tombol Verifikasi Akun dari Banner Terkunci
+    const verifyBtn = container.querySelector('#btnVerifyFromSetor');
+    verifyBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      sessionStorage.setItem('panenkunci:auto_open_bank', 'true');
+      window.location.hash = '/profil';
+    });
+
     // Submit handler
     submitBtn?.addEventListener('click', async () => {
+      const user = this._authService.getCurrentUser();
+      const isVerified = Boolean(user?.isVerified);
+
+      if (!isVerified) {
+        this._notification.showModal({
+          title: 'Fitur Setor Key Terkunci',
+          message: 'Akun Anda berstatus <strong>Belum Terverifikasi</strong>.<br><br>Untuk mencegah kendala pencairan saldo, Anda diwajibkan melengkapi rekening bank atau e-wallet pencairan di profil Anda terlebih dahulu sebelum dapat menyetor API Key.',
+          type: 'warning',
+          confirmText: 'Verifikasi Akun Sekarang',
+          cancelText: 'Batal',
+          showCancel: true,
+          onConfirm: () => {
+            sessionStorage.setItem('panenkunci:auto_open_bank', 'true');
+            window.location.hash = '/profil';
+          }
+        });
+        return;
+      }
+
       const rawKey = input.value.trim();
       if (!rawKey) {
         this._notification.error('Silakan masukkan API Key terlebih dahulu.');
@@ -301,7 +369,6 @@ export class SetorApiKeyView extends IComponent {
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Memverifikasi API Key...</span>';
 
-      const user = this._authService.getCurrentUser();
       const res = await this._apiKeyService.submitKey(rawKey, user ? user.id : 'usr_guest');
 
       submitBtn.disabled = false;

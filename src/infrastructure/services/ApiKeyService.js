@@ -262,6 +262,15 @@ export class ApiKeyService {
   async submitKey(rawKey, userId = 'usr_current') {
     const trimmed = (rawKey || '').trim();
 
+    // 0. Validasi Status Verifikasi Akun Pengguna
+    const currentUser = this._storage.get('current_user');
+    if (currentUser && !currentUser.isVerified && (currentUser.role || '').toLowerCase() !== 'admin') {
+      return {
+        success: false,
+        message: 'Akun Anda belum terverifikasi. Harap lengkapi rekening atau e-wallet pencairan di menu Profil terlebih dahulu sebelum menyetor API Key.'
+      };
+    }
+
     // 1. Validasi format/sintaks (SRP via ApiKeyValidator)
     const validation = this._validator.validate(trimmed);
     if (!validation.isValid) {

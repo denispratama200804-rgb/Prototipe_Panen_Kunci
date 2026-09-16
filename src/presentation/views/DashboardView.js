@@ -126,10 +126,26 @@ export class DashboardView extends IComponent {
 
           <!-- Quick Action Buttons -->
           <div class="grid grid-cols-2 gap-3">
-            <a href="#/setor" class="bg-primary text-on-primary rounded-2xl p-4 flex items-center justify-center gap-2.5 shadow-md shadow-primary/20 hover:bg-primary-container transition-all active:scale-95 group">
-              <span class="material-symbols-outlined text-[22px] group-hover:rotate-12 transition-transform" style="font-variation-settings: 'FILL' 1;">vpn_key</span>
-              <span class="font-label-md text-sm font-bold">Setor Key</span>
-            </a>
+            ${!isVerified ? `
+              <button
+                type="button"
+                id="btnDashboardSetorLocked"
+                class="bg-primary/80 text-on-primary rounded-2xl p-4 flex items-center justify-center gap-2.5 shadow-md shadow-primary/10 transition-all active:scale-95 group relative cursor-pointer"
+                title="Fitur Setor Key Terkunci - Akun Belum Terverifikasi"
+              >
+                <div class="absolute -top-2 -right-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-extrabold text-[10px] flex items-center gap-0.5 shadow border border-amber-300">
+                  <span class="material-symbols-outlined text-[12px]">lock</span>
+                  <span>Terkunci</span>
+                </div>
+                <span class="material-symbols-outlined text-[22px] text-amber-300" style="font-variation-settings: 'FILL' 1;">lock</span>
+                <span class="font-label-md text-sm font-bold">Setor Key</span>
+              </button>
+            ` : `
+              <a href="#/setor" class="bg-primary text-on-primary rounded-2xl p-4 flex items-center justify-center gap-2.5 shadow-md shadow-primary/20 hover:bg-primary-container transition-all active:scale-95 group">
+                <span class="material-symbols-outlined text-[22px] group-hover:rotate-12 transition-transform" style="font-variation-settings: 'FILL' 1;">vpn_key</span>
+                <span class="font-label-md text-sm font-bold">Setor Key</span>
+              </a>
+            `}
             <a href="#/tarik" class="bg-secondary text-on-secondary rounded-2xl p-4 flex items-center justify-center gap-2.5 shadow-md shadow-secondary/20 hover:opacity-95 transition-all active:scale-95 group">
               <span class="material-symbols-outlined text-[22px] group-hover:-translate-y-0.5 transition-transform" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
               <span class="font-label-md text-sm font-bold">Tarik Saldo</span>
@@ -309,6 +325,24 @@ export class DashboardView extends IComponent {
         const type = btn.getAttribute('data-tooltip');
         if (type) {
           this._showTooltipModal(type);
+        }
+      });
+    });
+
+    // Listener tombol Setor Key saat akun terkunci (belum terverifikasi)
+    const lockedSetorBtn = container.querySelector('#btnDashboardSetorLocked');
+    lockedSetorBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this._notificationService.showModal({
+        title: 'Fitur Setor Key Terkunci',
+        message: 'Akun Anda berstatus <strong>Belum Terverifikasi</strong>.<br><br>Untuk mencegah kendala pencairan dana, Anda diwajibkan melengkapi rekening bank atau e-wallet pencairan di profil Anda terlebih dahulu sebelum dapat menyetor API Key.',
+        type: 'warning',
+        confirmText: 'Verifikasi Akun Sekarang',
+        cancelText: 'Nanti Saja',
+        showCancel: true,
+        onConfirm: () => {
+          sessionStorage.setItem('panenkunci:auto_open_bank', 'true');
+          window.location.hash = '/profil';
         }
       });
     });
