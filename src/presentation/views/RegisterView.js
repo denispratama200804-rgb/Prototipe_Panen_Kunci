@@ -169,6 +169,35 @@ export class RegisterView extends IComponent {
               </div>
             </div>
 
+            <!-- Referral Code (Optional) -->
+            <div class="flex flex-col gap-1">
+              <label class="font-label-sm text-xs text-text-heading font-semibold uppercase tracking-wider flex items-center justify-between" for="regReferralCode">
+                <span>Kode Referral</span>
+                <span class="text-[10px] text-text-body font-normal lowercase">(opsional)</span>
+              </label>
+              <div class="relative flex items-center">
+                <span class="material-symbols-outlined absolute left-3.5 text-outline text-[20px]">loyalty</span>
+                <input
+                  id="regReferralCode"
+                  type="text"
+                  placeholder="Contoh: PK-85E4ZD"
+                  value="${refCodeFromUrl.toUpperCase()}"
+                  autocomplete="off"
+                  class="w-full bg-bg-subtle text-text-heading font-body-md text-sm rounded-xl py-3 pl-11 pr-4 border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all font-mono uppercase"
+                />
+              </div>
+              ${refCodeFromUrl ? `
+                <p class="text-[11px] text-secondary font-medium mt-0.5 flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[14px]">check_circle</span>
+                  <span>Kode rujukan <strong>${refCodeFromUrl.toUpperCase()}</strong> terpasang otomatis!</span>
+                </p>
+              ` : `
+                <p class="text-[11px] text-text-body/70 mt-0.5">
+                  Masukkan kode referral teman jika ada untuk memperoleh bonus rujukan.
+                </p>
+              `}
+            </div>
+
             <!-- Terms and Condition Checkbox -->
             <div class="pt-1">
               <label class="flex items-start gap-2.5 cursor-pointer select-none text-left" for="regAgreeTerms">
@@ -586,13 +615,17 @@ export class RegisterView extends IComponent {
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Proses</span>';
 
+      const refInput = container.querySelector('#regReferralCode');
+      const referralCode = refInput ? refInput.value.trim().toUpperCase() : '';
+
       const res = await this._authService.register({
         name,
         email,
         password,
         confirmPassword,
         agreeTerms,
-        verifiedToken: this._verifiedToken
+        verifiedToken: this._verifiedToken,
+        referredBy: referralCode
       });
 
       if (res.success) {
