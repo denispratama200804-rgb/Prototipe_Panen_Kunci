@@ -893,6 +893,82 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
+                  // Helper pengiriman email via Brevo REST API v3 atau Nodemailer SMTP di Vite Dev Server
+                  const sendEmailVite = async ({ currentEnv, to, subject, html, text }) => {
+                    const brevoApiKey = currentEnv.BREVO_API_KEY || process.env.BREVO_API_KEY || currentEnv.VITE_BREVO_API_KEY || currentEnv.BREVO_KEY;
+                    const brevoSenderEmail = currentEnv.BREVO_SENDER_EMAIL || currentEnv.SMTP_EMAIL || process.env.SMTP_EMAIL || 'panenkuncii@gmail.com';
+                    const brevoSenderName = currentEnv.BREVO_SENDER_NAME || 'Panen Kunci';
+                    let brevoError = null;
+
+                    // 1. Coba Brevo REST API v3 (Port 443 HTTPS)
+                    if (brevoApiKey) {
+                      try {
+                        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+                          method: 'POST',
+                          headers: {
+                            'accept': 'application/json',
+                            'api-key': brevoApiKey.trim(),
+                            'content-type': 'application/json'
+                          },
+                          body: JSON.stringify({
+                            sender: {
+                              name: brevoSenderName,
+                              email: brevoSenderEmail
+                            },
+                            to: [{ email: to }],
+                            subject: subject,
+                            htmlContent: html,
+                            ...(text ? { textContent: text } : {})
+                          })
+                        });
+
+                        const data = await response.json();
+                        if (response.ok) {
+                          console.log('[ViteProxy] Email terkirim via Brevo API ke:', to, 'messageId:', data.messageId);
+                          return { success: true, method: 'brevo_api', messageId: data.messageId };
+                        } else {
+                          brevoError = data?.message || JSON.stringify(data);
+                          console.warn('[ViteProxy] Brevo API error response:', data);
+                        }
+                      } catch (apiErr) {
+                        brevoError = apiErr.message;
+                        console.warn('[ViteProxy] Brevo API fetch warning:', apiErr.message);
+                      }
+                    }
+
+                    // 2. Fallback SMTP (smtp-relay.brevo.com atau custom SMTP)
+                    const smtpEmail = currentEnv.SMTP_EMAIL || process.env.SMTP_EMAIL || brevoSenderEmail;
+                    const smtpPassword = currentEnv.SMTP_PASSWORD || process.env.SMTP_PASSWORD || brevoApiKey;
+                    const smtpHost = currentEnv.SMTP_HOST || process.env.SMTP_HOST || 'smtp-relay.brevo.com';
+                    const smtpPort = Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || 587;
+
+                    if (smtpEmail && smtpPassword) {
+                      const isPort465 = smtpPort === 465;
+                      const transporter = nodemailer.createTransport({
+                        host: smtpHost,
+                        port: smtpPort,
+                        secure: isPort465,
+                        auth: { user: smtpEmail, pass: smtpPassword },
+                        connectionTimeout: 8000,
+                        greetingTimeout: 8000,
+                        socketTimeout: 8000
+                      });
+
+                      const info = await transporter.sendMail({
+                        from: `"${brevoSenderName}" <${smtpEmail}>`,
+                        to: to,
+                        subject: subject,
+                        html: html,
+                        ...(text ? { text } : {})
+                      });
+
+                      console.log('[ViteProxy] Email terkirim via SMTP ke:', to, 'messageId:', info.messageId);
+                      return { success: true, method: 'smtp', messageId: info.messageId };
+                    }
+
+                    throw new Error(brevoError ? `Brevo API error: ${brevoError}` : 'Konfigurasi Brevo (BREVO_API_KEY) atau SMTP (SMTP_EMAIL & SMTP_PASSWORD) belum diatur.');
+                  };
+
                   if (action === 'generate_recovery_link' && data?.email) {
                     if (adminSupabase) {
                       const { data: linkData, error } = await adminSupabase.auth.admin.generateLink({
@@ -907,49 +983,38 @@ export default defineConfig(({ mode }) => {
                         res.end(JSON.stringify({ success: false, error: error.message }));
                       } else {
                         const actionLink = linkData?.properties?.action_link;
-                        
-                        // Reload env on every request to pick up .env changes without restarting
                         const currentEnv = loadEnv(server.config.mode, process.cwd(), '');
-                        const smtpEmail = currentEnv.SMTP_EMAIL || process.env.SMTP_EMAIL;
-                        const smtpPassword = currentEnv.SMTP_PASSWORD || process.env.SMTP_PASSWORD;
-                        
-                        if (smtpEmail && smtpPassword && actionLink) {
+
+                        if (actionLink) {
                           try {
-                            const transporter = nodemailer.createTransport({
-                              host: currentEnv.SMTP_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
-                              port: Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || 465,
-                              secure: (Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || 465) === 465,
-                              auth: { user: smtpEmail, pass: smtpPassword }
-                            });
-                            
-                            await transporter.sendMail({
-                              from: `"Panen Kunci (Local Dev)" <${smtpEmail}>`,
+                            await sendEmailVite({
+                              currentEnv,
                               to: data.email,
                               subject: 'Pemulihan Kata Sandi Akun Panen Kunci',
                               html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px;">
                                 <h2 style="color: #4F46E5;">Atur Ulang Kata Sandi</h2>
                                 <p>Halo,</p>
-                                <p>Ini adalah email dari server lokal (npm run dev). Klik tombol di bawah ini untuk membuat kata sandi baru Anda:</p>
+                                <p>Ini adalah email pemulihan akun Panen Kunci Anda. Klik tombol di bawah ini untuk membuat kata sandi baru Anda:</p>
                                 <div style="text-align: center; margin: 30px 0;">
                                   <a href="${actionLink}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Atur Ulang Kata Sandi</a>
                                 </div>
                                 <p style="color: #666; font-size: 12px;">Atau salin dan tempel tautan berikut ke browser Anda:<br><a href="${actionLink}">${actionLink}</a></p>
                               </div>`
                             });
-                            
+
                             res.statusCode = 200;
                             res.end(JSON.stringify({
                               success: true,
                               emailSent: true,
-                              message: 'Email sudah dikirimkan melalui Gmail Anda.'
+                              message: 'Email pemulihan kata sandi berhasil dikirimkan.'
                             }));
                             return;
                           } catch (mailErr) {
-                            console.error('[ViteProxy] Gagal mengirim email via Nodemailer:', mailErr);
+                            console.error('[ViteProxy] Gagal mengirim email reset password via Brevo/SMTP:', mailErr);
                             res.statusCode = 400;
                             res.end(JSON.stringify({
                               success: false,
-                              error: 'Gagal mengirim email: Cek kembali keabsahan Password Aplikasi Gmail Anda dan koneksi internet.'
+                              error: 'Gagal mengirim email: ' + (mailErr.message || 'Cek kembali konfigurasi Brevo/SMTP.')
                             }));
                             return;
                           }
@@ -1055,18 +1120,8 @@ export default defineConfig(({ mode }) => {
                     }
 
                     try {
-                      const transporter = nodemailer.createTransport({
-                        host: currentEnv.SMTP_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
-                        port: Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || 465,
-                        secure: (Number(currentEnv.SMTP_PORT || process.env.SMTP_PORT) || 465) === 465,
-                        auth: { user: smtpEmail, pass: smtpPassword },
-                        connectionTimeout: 4000,
-                        greetingTimeout: 4000,
-                        socketTimeout: 4000
-                      });
-
-                      await transporter.sendMail({
-                        from: `"Panen Kunci" <${smtpEmail}>`,
+                      await sendEmailVite({
+                        currentEnv,
                         to: targetEmail,
                         subject: `[Panen Kunci] Kode OTP Verifikasi Pendaftaran: ${otp}`,
                         html: `
@@ -1111,13 +1166,14 @@ export default defineConfig(({ mode }) => {
                       }));
                       return;
                     } catch (mailErr) {
-                      console.warn('[ViteProxy] SMTP lokal terhalang jaringan/ISP:', mailErr.message);
+                      console.error('[ViteProxy] Gagal mengirim OTP email via Brevo/SMTP:', mailErr);
+                      console.warn('[ViteProxy] SMTP/Brevo lokal terhalang atau belum tervalidasi:', mailErr.message);
                       console.log('\n==========================================');
                       console.log('🔑 [PANEN KUNCI LOCAL DEV OTP]:', otp);
                       console.log('📧 Untuk email:', targetEmail);
                       console.log('==========================================\n');
-                      
-                      // Fallback dev lokal agar pengembang tetap dapat mengetes alur OTP secara mulus jika ISP memblokir port SMTP
+
+                      // Fallback dev lokal agar pengembang tetap dapat mengetes alur OTP secara mulus jika ISP/koneksi bermasalah
                       res.statusCode = 200;
                       res.end(JSON.stringify({
                         success: true,

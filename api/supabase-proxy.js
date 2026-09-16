@@ -7,21 +7,85 @@ import crypto from 'node:crypto';
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Konfigurasi SMTP Nodemailer (untuk pengiriman email)
-const smtpEmail = process.env.SMTP_EMAIL || 'panenkuncii@gmail.com';
-const smtpPassword = process.env.SMTP_PASSWORD || 'xverztdffhkyxteq';
-const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-const smtpPort = Number(process.env.SMTP_PORT) || 465;
+// Konfigurasi Pengiriman Email (Mendukung Brevo REST API v3 & Nodemailer SMTP)
+async function sendEmailMessage({ to, subject, html, text }) {
+  const brevoApiKey = process.env.BREVO_API_KEY || process.env.VITE_BREVO_API_KEY || process.env.NEXT_PUBLIC_BREVO_API_KEY || process.env.BREVO_KEY;
+  const brevoSenderEmail = process.env.BREVO_SENDER_EMAIL || process.env.SMTP_EMAIL || 'panenkuncii@gmail.com';
+  const brevoSenderName = process.env.BREVO_SENDER_NAME || 'Panen Kunci';
 
-const transporter = (smtpEmail && smtpPassword) ? nodemailer.createTransport({
-  host: smtpHost,
-  port: smtpPort,
-  secure: smtpPort === 465,
-  auth: {
-    user: smtpEmail,
-    pass: smtpPassword
+  let brevoError = null;
+
+  // 1. Prioritas Utama: Brevo REST API v3 (Port 443 HTTPS, bebas blokir port di Vercel/Cloud)
+  if (brevoApiKey) {
+    try {
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': brevoApiKey.trim(),
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: {
+            name: brevoSenderName,
+            email: brevoSenderEmail
+          },
+          to: [{ email: to }],
+          subject: subject,
+          htmlContent: html,
+          ...(text ? { textContent: text } : {})
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        console.log('[EmailService] Berhasil terkirim via Brevo REST API ke:', to, 'messageId:', data.messageId);
+        return { success: true, method: 'brevo_api', messageId: data.messageId };
+      } else {
+        brevoError = data?.message || JSON.stringify(data);
+        console.error('[EmailService] Brevo API error response:', data);
+      }
+    } catch (apiErr) {
+      brevoError = apiErr.message;
+      console.error('[EmailService] Gagal fetch ke Brevo API:', apiErr.message);
+    }
   }
-}) : null;
+
+  // 2. Fallback: Nodemailer SMTP (smtp-relay.brevo.com atau custom SMTP)
+  const smtpEmail = process.env.SMTP_EMAIL || brevoSenderEmail;
+  const smtpPassword = process.env.SMTP_PASSWORD || brevoApiKey;
+  const smtpHost = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
+  const smtpPort = Number(process.env.SMTP_PORT) || 587;
+
+  if (smtpEmail && smtpPassword) {
+    const isPort465 = smtpPort === 465;
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: isPort465,
+      auth: {
+        user: smtpEmail,
+        pass: smtpPassword
+      },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 8000
+    });
+
+    const info = await transporter.sendMail({
+      from: `"${brevoSenderName}" <${smtpEmail}>`,
+      to: to,
+      subject: subject,
+      html: html,
+      ...(text ? { text } : {})
+    });
+
+    console.log('[EmailService] Berhasil terkirim via SMTP ke:', to, 'messageId:', info.messageId);
+    return { success: true, method: 'smtp', messageId: info.messageId };
+  }
+
+  throw new Error(brevoError ? `Brevo API error: ${brevoError}` : 'Sistem email belum dikonfigurasi. Harap tambahkan BREVO_API_KEY atau SMTP_EMAIL & SMTP_PASSWORD.');
+}
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bmuthjyibkrcqyygjcxe.supabase.co';
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
@@ -589,11 +653,10 @@ export default async function handler(req, res) {
       
       const actionLink = linkData?.properties?.action_link;
 
-      // Jika SMTP terkonfigurasi, kirimkan tautan tersebut melalui email via Nodemailer
-      if (transporter && actionLink) {
+      // Kirimkan tautan tersebut melalui email via Brevo / SMTP
+      if (actionLink) {
         try {
-          await transporter.sendMail({
-            from: `"Panen Kunci" <${smtpEmail}>`,
+          await sendEmailMessage({
             to: data.email,
             subject: 'Pemulihan Kata Sandi Akun Panen Kunci',
             html: `
@@ -615,20 +678,20 @@ export default async function handler(req, res) {
           return res.status(200).json({
             success: true,
             emailSent: true,
-            message: 'Email sudah dikirimkan melalui Gmail Anda.'
+            message: 'Email pemulihan kata sandi berhasil dikirimkan.'
           });
         } catch (mailErr) {
-          console.error('[SupabaseProxy] Gagal mengirim email via Nodemailer:', mailErr);
+          console.error('[SupabaseProxy] Gagal mengirim email reset password via Brevo/SMTP:', mailErr);
           return res.status(400).json({
             success: false,
-            error: 'Gagal mengirim email. Harap pastikan SMTP_EMAIL dan SMTP_PASSWORD (App Password) di Vercel sudah benar dan Redeploy Vercel.'
+            error: 'Gagal mengirim email: ' + (mailErr.message || 'Periksa konfigurasi Brevo/SMTP di Vercel.')
           });
         }
       }
 
       return res.status(400).json({
         success: false,
-        error: 'Sistem email belum dikonfigurasi di Vercel. Harap tambahkan SMTP_EMAIL dan SMTP_PASSWORD di dashboard Vercel lalu klik Redeploy.'
+        error: 'Sistem email belum dikonfigurasi di server. Harap tambahkan BREVO_API_KEY atau SMTP di dashboard Vercel.'
       });
     }
 
@@ -668,16 +731,8 @@ export default async function handler(req, res) {
         .digest('hex');
       const token = `${expiresAt}.${signature}`;
 
-      if (!transporter) {
-        return res.status(500).json({
-          success: false,
-          error: 'Sistem email belum dikonfigurasi di server Vercel. Harap tambahkan SMTP_EMAIL dan SMTP_PASSWORD.'
-        });
-      }
-
       try {
-        await transporter.sendMail({
-          from: `"Panen Kunci" <${smtpEmail}>`,
+        await sendEmailMessage({
           to: targetEmail,
           subject: `[Panen Kunci] Kode OTP Verifikasi Pendaftaran: ${otp}`,
           html: `
@@ -720,10 +775,10 @@ export default async function handler(req, res) {
           message: `Kode OTP berhasil dikirimkan ke ${targetEmail}.`
         });
       } catch (mailErr) {
-        console.error('[SupabaseProxy] Gagal mengirim OTP email via Nodemailer:', mailErr);
+        console.error('[SupabaseProxy] Gagal mengirim OTP email via Brevo/SMTP:', mailErr);
         return res.status(500).json({
           success: false,
-          error: 'Gagal mengirim email OTP. Silakan periksa koneksi internet atau coba beberapa saat lagi.'
+          error: 'Gagal mengirim email OTP: ' + (mailErr.message || 'Silakan periksa koneksi internet atau coba beberapa saat lagi.')
         });
       }
     }
