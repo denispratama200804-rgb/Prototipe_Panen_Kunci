@@ -1,5 +1,6 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { googleClientId } from '../../infrastructure/supabase/supabaseClient.js';
+import { CaptchaModal } from '../components/CaptchaModal.js';
 
 /**
  * LoginView
@@ -154,6 +155,22 @@ export class LoginView extends IComponent {
 
       const email = emailInput.value.trim();
       const password = passInput.value;
+
+      if (!email || !password) {
+        this._notification.error('Harap masukkan alamat email dan kata sandi Anda.');
+        return;
+      }
+
+      // Verifikasi Captcha sebelum masuk ke dashboard
+      const isCaptchaPassed = await CaptchaModal.show({
+        title: 'Verifikasi Keamanan Masuk',
+        subtitle: 'Selesaikan kode captcha berikut untuk melanjutkan masuk ke akun Anda.',
+        confirmText: 'Verifikasi & Masuk'
+      });
+
+      if (!isCaptchaPassed) {
+        return;
+      }
 
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Memverifikasi akun...</span>';

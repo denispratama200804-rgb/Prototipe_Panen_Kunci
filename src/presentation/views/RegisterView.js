@@ -1,5 +1,6 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { googleClientId } from '../../infrastructure/supabase/supabaseClient.js';
+import { CaptchaModal } from '../components/CaptchaModal.js';
 
 /**
  * RegisterView
@@ -570,6 +571,17 @@ export class RegisterView extends IComponent {
           }
           return;
         }
+      }
+
+      // Verifikasi Captcha sebelum memproses pendaftaran akun
+      const isCaptchaPassed = await CaptchaModal.show({
+        title: 'Verifikasi Pendaftaran Akun',
+        subtitle: 'Selesaikan kode captcha berikut untuk menyelesaikan pendaftaran Anda.',
+        confirmText: 'Verifikasi & Daftar'
+      });
+
+      if (!isCaptchaPassed) {
+        return;
       }
 
       submitBtn.disabled = true;
