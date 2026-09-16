@@ -5,8 +5,9 @@
  * sebelum pengguna diarahkan masuk ke Dashboard.
  */
 
-// Official Google reCAPTCHA v2 Test Site Key (selalu valid untuk localhost & testing)
-// Pengguna dapat menggantinya dengan Site Key pribadi di file .env (VITE_RECAPTCHA_SITE_KEY)
+// Site Key Google reCAPTCHA v2 resmi (aktif)
+// Dapat di-override melalui file .env (VITE_RECAPTCHA_SITE_KEY / NEXT_PUBLIC_RECAPTCHA_SITE_KEY)
+const OFFICIAL_SITE_KEY = '6LfWFb4tAAAAAEi-slglM6xGecWT2wmLlYWaEN1a';
 const DEFAULT_TEST_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
 
 /**
@@ -65,7 +66,12 @@ export class CaptchaModal {
         cancelText = 'Batal'
       } = options;
 
-      const siteKey = (import.meta.env.VITE_RECAPTCHA_SITE_KEY || DEFAULT_TEST_SITE_KEY).trim();
+      const siteKey = (
+        import.meta.env.VITE_RECAPTCHA_SITE_KEY ||
+        import.meta.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ||
+        import.meta.env.RECAPTCHA_SITE_KEY ||
+        OFFICIAL_SITE_KEY
+      ).trim();
 
       // Bersihkan modal lama jika ada
       const existing = document.getElementById('panenkunci-captcha-modal-root');
