@@ -1302,54 +1302,40 @@ export class AuthService {
         const cleanOrigin = origin.replace(/\/$/, '');
         const redirectUrl = `${cleanOrigin}/#/reset-password`;
 
+        // 1. Prioritaskan pengiriman via backend proxy (Brevo) agar tidak terikat batasan SMTP Supabase
+        try {
+          const proxyRes = await fetch('/api/supabase-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'generate_recovery_link',
+              data: { email, redirectTo: redirectUrl }
+            })
+          });
+          if (proxyRes.ok) {
+            const proxyData = await proxyRes.json();
+            if (proxyData.success) {
+              return {
+                success: true,
+                isDirectLink: Boolean(proxyData.isDirectLink),
+                actionLink: proxyData.action_link,
+                message: proxyData.message || 'Email pemulihan kata sandi berhasil dikirimkan via Brevo.'
+              };
+            } else if (proxyData.error) {
+              console.warn('[AuthService] Proxy generate_recovery_link returned error:', proxyData.error);
+            }
+          }
+        } catch (proxyErr) {
+          console.warn('[AuthService] Brevo proxy recovery link note:', proxyErr.message);
+        }
+
+        // 2. Fallback jika proxy belum aktif: kirim via Supabase Auth bawaan
         const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: redirectUrl
         });
 
         if (error) {
           console.warn('[AuthService] Supabase resetPasswordForEmail error:', error);
-
-          // Coba buat link pemulihan instan via backend proxy menggunakan kunci admin
-          // Ini mengatasi masalah jika kuota email penuh (429) atau konfigurasi SMTP Supabase gagal (500)
-          try {
-            const proxyRes = await fetch('/api/supabase-proxy', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'generate_recovery_link',
-                data: { email, redirectTo: redirectUrl }
-              })
-            });
-            if (proxyRes.ok) {
-              const proxyData = await proxyRes.json();
-              if (proxyData.success) {
-                if (proxyData.emailSent) {
-                  return {
-                    success: true,
-                    isDirectLink: false,
-                    message: proxyData.message || 'Email sudah dikirimkan melalui Gmail Anda.'
-                  };
-                }
-                return {
-                  success: true,
-                  isDirectLink: true,
-                  actionLink: proxyData.action_link,
-                  message: 'Tautan pemulihan kata sandi instan telah berhasil dibuat untuk akun Anda!'
-                };
-              }
-            } else {
-              const proxyErrJson = await proxyRes.json().catch(() => null);
-              console.warn('[AuthService] Fallback recovery proxy status:', proxyRes.status, proxyErrJson);
-              if (proxyErrJson && proxyErrJson.error) {
-                return {
-                  success: false,
-                  message: proxyErrJson.error
-                };
-              }
-            }
-          } catch (proxyErr) {
-            console.warn('[AuthService] Fallback recovery link proxy note:', proxyErr.message);
-          }
 
           // Jika fallback proxy tidak tersedia, berikan pesan error yang jelas dan spesifik
           const errMsg = (error.message || '').toLowerCase();
