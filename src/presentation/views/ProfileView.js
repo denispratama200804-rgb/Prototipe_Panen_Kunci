@@ -200,7 +200,7 @@ export class ProfileView extends IComponent {
               </h3>
               <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30">
                 <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
-                <span>Aktif & Unik</span>
+                <span>Aktif &amp; Unik</span>
               </span>
             </div>
 
@@ -209,20 +209,35 @@ export class ProfileView extends IComponent {
               <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none"></div>
 
               <!-- Referral Code Box -->
-              <div class="bg-gradient-to-br from-primary/10 via-surface-container-low to-secondary/5 rounded-2xl p-4 border border-primary/20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-xs">
-                <div class="flex flex-col">
-                  <span class="text-[10px] font-bold uppercase tracking-wider text-text-body">Kode Rujukan Akun Anda</span>
-                  <div class="flex items-center gap-2 mt-1">
-                    <span class="font-mono text-xl sm:text-2xl font-extrabold tracking-widest text-primary selection:bg-primary/20" id="profileReferralCodeDisplay">${referralCode}</span>
-                    <span class="px-2 py-0.5 rounded-md bg-primary/15 text-primary text-[10px] font-extrabold uppercase">Permanen</span>
-                  </div>
+              <div class="bg-gradient-to-br from-primary/10 via-surface-container-low to-secondary/5 rounded-2xl p-4 border border-primary/20 flex flex-col gap-3 shadow-xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold uppercase tracking-wider text-text-body">Kode Rujukan Akun Anda</span>
+                  <span class="px-2.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-extrabold uppercase tracking-wide">Permanen</span>
                 </div>
 
-                <div class="flex items-center gap-2 shrink-0">
+                <!-- Code Display Box (Ticket Style) -->
+                <div class="bg-surface-card/90 backdrop-blur-xs rounded-xl border border-primary/25 px-4 py-3 flex items-center justify-between shadow-xs cursor-pointer hover:border-primary/50 transition-colors" id="boxReferralCodeContainer" title="Klik untuk menyalin kode">
+                  <div class="flex items-center gap-2.5 overflow-hidden">
+                    <span class="material-symbols-outlined text-primary text-[22px] shrink-0">vpn_key</span>
+                    <span class="font-mono text-2xl font-black tracking-widest text-primary selection:bg-primary/20 whitespace-nowrap" id="profileReferralCodeDisplay">${referralCode}</span>
+                  </div>
+                  <button
+                    type="button"
+                    id="btnQuickCopyCode"
+                    class="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors cursor-pointer shrink-0"
+                    title="Klik untuk salin kode"
+                    aria-label="Salin Kode"
+                  >
+                    <span class="material-symbols-outlined text-[18px]">content_copy</span>
+                  </button>
+                </div>
+
+                <!-- Action Buttons: 2 Equal Columns -->
+                <div class="grid grid-cols-2 gap-2 w-full pt-0.5">
                   <button
                     type="button"
                     id="btnCopyReferralCode"
-                    class="flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl bg-primary text-white font-label-md text-xs font-bold shadow-sm hover:bg-primary-container active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    class="w-full py-2.5 px-3 rounded-xl bg-primary text-white font-label-md text-xs font-bold shadow-sm hover:bg-primary-container active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     title="Salin Kode Referral"
                   >
                     <span class="material-symbols-outlined text-[16px]" id="iconCopyReferralCode">content_copy</span>
@@ -232,7 +247,7 @@ export class ProfileView extends IComponent {
                   <button
                     type="button"
                     id="btnShareReferralLink"
-                    class="px-3.5 py-2.5 rounded-xl bg-surface-card hover:bg-surface-container text-text-heading border border-surface-container font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    class="w-full py-2.5 px-3 rounded-xl bg-surface-card hover:bg-surface-container text-text-heading border border-surface-container font-label-md text-xs font-bold shadow-xs active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     title="Bagikan Link Referral"
                   >
                     <span class="material-symbols-outlined text-[16px] text-primary">share</span>
@@ -244,18 +259,18 @@ export class ProfileView extends IComponent {
               <!-- Referral Link Box -->
               <div class="flex flex-col gap-1.5">
                 <span class="text-[11px] font-semibold text-text-body">Tautan Registrasi Langsung:</span>
-                <div class="flex items-center bg-surface-container-low rounded-xl border border-surface-container p-1.5 pl-3 gap-2">
+                <div class="flex items-center bg-surface-container-low rounded-xl border border-surface-container p-1 pl-3 gap-2 overflow-hidden">
                   <input
                     type="text"
                     readonly
                     id="profileReferralLinkInput"
                     value="${referralLink}"
-                    class="w-full bg-transparent text-xs text-text-heading font-mono select-all focus:outline-none truncate"
+                    class="w-full bg-transparent text-xs text-text-heading font-mono select-all focus:outline-none truncate min-w-0"
                   />
                   <button
                     type="button"
                     id="btnCopyReferralLinkSmall"
-                    class="px-2.5 py-1.5 rounded-lg bg-surface-container hover:bg-primary/10 hover:text-primary text-text-body text-xs font-bold transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+                    class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-primary/10 hover:text-primary text-text-body text-xs font-bold transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
                     title="Salin tautan"
                   >
                     <span class="material-symbols-outlined text-[14px]">link</span>
@@ -265,13 +280,13 @@ export class ProfileView extends IComponent {
               </div>
 
               <!-- Benefit Highlights -->
-              <div class="bg-surface-container-low rounded-2xl p-3.5 border border-surface-container/60 flex items-start gap-2.5">
-                <div class="w-7 h-7 rounded-lg bg-secondary/15 text-secondary flex items-center justify-center shrink-0 mt-0.5">
-                  <span class="material-symbols-outlined text-[16px]">featured_seasonal_and_gifts</span>
+              <div class="bg-surface-container-low rounded-2xl p-3.5 border border-surface-container/60 flex items-start gap-3">
+                <div class="w-8 h-8 rounded-xl bg-secondary/15 text-secondary flex items-center justify-center shrink-0 mt-0.5">
+                  <span class="material-symbols-outlined text-[18px]">featured_seasonal_and_gifts</span>
                 </div>
                 <div class="flex flex-col text-[11px] leading-relaxed text-text-body">
-                  <span class="font-bold text-text-heading">Keuntungan Program Referral:</span>
-                  <span>Ajak teman bergabung menggunakan kode referral unik Anda. Dapatkan komisi saldo pasif dari setiap setoran API key rekan Anda yang berhasil disetujui!</span>
+                  <span class="font-bold text-text-heading text-xs">Keuntungan Program Referral:</span>
+                  <span class="mt-0.5">Ajak teman bergabung dengan kode rujukan Anda. Dapatkan komisi saldo pasif dari setiap setoran API key rekan Anda yang berhasil disetujui!</span>
                 </div>
               </div>
             </div>
@@ -555,7 +570,10 @@ export class ProfileView extends IComponent {
       }
     };
 
-    btnCopyReferralCode?.addEventListener('click', async () => {
+    const btnQuickCopyCode = container.querySelector('#btnQuickCopyCode');
+    const boxReferralCodeContainer = container.querySelector('#boxReferralCodeContainer');
+
+    const handleCopyCodeAction = async () => {
       const code = (profileReferralCodeDisplay?.textContent || '').trim();
       if (!code) return;
 
@@ -565,17 +583,24 @@ export class ProfileView extends IComponent {
         const originalText = textCopyReferralCode.textContent;
         iconCopyReferralCode.textContent = 'check';
         textCopyReferralCode.textContent = 'Tersalin!';
-        btnCopyReferralCode.classList.add('bg-secondary');
-        btnCopyReferralCode.classList.remove('bg-primary');
+        btnCopyReferralCode?.classList.add('bg-secondary');
+        btnCopyReferralCode?.classList.remove('bg-primary');
 
         setTimeout(() => {
           iconCopyReferralCode.textContent = originalIcon;
           textCopyReferralCode.textContent = originalText;
-          btnCopyReferralCode.classList.remove('bg-secondary');
-          btnCopyReferralCode.classList.add('bg-primary');
+          btnCopyReferralCode?.classList.remove('bg-secondary');
+          btnCopyReferralCode?.classList.add('bg-primary');
         }, 2000);
       }
+    };
+
+    btnCopyReferralCode?.addEventListener('click', handleCopyCodeAction);
+    btnQuickCopyCode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleCopyCodeAction();
     });
+    boxReferralCodeContainer?.addEventListener('click', handleCopyCodeAction);
 
     btnCopyReferralLinkSmall?.addEventListener('click', async () => {
       const link = profileReferralLinkInput?.value || '';
