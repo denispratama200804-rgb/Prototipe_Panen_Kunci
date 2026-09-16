@@ -440,7 +440,7 @@ export class TarikSaldoView extends IComponent {
             </div>
 
             <!-- Live Transaction Breakdown Section -->
-            <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-3">
+            <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-3" id="breakdownCard">
               <h3 class="text-xs font-bold uppercase tracking-wider text-text-heading flex items-center gap-1.5">
                 <span class="material-symbols-outlined text-[18px] text-primary">receipt_long</span>
                 <span>Rincian Biaya Penarikan</span>
@@ -448,7 +448,7 @@ export class TarikSaldoView extends IComponent {
               <div class="flex flex-col gap-2 text-xs">
                 <div class="flex justify-between items-center text-text-body">
                   <span>Nominal Penarikan</span>
-                  <span class="font-bold font-mono text-text-heading" id="summaryAmount">Rp ${minWithdrawal.toLocaleString('id-ID')}</span>
+                  <span class="font-bold font-mono text-text-heading" id="summaryAmount">Rp ${(isLocked ? 0 : minWithdrawal).toLocaleString('id-ID')}</span>
                 </div>
                 <div class="flex justify-between items-center text-text-body">
                   <span>Biaya Admin</span>
@@ -457,12 +457,33 @@ export class TarikSaldoView extends IComponent {
                 <div class="w-full h-px bg-surface-container my-0.5"></div>
                 <div class="flex justify-between items-center text-sm font-extrabold text-text-heading">
                   <span>Total Diterima</span>
-                  <span class="text-secondary font-mono text-base font-bold" id="summaryTotalReceive">Rp ${currentReceive.toLocaleString('id-ID')}</span>
+                  <span class="${isLocked ? 'text-rose-500 font-sans text-xs' : 'text-secondary font-mono text-base'} font-bold flex items-center gap-1" id="summaryTotalReceive">
+                    ${
+                      isLocked
+                        ? `<span class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2.5 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">cancel</span>
+                            Tidak Valid
+                           </span>`
+                        : `Rp ${currentReceive.toLocaleString('id-ID')}`
+                    }
+                  </span>
                 </div>
                 <div class="flex justify-between items-center text-[11px] text-text-body pt-1 border-t border-surface-container/50">
                   <span class="text-outline">Total Potong Saldo</span>
-                  <span class="font-bold text-primary font-mono" id="summaryTotalDeduction">Rp ${minWithdrawal.toLocaleString('id-ID')}</span>
+                  <span class="font-bold ${isLocked ? 'text-rose-500' : 'text-primary'} font-mono" id="summaryTotalDeduction">Rp ${(isLocked ? 0 : minWithdrawal).toLocaleString('id-ID')}</span>
                 </div>
+              </div>
+              <div id="breakdownAlertContainer" class="${isLocked ? '' : 'hidden'}">
+                ${
+                  isLocked
+                    ? `
+                  <div class="text-[11px] text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl p-2.5 flex items-start gap-1.5 font-medium">
+                    <span class="material-symbols-outlined text-[16px] shrink-0 text-rose-500 mt-0.5">error</span>
+                    <span>Saldo belum mencapai batas minimal penarikan Rp ${minWithdrawal.toLocaleString('id-ID')}. Total diterima tidak valid karena saldo tidak mencukupi.</span>
+                  </div>
+                `
+                    : ''
+                }
               </div>
             </div>
 
@@ -516,6 +537,8 @@ export class TarikSaldoView extends IComponent {
     // Helper untuk update live summary breakdown biaya
     const updateBreakdown = () => {
       const amount = Number(amountInput?.value) || 0;
+      const currentBalance = this._walletService.getBalance();
+      const minWithdrawal = this._walletService.minWithdrawal;
       const resolved = getCurrentResolved();
       const method = resolved.method;
       const fee = this._walletService.getFeeForMethod(method, amount);
@@ -525,12 +548,100 @@ export class TarikSaldoView extends IComponent {
       const summaryFee = container.querySelector('#summaryFee');
       const summaryTotal = container.querySelector('#summaryTotalDeduction');
       const summaryNet = container.querySelector('#summaryTotalReceive');
+      const breakdownAlertContainer = container.querySelector('#breakdownAlertContainer');
+      const submitBtn = container.querySelector('#btnSubmitWithdrawal');
 
       if (summaryAmount) summaryAmount.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
       if (summaryFee) summaryFee.textContent = `Rp ${fee.toLocaleString('id-ID')}`;
-      if (summaryNet) summaryNet.textContent = `Rp ${totalReceive.toLocaleString('id-ID')}`;
-      if (summaryTotal) summaryTotal.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
+
+      // Validasi kesesuaian saldo dengan nominal yang ingin ditarik
+      const isExcessive = amount > currentBalance;
+      const isBelowMin = amount < minWithdrawal;
+      const isLocked = currentBalance < minWithdrawal;
+      const isInvalid = isExcessive || isBelowMin || isLocked || amount <= 0;
+
+      if (isInvalid) {
+        // Tampilkan status "Tidak Valid" pada Total Diterima
+        if (summaryNet) {
+          summaryNet.className = 'font-bold flex items-center gap-1';
+          summaryNet.innerHTML = `
+            <span class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+              <span class="material-symbols-outlined text-[14px]">cancel</span>
+              Tidak Valid
+            </span>
+          `;
+        }
+
+        if (summaryTotal) {
+          summaryTotal.className = 'font-bold text-rose-500 font-mono flex items-center gap-1';
+          summaryTotal.innerHTML = `<span class="line-through opacity-70">Rp ${amount.toLocaleString('id-ID')}</span> <span class="text-[10px] font-sans font-semibold">(Saldo Kurang)</span>`;
+        }
+
+        if (breakdownAlertContainer) {
+          breakdownAlertContainer.classList.remove('hidden');
+          const reasonMsg = isLocked
+            ? `Saldo Anda (Rp ${currentBalance.toLocaleString('id-ID')}) belum mencapai batas minimal penarikan Rp ${minWithdrawal.toLocaleString('id-ID')}. Total diterima tidak valid.`
+            : (isExcessive
+              ? `Saldo Anda (Rp ${currentBalance.toLocaleString('id-ID')}) tidak mencukupi untuk menarik Rp ${amount.toLocaleString('id-ID')}. Total diterima tidak valid karena saldo yang ingin ditarik tidak sesuai dengan saldo yang Anda miliki.`
+              : `Nominal penarikan (Rp ${amount.toLocaleString('id-ID')}) belum memenuhi batas minimal penarikan Rp ${minWithdrawal.toLocaleString('id-ID')}.`);
+
+          breakdownAlertContainer.innerHTML = `
+            <div class="text-[11px] text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl p-2.5 flex items-start gap-1.5 font-medium">
+              <span class="material-symbols-outlined text-[16px] shrink-0 text-rose-500 mt-0.5">error</span>
+              <span>${reasonMsg}</span>
+            </div>
+          `;
+        }
+
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.className = 'w-full font-label-md font-bold text-sm rounded-full py-4 shadow-none transition-all flex items-center justify-center gap-2 mt-2 bg-surface-container-high/60 text-outline border border-surface-container cursor-not-allowed pointer-events-none select-none opacity-70';
+          const btnLabel = isLocked
+            ? `Penarikan Terkunci (Kurang Rp ${(minWithdrawal - currentBalance).toLocaleString('id-ID')})`
+            : (isExcessive
+              ? `Saldo Tidak Sesuai (Kurang Rp ${(amount - currentBalance).toLocaleString('id-ID')})`
+              : 'Nominal Tidak Memenuhi Syarat');
+          submitBtn.innerHTML = `
+            <span class="material-symbols-outlined text-[18px] text-rose-500">block</span>
+            <span>${btnLabel}</span>
+          `;
+        }
+      } else {
+        // Saldo valid dan sesuai
+        if (summaryNet) {
+          summaryNet.className = 'text-secondary font-mono text-base font-bold flex items-center gap-1';
+          summaryNet.textContent = `Rp ${totalReceive.toLocaleString('id-ID')}`;
+        }
+
+        if (summaryTotal) {
+          summaryTotal.className = 'font-bold text-primary font-mono';
+          summaryTotal.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
+        }
+
+        if (breakdownAlertContainer) {
+          breakdownAlertContainer.classList.add('hidden');
+          breakdownAlertContainer.innerHTML = '';
+        }
+
+        if (submitBtn) {
+          if (!resolved.isConfigured || !resolved.registeredAccount) {
+            submitBtn.disabled = true;
+            submitBtn.className = 'w-full font-label-md font-bold text-sm rounded-full py-4 shadow-lg transition-all flex items-center justify-center gap-2 mt-2 bg-secondary/50 text-white cursor-not-allowed opacity-50';
+            submitBtn.innerHTML = '<span>Lengkapi Rekening di Profil Terlebih Dahulu</span>';
+          } else {
+            submitBtn.disabled = false;
+            submitBtn.className = 'w-full font-label-md font-bold text-sm rounded-full py-4 shadow-lg transition-all flex items-center justify-center gap-2 mt-2 bg-secondary text-white shadow-secondary/25 hover:opacity-95 active:scale-[0.98]';
+            submitBtn.innerHTML = `
+              <span>Lanjutkan Penarikan</span>
+              <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+            `;
+          }
+        }
+      }
     };
+
+    // Panggil updateBreakdown saat inisialisasi untuk sinkronisasi tampilan awal
+    updateBreakdown();
 
     // Kunci pengetikan manual agar user hanya memilih melalui tombol chip atau Tarik Semua
     amountInput?.addEventListener('keydown', (e) => {
