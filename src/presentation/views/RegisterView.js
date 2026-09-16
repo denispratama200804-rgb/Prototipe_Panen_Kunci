@@ -622,6 +622,17 @@ export class RegisterView extends IComponent {
 
     googleBtn?.addEventListener('click', async (e) => {
       e.preventDefault();
+
+      // Verifikasi Google reCAPTCHA sebelum melanjutkan pendaftaran dengan Google
+      const isCaptchaPassed = await CaptchaModal.show({
+        title: 'Verifikasi Pendaftaran Akun',
+        subtitle: 'Centang kotak Google reCAPTCHA di bawah untuk melanjutkan pendaftaran dengan akun Google Anda.'
+      });
+
+      if (!isCaptchaPassed) {
+        return;
+      }
+
       googleBtn.disabled = true;
       googleBtn.classList.add('opacity-75', 'cursor-not-allowed');
       if (googleTxt) googleTxt.textContent = 'Menghubungkan ke Google...';

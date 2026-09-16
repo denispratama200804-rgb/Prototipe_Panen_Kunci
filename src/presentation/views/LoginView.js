@@ -196,6 +196,17 @@ export class LoginView extends IComponent {
     // Login via Google OAuth (Fallback Redirect dengan prompt select_account)
     googleBtn?.addEventListener('click', async (e) => {
       e.preventDefault();
+
+      // Verifikasi Google reCAPTCHA sebelum melanjutkan masuk dengan Google
+      const isCaptchaPassed = await CaptchaModal.show({
+        title: 'Verifikasi Keamanan Masuk',
+        subtitle: 'Centang kotak Google reCAPTCHA di bawah untuk melanjutkan masuk dengan akun Google Anda.'
+      });
+
+      if (!isCaptchaPassed) {
+        return;
+      }
+
       googleBtn.disabled = true;
       googleBtn.classList.add('opacity-75', 'cursor-not-allowed');
       if (googleTxt) googleTxt.textContent = 'Menghubungkan ke Google...';
@@ -218,6 +229,12 @@ export class LoginView extends IComponent {
               client_id: googleClientId,
               callback: async (response) => {
                 if (response.credential) {
+                  const isCaptchaPassed = await CaptchaModal.show({
+                    title: 'Verifikasi Keamanan Masuk',
+                    subtitle: 'Centang kotak Google reCAPTCHA di bawah untuk melanjutkan masuk dengan akun Google Anda.'
+                  });
+                  if (!isCaptchaPassed) return;
+
                   this._notification.info('Sedang masuk dengan Google...');
                   const res = await this._authService.loginWithGoogleIdToken(response.credential);
                   if (res.success) {
