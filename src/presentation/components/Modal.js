@@ -160,6 +160,14 @@ export class ModalComponent {
     document.body.appendChild(modalWrapper);
     this._currentModal = modalWrapper;
 
+    if (typeof options.onRender === 'function') {
+      try {
+        options.onRender(modalWrapper);
+      } catch (err) {
+        console.warn('Modal onRender error:', err);
+      }
+    }
+
     // Trigger animate in
     requestAnimationFrame(() => {
       modalWrapper.classList.remove('opacity-0');

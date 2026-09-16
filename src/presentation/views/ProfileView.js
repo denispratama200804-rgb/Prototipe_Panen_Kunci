@@ -296,24 +296,42 @@ export class ProfileView extends IComponent {
               </div>
 
               <div class="bg-surface-container-low rounded-2xl p-4 flex flex-col gap-2.5 border border-surface-container">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs text-text-body">Nomor Rekening</span>
-                  <span class="text-xs font-semibold text-text-heading" id="profileAccountNum">
-                    ${user.accountNumber ? user.getMaskedAccountNumber() : 'Belum diatur'}
-                  </span>
-                </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-xs text-text-body">Atas Nama</span>
-                  <span class="text-xs font-semibold text-text-heading" id="profileAccountHolder">
-                    ${user.accountHolder ? user.accountHolder : (user.name || 'Belum diatur')}
-                  </span>
-                </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-xs text-text-body">Nomor HP E-Wallet</span>
-                  <span class="text-xs font-semibold text-text-heading" id="profilePhone">
-                    ${user.phone ? user.phone : 'Belum diatur'}
-                  </span>
-                </div>
+                ${(() => {
+                  const bankMeta = getPaymentMethodMetadata(user.bankName);
+                  const isEw = bankMeta.type === 'ewallet' || ['dana', 'gopay', 'ovo', 'shopeepay'].some(x => (user.bankName || '').toLowerCase().includes(x));
+                  
+                  if (isEw) {
+                    return `
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs text-text-body">Nomor HP / E-Wallet</span>
+                        <span class="text-xs font-semibold text-text-heading" id="profilePhone">
+                          ${user.phone || user.accountNumber || 'Belum diatur'}
+                        </span>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs text-text-body">Nama Pemilik Akun</span>
+                        <span class="text-xs font-semibold text-text-heading" id="profileAccountHolder">
+                          ${user.accountHolder ? user.accountHolder : (user.name || 'Belum diatur')}
+                        </span>
+                      </div>
+                    `;
+                  } else {
+                    return `
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs text-text-body">Nomor Rekening</span>
+                        <span class="text-xs font-semibold text-text-heading" id="profileAccountNum">
+                          ${user.accountNumber ? user.getMaskedAccountNumber() : 'Belum diatur'}
+                        </span>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs text-text-body">Nama Pemilik Rekening</span>
+                        <span class="text-xs font-semibold text-text-heading" id="profileAccountHolder">
+                          ${user.accountHolder ? user.accountHolder : (user.name || 'Belum diatur')}
+                        </span>
+                      </div>
+                    `;
+                  }
+                })()}
               </div>
             </div>
           </section>
@@ -783,17 +801,23 @@ export class ProfileView extends IComponent {
                 ${optionsHtml}
               </select>
             </div>
-            <div class="flex flex-col gap-1">
+
+            <!-- Kolom Nomor Rekening (Khusus Bank) -->
+            <div id="wrapAccountNum" class="flex flex-col gap-1 transition-all">
               <label class="text-[11px] font-bold text-text-heading uppercase">Nomor Rekening</label>
               <input type="text" id="editAccountNum" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Masukkan nomor rekening Anda" value="${user.accountNumber || ''}" />
             </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-[11px] font-bold text-text-heading uppercase">Nama Pemilik Rekening</label>
-              <input type="text" id="editAccountHolder" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Nama sesuai buku tabungan / e-wallet" value="${user.accountHolder || user.name || ''}" />
+
+            <!-- Kolom Nomor HP E-Wallet (Khusus E-Wallet) -->
+            <div id="wrapPhone" class="flex flex-col gap-1 transition-all">
+              <label class="text-[11px] font-bold text-text-heading uppercase">Nomor HP / E-Wallet</label>
+              <input type="tel" id="editPhone" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Contoh: 081234567890" value="${user.phone || user.accountNumber || ''}" />
             </div>
+
+            <!-- Kolom Nama Pemilik Rekening / Akun -->
             <div class="flex flex-col gap-1">
-              <label class="text-[11px] font-bold text-text-heading uppercase">Nomor HP E-Wallet / Telepon</label>
-              <input type="tel" id="editPhone" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Contoh: 081234567890" value="${user.phone || ''}" />
+              <label id="labelAccountHolder" class="text-[11px] font-bold text-text-heading uppercase">Nama Pemilik Rekening</label>
+              <input type="text" id="editAccountHolder" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Nama sesuai buku tabungan / e-wallet" value="${user.accountHolder || user.name || ''}" />
             </div>
           </div>
         `,
@@ -801,15 +825,72 @@ export class ProfileView extends IComponent {
         confirmText: 'Simpan',
         cancelText: 'Batal',
         showCancel: true,
+        onRender: (modal) => {
+          const selectBank = modal.querySelector('#editBankName');
+          const wrapAcc = modal.querySelector('#wrapAccountNum');
+          const wrapPh = modal.querySelector('#wrapPhone');
+          const lblHolder = modal.querySelector('#labelAccountHolder');
+
+          const updateVisibility = (val) => {
+            const meta = getPaymentMethodMetadata(val);
+            const isEw = meta.type === 'ewallet' || ['dana', 'gopay', 'ovo', 'shopeepay'].some(x => (val || '').toLowerCase().includes(x));
+
+            if (isEw) {
+              if (wrapAcc) wrapAcc.classList.add('hidden');
+              if (wrapPh) wrapPh.classList.remove('hidden');
+              if (lblHolder) lblHolder.textContent = 'Nama Pemilik Akun E-Wallet';
+            } else {
+              if (wrapAcc) wrapAcc.classList.remove('hidden');
+              if (wrapPh) wrapPh.classList.add('hidden');
+              if (lblHolder) lblHolder.textContent = 'Nama Pemilik Rekening';
+            }
+          };
+
+          if (selectBank) {
+            updateVisibility(selectBank.value || currentBank || 'DANA');
+            selectBank.addEventListener('change', (e) => {
+              updateVisibility(e.target.value);
+            });
+          }
+        },
         onConfirm: async () => {
           const bankName = document.getElementById('editBankName')?.value?.trim();
-          const accountNumber = document.getElementById('editAccountNum')?.value?.trim();
+          if (!bankName) {
+            this._notification.error('Silakan pilih Bank atau E-Wallet terlebih dahulu!');
+            return false;
+          }
+
+          const meta = getPaymentMethodMetadata(bankName);
+          const isEw = meta.type === 'ewallet' || ['dana', 'gopay', 'ovo', 'shopeepay'].some(x => (bankName || '').toLowerCase().includes(x));
+
+          let accountNumber = '';
+          let phone = '';
           const accountHolder = document.getElementById('editAccountHolder')?.value?.trim();
-          const phone = document.getElementById('editPhone')?.value?.trim();
+
+          if (isEw) {
+            phone = document.getElementById('editPhone')?.value?.trim() || '';
+            accountNumber = phone; // Sinkronkan nomor e-wallet ke accountNumber agar penarikan saldo lancar
+            if (!phone) {
+              this._notification.error('Nomor HP / E-Wallet wajib diisi!');
+              return false;
+            }
+          } else {
+            accountNumber = document.getElementById('editAccountNum')?.value?.trim() || '';
+            phone = user.phone || '';
+            if (!accountNumber) {
+              this._notification.error('Nomor Rekening bank wajib diisi!');
+              return false;
+            }
+          }
+
+          if (!accountHolder) {
+            this._notification.error('Nama pemilik rekening/akun wajib diisi!');
+            return false;
+          }
 
           try {
             await this._authService.updateProfile({ bankName, accountNumber, accountHolder, phone });
-            this._notification.success('Data rekening berhasil disimpan!');
+            this._notification.success('Data ' + (isEw ? 'e-wallet' : 'rekening') + ' berhasil disimpan!');
 
             // Re-render konten tampilan profil saat ini
             const viewRoot = document.getElementById('app-view-root');
@@ -822,6 +903,36 @@ export class ProfileView extends IComponent {
           }
         }
       });
+
+      // Fallback listener in case modal DOM timing varies
+      setTimeout(() => {
+        const selectBank = document.getElementById('editBankName');
+        const wrapAcc = document.getElementById('wrapAccountNum');
+        const wrapPh = document.getElementById('wrapPhone');
+        const lblHolder = document.getElementById('labelAccountHolder');
+
+        if (selectBank) {
+          const updateVisibility = (val) => {
+            const meta = getPaymentMethodMetadata(val);
+            const isEw = meta.type === 'ewallet' || ['dana', 'gopay', 'ovo', 'shopeepay'].some(x => (val || '').toLowerCase().includes(x));
+
+            if (isEw) {
+              if (wrapAcc) wrapAcc.classList.add('hidden');
+              if (wrapPh) wrapPh.classList.remove('hidden');
+              if (lblHolder) lblHolder.textContent = 'Nama Pemilik Akun E-Wallet';
+            } else {
+              if (wrapAcc) wrapAcc.classList.remove('hidden');
+              if (wrapPh) wrapPh.classList.add('hidden');
+              if (lblHolder) lblHolder.textContent = 'Nama Pemilik Rekening';
+            }
+          };
+
+          updateVisibility(selectBank.value || currentBank || 'DANA');
+          selectBank.addEventListener('change', (e) => {
+            updateVisibility(e.target.value);
+          });
+        }
+      }, 0);
     });
 
     // Auto-open modal edit rekening jika diarahkan dari petunjuk verifikasi dashboard
