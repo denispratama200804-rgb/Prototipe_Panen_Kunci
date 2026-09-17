@@ -1687,6 +1687,7 @@ export class AdminDataService {
    * @param {Object} [options]
    * @param {string} [options.proofImage] Base64 data URL atau URL gambar bukti transfer
    * @param {string} [options.notes] Catatan transfer dari admin
+   */
   async approveWithdrawal(transactionId, { proofImage = '', notes = '', referralDeduction: optDeduction, referralCode: optRefCode } = {}) {
     // 0. Jika bukti transfer berupa base64 Data URL, unggah ke Cloudflare R2 dengan timeout cepat
     if (proofImage && proofImage.startsWith('data:')) {
