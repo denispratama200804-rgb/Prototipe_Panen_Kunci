@@ -386,6 +386,7 @@ export class ApiKeyService {
       ? Number(config.rewardPerKey)
       : 3000;
 
+    const holdUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
     const newApiKey = new ApiKey({
       id: 'key_' + Math.random().toString(36).substring(2, 9),
       keyString: trimmed,
@@ -393,7 +394,8 @@ export class ApiKeyService {
       status: 'pending',
       rewardAmount,
       credits: liveCredit,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      holdUntil
     });
 
     // Simpan ke database Supabase terlebih dahulu sebelum kredit saldo
@@ -426,7 +428,7 @@ export class ApiKeyService {
     // 5. Kreditkan saldo ke dompet pengguna sebagai Saldo Pasif HANYA setelah key terbukti valid dan tersimpan
     this._walletService.addPassiveDeposit(rewardAmount, newApiKey);
 
-    // 6. Emit event lokal dan BroadcastChannel agar Admin Panel seketika memvalidasi otomatis
+    // 6. Emit event lokal dan BroadcastChannel agar Admin Panel seketika memantau key
     this._eventBus.emit(AppEvents.API_KEY_SUBMITTED, { apiKey: newApiKey, reward: rewardAmount });
 
     if (typeof BroadcastChannel !== 'undefined') {
@@ -441,7 +443,9 @@ export class ApiKeyService {
             userId: newApiKey.userId,
             status: newApiKey.status,
             rewardAmount: newApiKey.rewardAmount,
-            credits: newApiKey.credits
+            credits: newApiKey.credits,
+            createdAt: newApiKey.createdAt,
+            holdUntil: newApiKey.holdUntil
           },
           timestamp: Date.now()
         });
@@ -453,7 +457,7 @@ export class ApiKeyService {
       success: true,
       apiKey: newApiKey,
       reward: rewardAmount,
-      message: `API Key valid (80 cr) dan telah disetorkan! Sistem sedang melakukan validasi otomatis.`
+      message: `API Key valid (80 cr) dan telah disetorkan! Masuk masa pemantauan 3 hari.`
     };
   }
 

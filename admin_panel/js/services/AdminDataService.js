@@ -16,6 +16,7 @@ export class AdminDataService {
     this._cleanDummyUsers();
     this._cleanDummyKeys();
     this._initRealtimeSync();
+    this._scheduleMidnightInspection();
     // Auto-sync awal dari Supabase di background
     this.fetchConfigFromSupabase().catch(() => {});
     this.fetchUsersFromSupabase().catch(() => {});
@@ -511,9 +512,58 @@ export class AdminDataService {
   }
 
   /**
+   * Mengirimkan notifikasi langsung ke inbox pengguna (localStorage & real-time broadcast)
+   * @param {string} userId
+   * @param {Object} param1
+   * @returns {Object|null}
+   */
+  sendUserNotification(userId, { title, message, type = 'info', metadata = {} }) {
+    if (!userId) return null;
+    try {
+      const notifItem = {
+        id: 'notif_' + Math.random().toString(36).substring(2, 9),
+        userId,
+        title: title || 'Notifikasi Sistem',
+        message: message || '',
+        type,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+        ...metadata
+      };
+
+      // 1. Simpan ke local storage user (notifications_{userId})
+      const userNotifKey = `notifications_${userId}`;
+      const userNotifs = this._get(userNotifKey, []);
+      if (Array.isArray(userNotifs)) {
+        userNotifs.unshift(notifItem);
+        this._set(userNotifKey, userNotifs);
+      }
+
+      // 2. Simpan ke daftar notifikasi global (notifications)
+      const globalNotifs = this._get('notifications', []);
+      if (Array.isArray(globalNotifs)) {
+        globalNotifs.unshift(notifItem);
+        this._set('notifications', globalNotifs);
+      }
+
+      // 3. Broadcast ke seluruh tab / aplikasi pengguna
+      this._broadcastSync({
+        type: 'NOTIFICATION_ADDED',
+        userId,
+        notification: notifItem
+      });
+
+      return notifItem;
+    } catch (e) {
+      console.warn('[AdminDataService] sendUserNotification error:', e.message);
+      return null;
+    }
+  }
+
+  /**
    * Setujui / Verifikasi API Key dari user
    * Mengubah status key menjadi 'valid', memindahkan reward dari Saldo Pasif ke Saldo Aktif,
-   * dan menyinkronkan status ke Supabase.
+   * menyinkronkan status ke Supabase, dan mengirimkan notifikasi sukses ke user.
    */
   async approveApiKey(keyId) {
     const keys = this.getApiKeys();
@@ -741,6 +791,16 @@ export class AdminDataService {
       console.warn('[AdminDataService] Sync approve ke Supabase error:', err.message);
     }
 
+    // 8. Kirim notifikasi sukses ke user bahwa key telah lolos pemantauan 3 hari & dicairkan
+    if (targetUserId) {
+      this.sendUserNotification(targetUserId, {
+        title: 'API Key Berhasil Tervalidasi (3 Hari Selesai)!',
+        message: `Selamat! API Key ${masked} telah resmi divalidasi setelah melewati 3 hari masa pemantauan dengan 80 kredit. Saldo reward Rp ${rewardAmount.toLocaleString('id-ID')} telah dicairkan ke Saldo Aktif Anda.`,
+        type: 'success',
+        metadata: { keyId, keyString: masked, rewardAmount }
+      });
+    }
+
     this._broadcastSync({
       type: 'KEY_APPROVED',
       keyId,
@@ -893,6 +953,16 @@ export class AdminDataService {
       }
     } catch (err) {
       console.warn('[AdminDataService] Sync reject ke Supabase error:', err.message);
+    }
+
+    // 5. Kirim notifikasi pada user terkait alasan invalid / penolakan
+    if (targetUserId) {
+      this.sendUserNotification(targetUserId, {
+        title: 'Setoran API Key Dinyatakan Tidak Valid',
+        message: `API Key ${masked} dinyatakan tidak valid: ${reason}. Saldo pasif Anda telah disesuaikan.`,
+        type: 'error',
+        metadata: { keyId, keyString: masked, reason }
+      });
     }
 
     this._broadcastSync({
@@ -1062,14 +1132,19 @@ export class AdminDataService {
   }
 
   /**
-   * Validasi Otomatis satu API Key ke server Kie.ai
-   * Mengecek apakah kunci aktif dan memiliki kuota 80 kredit.
-   * Jika aktif & kredit 80 (atau >= 80): otomatis disetujui, reward dicairkan ke saldo aktif.
-   * Jika tidak aktif / kredit bukan 80: otomatis ditolak dan saldo pasif dibatalkan.
+   * Validasi Otomatis satu API Key ke server Kie.ai dengan aturan:
+   * 1. Key hanya tervalidasi setelah 3 hari (72 jam) masa pemantauan.
+   * 2. Sistem terus memantau keaktifan dan kredit (harus 80 credit).
+   * 3. Jika kredit berkurang (< 80) atau tidak aktif -> otomatis dinyatakan INVALID,
+   *    saldo pasif dibatalkan, dan user menerima notifikasi alasan penolakannya.
+   * 4. Jika umur key >= 3 hari dan kredit tetap 80 -> otomatis disetujui (VALID), reward dicairkan
+   *    ke Saldo Aktif, dan user menerima notifikasi sukses.
+   * 5. Jika umur key < 3 hari dan kredit 80 -> status tetap PENDING (dalam masa pemantauan 3 hari).
    * @param {string} keyId
-   * @returns {Promise<{ success: boolean, validated: boolean, status: string, credit: number, message: string }>}
+   * @param {boolean} [forceApprove=false]
+   * @returns {Promise<{ success: boolean, validated: boolean, status: string, credit: number, message: string, daysRemaining?: number }>}
    */
-  async autoValidateApiKey(keyId) {
+  async autoValidateApiKey(keyId, forceApprove = false) {
     if (!keyId || this._validatingKeyIds.has(keyId)) {
       return { success: false, message: 'Key sedang divalidasi...' };
     }
@@ -1119,9 +1194,14 @@ export class AdminDataService {
       const liveCredit = Number(syncRes.credit) || 0;
       const isKieActive = syncRes.isValidKey === true;
       const isCredit80 = (liveCredit === 80 || liveCredit >= 80);
-      const isValid = isKieActive && isCredit80;
 
-      // Pastikan data key tetap sinkron di local storage sebelum approval
+      // Hitung masa pemantauan 3 hari (72 jam)
+      const holdTime = new Date(key.holdUntil || (new Date(key.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000)).getTime();
+      const isHoldExpired = Date.now() >= holdTime;
+      const diffMs = holdTime - Date.now();
+      const daysRemaining = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+
+      // Pastikan data key tetap sinkron di local storage
       const freshKeys = this.getApiKeys();
       let freshKey = freshKeys.find(k => k.id === keyId);
       if (!freshKey) {
@@ -1129,30 +1209,19 @@ export class AdminDataService {
         freshKey = freshKeys[0];
       }
       freshKey.credits = liveCredit;
+      freshKey.lastInspectedAt = new Date().toISOString();
       this._set('api_keys', freshKeys);
 
-      if (isValid) {
-        // Kunci Sah & 80 Kredit: Setujui & cairkan reward ke Saldo Aktif
-        const appRes = await this.approveApiKey(keyId);
-        console.log(`[AdminDataService] Auto-validated: Key ${keyId} VALID (${liveCredit} cr)`);
-        return {
-          success: true,
-          validated: true,
-          status: 'valid',
-          credit: liveCredit,
-          rewardAmount: appRes.rewardAmount || 3000,
-          message: `Kie.ai Aktif & Kredit ${liveCredit} cr: Berhasil divalidasi dan dicairkan ke Saldo Aktif!`
-        };
-      } else {
-        // Kunci Tidak Sah atau Kredit bukan 80: Tolak & batalkan dari Saldo Pasif
+      // KONDISI A: Kredit berkurang (< 80) atau key tidak aktif -> INVALID
+      if (!isKieActive || !isCredit80) {
         let reason = '';
         if (!isKieActive) {
-          reason = `Otomatis Ditolak: Kie.ai tidak aktif atau API Key tidak sah (${syncRes.error || syncRes.message || '401 Unauthorized'})`;
+          reason = `Kie.ai tidak aktif atau API Key tidak sah (${syncRes.error || syncRes.message || '401 Unauthorized'})`;
         } else {
-          reason = `Otomatis Ditolak: Kredit Kie.ai hanya ${liveCredit} cr (Syarat: 80 cr)`;
+          reason = `Kredit Kie.ai berkurang menjadi ${liveCredit} cr (syarat minimal: 80 cr)`;
         }
         await this.rejectApiKey(keyId, reason);
-        console.log(`[AdminDataService] Auto-rejected: Key ${keyId} INVALID (${reason})`);
+        console.log(`[AdminDataService] Key ${keyId} dinyatakan INVALID: ${reason}`);
         return {
           success: false,
           validated: false,
@@ -1162,12 +1231,162 @@ export class AdminDataService {
           message: reason
         };
       }
+
+      // KONDISI B: Key aktif & kredit tetap 80
+      if (isHoldExpired || forceApprove) {
+        // Masa pemantauan 3 hari telah selesai -> APPROVE & CAIRKAN KE SALDO AKTIF
+        const appRes = await this.approveApiKey(keyId);
+        console.log(`[AdminDataService] Key ${keyId} VALID setelah 3 hari (${liveCredit} cr)`);
+        return {
+          success: true,
+          validated: true,
+          status: 'valid',
+          credit: liveCredit,
+          rewardAmount: appRes.rewardAmount || 3000,
+          message: `Masa pantau 3 hari selesai & kredit 80 cr: Berhasil tervalidasi dan dicairkan ke Saldo Aktif!`
+        };
+      } else {
+        // Belum 3 hari: Tetap PENDING dalam masa pemantauan
+        console.log(`[AdminDataService] Key ${keyId} aktif (80 cr), masih dalam masa pantau (sisa ${daysRemaining} hari).`);
+        return {
+          success: true,
+          validated: false,
+          status: 'pending',
+          credit: liveCredit,
+          daysRemaining,
+          message: `Key aktif & kredit 80 cr. Status tetap pending (Masa pantau sisa ${daysRemaining} hari).`
+        };
+      }
     } catch (err) {
       console.error('[AdminDataService] autoValidateApiKey exception:', err);
       return { success: false, message: err.message };
     } finally {
       this._validatingKeyIds.delete(keyId);
     }
+  }
+
+  /**
+   * Menjalankan inspeksi berkala jam 12 malam WIB (00:00 WIB = 17:00 UTC)
+   * Memeriksa seluruh kode Kie aktif dan mempunyai kredit 80:
+   * - Jika kredit berkurang (< 80) atau tidak aktif -> INVALID & kirim notifikasi user alasan invalid-nya.
+   * - Jika umur key >= 3 hari dan kredit 80 -> VALID & dicairkan ke saldo aktif + notifikasi user.
+   * - Jika umur key < 3 hari dan kredit 80 -> TETAP PENDING dalam masa pemantauan.
+   * @returns {Promise<Object>}
+   */
+  async runMidnightKieInspection() {
+    console.log('[AdminDataService] 🌙 Menjalankan Inspeksi Rutin Jam 12 Malam WIB...');
+    const keys = this.getApiKeys();
+    const pendingKeys = keys.filter(k => k.status === 'pending');
+
+    const results = {
+      inspectedAt: new Date().toISOString(),
+      totalInspected: pendingKeys.length,
+      approvedCount: 0,
+      rejectedCount: 0,
+      pendingCount: 0,
+      details: []
+    };
+
+    for (const key of pendingKeys) {
+      try {
+        const res = await this.autoValidateApiKey(key.id);
+        if (res.status === 'valid') {
+          results.approvedCount++;
+        } else if (res.status === 'invalid') {
+          results.rejectedCount++;
+        } else {
+          results.pendingCount++;
+        }
+        results.details.push({
+          id: key.id,
+          keyString: key.keyString ? `${key.keyString.slice(0, 8)}...${key.keyString.slice(-4)}` : '',
+          userId: key.userId,
+          status: res.status,
+          credit: res.credit,
+          message: res.message
+        });
+      } catch (err) {
+        results.details.push({ id: key.id, error: err.message });
+      }
+    }
+
+    // Catat log inspeksi terakhir di localStorage
+    this._set('last_midnight_inspection', results);
+
+    this.emit('midnight_inspection_completed', results);
+    this._broadcastSync({
+      type: 'MIDNIGHT_INSPECTION_COMPLETED',
+      results
+    });
+
+    return results;
+  }
+
+  /**
+   * Menjadwalkan timer otomatis setiap jam 12 malam WIB (00:00:00 WIB = 17:00:00 UTC)
+   */
+  _scheduleMidnightInspection() {
+    if (this._midnightTimeoutId) {
+      clearTimeout(this._midnightTimeoutId);
+      this._midnightTimeoutId = null;
+    }
+
+    const calcMsToNextMidnightWIB = () => {
+      const now = new Date();
+      const utcMs = now.getTime();
+      const wibOffset = 7 * 60 * 60 * 1000;
+      const wibTime = new Date(utcMs + wibOffset);
+
+      // Jam 00:00:00 WIB hari berikutnya
+      const nextMidnightWib = new Date(wibTime);
+      nextMidnightWib.setUTCHours(0, 0, 0, 0);
+      nextMidnightWib.setUTCDate(nextMidnightWib.getUTCDate() + 1);
+
+      const nextMidnightUtc = nextMidnightWib.getTime() - wibOffset;
+      return Math.max(1000, nextMidnightUtc - utcMs);
+    };
+
+    const msUntilMidnight = calcMsToNextMidnightWIB();
+    const hours = Math.floor(msUntilMidnight / (60 * 60 * 1000));
+    const minutes = Math.floor((msUntilMidnight % (60 * 60 * 1000)) / (60 * 1000));
+    console.log(`[AdminDataService] 🌙 Inspeksi 00:00 WIB terjadwal dalam ${hours} jam ${minutes} menit`);
+
+    this._midnightTimeoutId = setTimeout(async () => {
+      try {
+        await this.runMidnightKieInspection();
+      } catch (e) {
+        console.error('[AdminDataService] Error runMidnightKieInspection:', e);
+      }
+      // Jadwalkan untuk 24 jam berikutnya
+      this._scheduleMidnightInspection();
+    }, msUntilMidnight);
+  }
+
+  /**
+   * Menghitung sisa waktu menuju jam 12 malam WIB berikutnya
+   * @returns {{ hours: number, minutes: number, ms: number, text: string }}
+   */
+  getNextMidnightWIBRemaining() {
+    const now = new Date();
+    const utcMs = now.getTime();
+    const wibOffset = 7 * 60 * 60 * 1000;
+    const wibTime = new Date(utcMs + wibOffset);
+
+    const nextMidnightWib = new Date(wibTime);
+    nextMidnightWib.setUTCHours(0, 0, 0, 0);
+    nextMidnightWib.setUTCDate(nextMidnightWib.getUTCDate() + 1);
+
+    const nextMidnightUtc = nextMidnightWib.getTime() - wibOffset;
+    const ms = Math.max(0, nextMidnightUtc - utcMs);
+    const hours = Math.floor(ms / (60 * 60 * 1000));
+    const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
+
+    return {
+      hours,
+      minutes,
+      ms,
+      text: `${hours} jam ${minutes} menit`
+    };
   }
 
   /**

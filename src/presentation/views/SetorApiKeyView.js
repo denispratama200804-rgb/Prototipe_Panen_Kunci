@@ -227,12 +227,27 @@ export class SetorApiKeyView extends IComponent {
         minute: '2-digit'
       });
 
+      let holdInfo = null;
+      if (typeof k.getHoldRemaining === 'function') {
+        holdInfo = k.getHoldRemaining();
+      } else {
+        const holdTime = new Date(k.holdUntil || (new Date(k.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000)).getTime();
+        const diffMs = holdTime - Date.now();
+        if (diffMs <= 0) {
+          holdInfo = { isReady: true, text: 'Siap validasi' };
+        } else {
+          const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+          const hours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+          holdInfo = { isReady: false, text: days > 0 ? `Sisa ${days}h ${hours}j` : `Sisa ${hours}j` };
+        }
+      }
+
       return `
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm relative overflow-hidden">
           <div class="absolute left-0 top-0 bottom-0 w-1 ${borderClass}"></div>
           <div class="flex flex-col gap-0.5 pl-2">
             <div class="flex items-center gap-1.5">
-              <span class="font-mono text-xs font-semibold text-text-heading">${k.getMaskedKey()}</span>
+              <span class="font-mono text-xs font-semibold text-text-heading">${typeof k.getMaskedKey === 'function' ? k.getMaskedKey() : (k.keyString ? (k.keyString.length <= 12 ? k.keyString : `${k.keyString.slice(0, 9)}...${k.keyString.slice(-4)}`) : '')}</span>
               <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-600 border border-sky-500/20">${k.credits !== undefined ? k.credits : 80} cr</span>
             </div>
             <div class="text-[11px] text-text-body">${dateStr}</div>
@@ -242,7 +257,7 @@ export class SetorApiKeyView extends IComponent {
               <span class="text-xs font-extrabold text-amber-500">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
               <div class="bg-amber-500/15 text-amber-600 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-amber-500/30">
                 <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                <span>Menunggu Verifikasi</span>
+                <span>${holdInfo.isReady ? '⚡ Siap Validasi' : `⏳ Pantau: ${holdInfo.text}`}</span>
               </div>
             ` : isValid ? `
               <span class="text-xs font-extrabold text-secondary">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
@@ -342,6 +357,46 @@ export class SetorApiKeyView extends IComponent {
       window.location.hash = '/profil';
     });
 
+    // Proses eksekusi pengiriman key ke service
+    const executeKeySubmission = async () => {
+      const user = this._authService.getCurrentUser();
+      const rawKey = input.value.trim();
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Memverifikasi API Key...</span>';
+
+      const res = await this._apiKeyService.submitKey(rawKey, user ? user.id : 'usr_guest');
+
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">arrow_forward</span><span>Setor API Key</span>';
+
+      if (res.success) {
+        input.value = '';
+
+        // Segera perbarui daftar riwayat di bawah formulir secara reaktif seketika
+        this._updateKeysHistoryUI(container);
+
+        // Tampilkan Popup Setor Berhasil Masuk ke Saldo Pasif & Masa Pemantauan
+        this._notification.showModal({
+          title: 'Setoran Masuk ke Saldo Pasif!',
+          message: `API Key berhasil disetorkan! Reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.<br><br><div class="bg-surface-container-low p-2.5 rounded-xl text-xs text-text-body border border-surface-container">⏳ <strong>Masa Pemantauan:</strong> Key akan dipantau selama <strong>3 hari (72 jam)</strong> setiap jam 12 malam WIB dengan syarat kredit tetap 80 sebelum dicairkan ke Saldo Aktif.</div>`,
+          type: 'success',
+          confirmText: 'Kembali ke Dashboard',
+          onConfirm: () => {
+            window.location.hash = '/dashboard';
+          }
+        });
+      } else {
+        // Tampilkan Popup Setor Gagal (sesuai setor_api_key_gagal_pop_up)
+        this._notification.showModal({
+          title: 'Setoran Ditolak',
+          message: res.message || 'Verifikasi API Key gagal. Pastikan secret key valid dan kuota kredit masih 80.',
+          type: 'error',
+          confirmText: 'Coba Lagi'
+        });
+      }
+    };
+
     // Submit handler
     submitBtn?.addEventListener('click', async () => {
       const user = this._authService.getCurrentUser();
@@ -369,38 +424,42 @@ export class SetorApiKeyView extends IComponent {
         return;
       }
 
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span><span>Memverifikasi API Key...</span>';
+      // Cek apakah user sudah memilih untuk tidak membaca pop up ini lagi
+      const hide3DayNotice = localStorage.getItem('panenkunci:hide_3day_notice') === 'true';
 
-      const res = await this._apiKeyService.submitKey(rawKey, user ? user.id : 'usr_guest');
-
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<span>Setor API Key</span><span class="material-symbols-outlined text-[20px]">arrow_forward</span>';
-
-      if (res.success) {
-        input.value = '';
-
-        // Segera perbarui daftar riwayat di bawah formulir secara reaktif seketika
-        this._updateKeysHistoryUI(container);
-
-        // Tampilkan Popup Setor Berhasil Masuk ke Saldo Pasif
+      if (!hide3DayNotice) {
+        // Tampilkan pop up pemberitahuan bahwa key tervalidasi setiap 3 hari sekali dengan checklist
         this._notification.showModal({
-          title: 'Setoran Masuk ke Saldo Pasif!',
-          message: `API Key valid dan reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.`,
-          type: 'success',
-          confirmText: 'Kembali ke Dashboard',
-          onConfirm: () => {
-            window.location.hash = '/dashboard';
+          title: 'Ketentuan Validasi API Key',
+          message: `
+            <div class="flex flex-col gap-2.5 text-left text-xs text-text-body">
+              <p>Setiap API Key yang disetorkan akan melalui <strong>masa pemantauan selama 3 hari (72 jam)</strong> sebelum tervalidasi secara penuh.</p>
+              <div class="bg-surface-container-low p-3 rounded-xl border border-surface-container flex flex-col gap-1 text-[11px]">
+                <div class="flex items-center gap-1.5 font-bold text-text-heading">
+                  <span class="material-symbols-outlined text-amber-500 text-[16px]">schedule</span>
+                  <span>Pemeriksaan Rutin Jam 12 Malam WIB</span>
+                </div>
+                <p>Sistem otomatis mengecek seluruh key aktif dengan saldo <strong>80 kredit</strong> setiap jam 12 malam WIB. Jika kredit berkurang atau tidak aktif sebelum 3 hari, key dinyatakan invalid.</p>
+              </div>
+              <p class="text-[11px] text-outline">Reward sebesar Rp 3.000 sementara tersimpan di <strong>Saldo Pasif</strong> dan otomatis cair ke Saldo Aktif setelah 3 hari jika syarat terpenuhi.</p>
+            </div>
+          `,
+          type: 'info',
+          confirmText: 'Saya Mengerti & Lanjutkan',
+          cancelText: 'Batal',
+          showCancel: true,
+          checkboxText: 'Jangan tampilkan pesan ini lagi',
+          checkboxChecked: false,
+          onConfirm: ({ checked }) => {
+            if (checked) {
+              localStorage.setItem('panenkunci:hide_3day_notice', 'true');
+            }
+            executeKeySubmission();
           }
         });
       } else {
-        // Tampilkan Popup Setor Gagal (sesuai setor_api_key_gagal_pop_up)
-        this._notification.showModal({
-          title: 'Setoran Ditolak',
-          message: res.message || 'Verifikasi API Key gagal. Pastikan secret key valid dan kuota kredit masih aktif.',
-          type: 'error',
-          confirmText: 'Coba Lagi'
-        });
+        // User sudah mencentang untuk tidak membaca pop up lagi, langsung eksekusi setor
+        executeKeySubmission();
       }
     });
 

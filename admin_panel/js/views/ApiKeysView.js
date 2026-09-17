@@ -14,6 +14,7 @@ export class ApiKeysView {
     this.isSyncing = false;
     this.isSyncingKie = false;
     this.isAutoValidating = false;
+    this.isInspectingMidnight = false;
   }
 
   destroy() {
@@ -261,6 +262,18 @@ export class ApiKeysView {
             <div class="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
+                id="btn-midnight-kie-inspection"
+                title="Jalankan inspeksi jam 12 malam WIB: Cek seluruh key pending ke Kie.ai, tolak jika kredit berkurang (<80 cr), dan validasi jika sudah melewati 3 hari"
+                class="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-500/20 hover:bg-indigo-500/30 active:scale-95 text-indigo-200 border border-indigo-500/50 flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-indigo-500/20 ${
+                  this.isInspectingMidnight ? 'opacity-70 cursor-not-allowed' : ''
+                }"
+                ${this.isInspectingMidnight ? 'disabled' : ''}
+              >
+                <span class="material-symbols-outlined text-sm ${this.isInspectingMidnight ? 'animate-spin text-indigo-400' : 'text-indigo-400'}">dark_mode</span>
+                <span>${this.isInspectingMidnight ? 'Menginspeksi 00:00 WIB...' : '🌙 Inspeksi 00:00 WIB & Validasi 3 Hari'}</span>
+              </button>
+              <button
+                type="button"
                 id="btn-auto-validate-all-keys"
                 title="Cek langsung ke Kie.ai: Validasi otomatis semua key pending yang aktif dan memiliki 80 kredit"
                 class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-500/10 ${
@@ -427,7 +440,26 @@ export class ApiKeysView {
                           if (k.status === 'valid') {
                             statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 whitespace-nowrap">Valid</span>';
                           } else if (k.status === 'pending') {
-                            statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-amber-500/15 text-amber-300 border-amber-500/40 inline-flex items-center gap-1.5 whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>Perlu Verifikasi</span>';
+                            const holdTime = new Date(k.holdUntil || (new Date(k.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000)).getTime();
+                            const diffMs = holdTime - Date.now();
+                            const isReady = diffMs <= 0;
+                            let holdText = '';
+                            if (isReady) {
+                              holdText = '⚡ Siap Validasi (3 Hari Selesai)';
+                            } else {
+                              const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+                              const hours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+                              holdText = days > 0 ? `⏳ Pantau: Sisa ${days}h ${hours}j` : `⏳ Pantau: Sisa ${hours}j`;
+                            }
+                            statusBadge = `
+                              <div class="flex flex-col gap-1 items-start">
+                                <span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${isReady ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/15 text-amber-300 border-amber-500/40'} inline-flex items-center gap-1 whitespace-nowrap">
+                                  <span class="w-1.5 h-1.5 rounded-full ${isReady ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse"></span>
+                                  <span>${holdText}</span>
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-mono">Dipantau 00:00 WIB</span>
+                              </div>
+                            `;
                           } else if (k.status === 'used') {
                             statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-blue-500/10 text-blue-400 border-blue-500/30 whitespace-nowrap">Digunakan</span>';
                           } else {
@@ -607,6 +639,27 @@ export class ApiKeysView {
       });
     }
 
+    // Tombol Inspeksi Jam 12 Malam WIB & Validasi 3 Hari
+    const midnightInspectionBtn = container.querySelector('#btn-midnight-kie-inspection');
+    if (midnightInspectionBtn) {
+      midnightInspectionBtn.addEventListener('click', async () => {
+        this.isInspectingMidnight = true;
+        refreshCallback();
+        const res = await this.dataService.runMidnightKieInspection();
+        this.isInspectingMidnight = false;
+        if (res.totalInspected === 0) {
+          this.toast.info('Tidak ada API Key pending yang perlu diinspeksi saat ini.', 'Inspeksi 00:00 WIB Selesai');
+        } else {
+          this.toast.success(
+            `Inspeksi 00:00 WIB selesai! Diperiksa: ${res.totalInspected}, Lolos 3 Hari (Valid): ${res.approvedCount}, Ditolak (Invalid): ${res.rejectedCount}, Masih Dipantau: ${res.pendingCount}`,
+            'Inspeksi Berhasil',
+            6000
+          );
+        }
+        refreshCallback();
+      });
+    }
+
     // Tombol Validasi Otomatis Semua API Key Pending ke Kie.ai
     const autoValidateAllBtn = container.querySelector('#btn-auto-validate-all-keys');
     if (autoValidateAllBtn) {
@@ -771,6 +824,8 @@ export class ApiKeysView {
         const res = await this.dataService.autoValidateApiKey(id);
         if (res.success && res.validated) {
           this.toast.success(res.message, 'Kie.ai Valid (80 cr)');
+        } else if (res.success && !res.validated) {
+          this.toast.info(res.message, 'Masa Pemantauan 3 Hari');
         } else {
           this.toast.warning(res.message || 'Key ditolak otomatis: Kie.ai tidak aktif atau kredit bukan 80.', 'Hasil Validasi');
         }

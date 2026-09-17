@@ -1464,9 +1464,88 @@ export default defineConfig(({ mode }) => {
 
                       const isKieActive = code === 200;
                       const isCreditValid = creditVal === 80 || creditVal >= 80;
-                      const isValid = isKieActive && isCreditValid;
 
-                      if (isValid) {
+                      // Hitung apakah masa pemantauan 3 hari (72 jam) telah terpenuhi
+                      let isHoldExpired = false;
+                      let daysRemaining = 3;
+                      if (targetKeyId && adminSupabase) {
+                        try {
+                          const { data: dbKeyData } = await adminSupabase
+                            .from('api_keys')
+                            .select('created_at')
+                            .eq('id', targetKeyId)
+                            .maybeSingle();
+                          if (dbKeyData && dbKeyData.created_at) {
+                            const createdAtMs = new Date(dbKeyData.created_at).getTime();
+                            const holdUntilMs = createdAtMs + 3 * 24 * 60 * 60 * 1000;
+                            const diffMs = holdUntilMs - Date.now();
+                            isHoldExpired = diffMs <= 0;
+                            daysRemaining = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+                          }
+                        } catch (_) {}
+                      }
+
+                      // KONDISI A: Kredit berkurang (< 80) atau key tidak aktif -> INVALID
+                      if (!isKieActive || !isCreditValid) {
+                        const reason = !isKieActive
+                          ? (resData.msg || (code === 401 ? 'API Key tidak valid atau otentikasi gagal di Kie.ai' : `Kie.ai error (${code})`))
+                          : `Kredit Kie.ai tidak memenuhi syarat (${creditVal} cr / syarat: 80 cr)`;
+
+                        if (targetKeyId && adminSupabase) {
+                          await adminSupabase
+                            .from('api_keys')
+                            .update({
+                              status: 'invalid',
+                              credits: creditVal,
+                              error_message: reason,
+                              updated_at: new Date().toISOString()
+                            })
+                            .eq('id', targetKeyId);
+
+                          try {
+                            const suffix = apiKeyString.slice(-4);
+                            const { data: relatedTxs } = await adminSupabase
+                              .from('transactions')
+                              .select('id, description')
+                              .eq('type', 'deposit')
+                              .eq('status', 'pending');
+                            
+                            if (Array.isArray(relatedTxs)) {
+                              const matched = relatedTxs.find(t => 
+                                (suffix && t.description?.includes(suffix)) || 
+                                (targetKeyId && t.description?.includes(targetKeyId))
+                              );
+                              if (matched) {
+                                await adminSupabase
+                                  .from('transactions')
+                                  .update({ 
+                                    status: 'failed', 
+                                    description: `Ditolak Sistem: ${reason}`,
+                                    updated_at: new Date().toISOString() 
+                                  })
+                                  .eq('id', matched.id);
+                              }
+                            }
+                          } catch (_) {}
+                        }
+
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({
+                          success: false,
+                          isValid: false,
+                          status: 'invalid',
+                          credit: creditVal,
+                          reason,
+                          message: reason
+                        }));
+                        return;
+                      }
+
+                      // KONDISI B: Key aktif & kredit tetap 80
+                      const shouldApprove = isHoldExpired || parsed.forceApprove;
+
+                      if (shouldApprove) {
+                        // Masa pemantauan 3 hari telah selesai -> APPROVE & CAIRKAN
                         if (targetKeyId && adminSupabase) {
                           await adminSupabase
                             .from('api_keys')
@@ -1509,56 +1588,29 @@ export default defineConfig(({ mode }) => {
                           isValid: true,
                           status: 'valid',
                           credit: creditVal,
-                          message: `Key valid & aktif (${creditVal} kredit Kie.ai)`
+                          message: `Key valid & aktif (${creditVal} kredit Kie.ai - 3 hari selesai)`
                         }));
                         return;
                       } else {
-                        const reason = !isKieActive
-                          ? (resData.msg || (code === 401 ? 'API Key tidak valid atau otentikasi gagal di Kie.ai' : `Kie.ai error (${code})`))
-                          : `Kredit Kie.ai tidak memenuhi syarat (${creditVal} cr / syarat: 80 cr)`;
-
+                        // Belum 3 hari: Update kredit tapi pertahankan status pending
                         if (targetKeyId && adminSupabase) {
                           await adminSupabase
                             .from('api_keys')
                             .update({
-                              status: 'invalid',
                               credits: creditVal,
-                              error_message: reason,
                               updated_at: new Date().toISOString()
                             })
                             .eq('id', targetKeyId);
-
-                          try {
-                            const suffix = apiKeyString.slice(-4);
-                            const { data: relatedTxs } = await adminSupabase
-                              .from('transactions')
-                              .select('id, description')
-                              .eq('type', 'deposit')
-                              .eq('status', 'pending');
-                            
-                            if (Array.isArray(relatedTxs)) {
-                              const matched = relatedTxs.find(t => 
-                                (suffix && t.description?.includes(suffix)) || 
-                                (targetKeyId && t.description?.includes(targetKeyId))
-                              );
-                              if (matched) {
-                                await adminSupabase
-                                  .from('transactions')
-                                  .update({ status: 'failed', description: `Ditolak: ${reason}`, updated_at: new Date().toISOString() })
-                                  .eq('id', matched.id);
-                              }
-                            }
-                          } catch (_) {}
                         }
 
                         res.statusCode = 200;
                         res.end(JSON.stringify({
-                          success: false,
+                          success: true,
                           isValid: false,
-                          status: 'invalid',
+                          status: 'pending',
                           credit: creditVal,
-                          reason,
-                          message: reason
+                          daysRemaining,
+                          message: `Key aktif & kredit 80 cr. Status tetap pending (Masa pantau sisa ${daysRemaining} hari)`
                         }));
                         return;
                       }
@@ -1570,8 +1622,8 @@ export default defineConfig(({ mode }) => {
                     }
                   }
 
-                  // Auto-Validate Semua Kunci Pending
-                  if (action === 'auto_validate_all_keys') {
+                  // Auto-Validate Semua Kunci Pending & Inspeksi Jam 12 Malam WIB (00:00 WIB)
+                  if (action === 'auto_validate_all_keys' || action === 'midnight_kie_inspection') {
                     if (!adminSupabase) {
                       res.statusCode = 500;
                       res.end(JSON.stringify({ success: false, error: 'Database belum terkonfigurasi' }));
@@ -1581,7 +1633,7 @@ export default defineConfig(({ mode }) => {
                     try {
                       const { data: pendingKeys, error } = await adminSupabase
                         .from('api_keys')
-                        .select('id, key_string, user_id, reward_amount, status')
+                        .select('id, key_string, user_id, reward_amount, status, created_at')
                         .eq('status', 'pending');
 
                       if (error) {
@@ -1614,22 +1666,63 @@ export default defineConfig(({ mode }) => {
                           const isKieActive = code === 200;
                           const isCreditValid = creditVal === 80 || creditVal >= 80;
 
-                          if (isKieActive && isCreditValid) {
-                            await adminSupabase
-                              .from('api_keys')
-                              .update({
-                                status: 'valid',
-                                credits: creditVal,
-                                error_message: '',
-                                updated_at: new Date().toISOString()
-                              })
-                              .eq('id', item.id);
+                          const createdAtMs = item.created_at ? new Date(item.created_at).getTime() : Date.now();
+                          const holdUntilMs = createdAtMs + 3 * 24 * 60 * 60 * 1000;
+                          const isHoldExpired = Date.now() >= holdUntilMs;
 
-                            results.push({ id: item.id, status: 'valid', credit: creditVal, success: true });
+                          if (isKieActive && isCreditValid) {
+                            if (isHoldExpired) {
+                              // Masa pemantauan 3 hari selesai -> VALID
+                              await adminSupabase
+                                .from('api_keys')
+                                .update({
+                                  status: 'valid',
+                                  credits: creditVal,
+                                  error_message: '',
+                                  updated_at: new Date().toISOString()
+                                })
+                                .eq('id', item.id);
+
+                              try {
+                                const suffix = keyString.slice(-4);
+                                const { data: relatedTxs } = await adminSupabase
+                                  .from('transactions')
+                                  .select('id, description')
+                                  .eq('type', 'deposit')
+                                  .eq('status', 'pending');
+                                
+                                if (Array.isArray(relatedTxs)) {
+                                  const matched = relatedTxs.find(t => 
+                                    (suffix && t.description?.includes(suffix)) || 
+                                    (item.id && t.description?.includes(item.id))
+                                  );
+                                  if (matched) {
+                                    await adminSupabase
+                                      .from('transactions')
+                                      .update({ status: 'success', updated_at: new Date().toISOString() })
+                                      .eq('id', matched.id);
+                                  }
+                                }
+                              } catch (_) {}
+
+                              results.push({ id: item.id, status: 'valid', credit: creditVal, success: true, message: 'Valid setelah 3 hari' });
+                            } else {
+                              // Belum 3 hari -> Tetap PENDING dalam masa pemantauan
+                              await adminSupabase
+                                .from('api_keys')
+                                .update({
+                                  credits: creditVal,
+                                  updated_at: new Date().toISOString()
+                                })
+                                .eq('id', item.id);
+
+                              results.push({ id: item.id, status: 'pending', credit: creditVal, success: true, message: 'Aktif 80 cr, masih dalam masa pantau 3 hari' });
+                            }
                           } else {
+                            // Kredit berkurang (< 80) atau tidak aktif -> INVALID
                             const reason = !isKieActive
                               ? (resJson.msg || 'API Key tidak sah atau tidak aktif di Kie.ai')
-                              : `Kredit Kie.ai tidak memenuhi syarat (${creditVal} cr / syarat: 80 cr)`;
+                              : `Kredit Kie.ai berkurang menjadi ${creditVal} cr (syarat: 80 cr)`;
 
                             await adminSupabase
                               .from('api_keys')
@@ -1641,6 +1734,28 @@ export default defineConfig(({ mode }) => {
                               })
                               .eq('id', item.id);
 
+                            try {
+                              const suffix = keyString.slice(-4);
+                              const { data: relatedTxs } = await adminSupabase
+                                .from('transactions')
+                                .select('id, description')
+                                .eq('type', 'deposit')
+                                .eq('status', 'pending');
+                              
+                              if (Array.isArray(relatedTxs)) {
+                                const matched = relatedTxs.find(t => 
+                                  (suffix && t.description?.includes(suffix)) || 
+                                  (item.id && t.description?.includes(item.id))
+                                );
+                                if (matched) {
+                                  await adminSupabase
+                                    .from('transactions')
+                                    .update({ status: 'failed', description: `Ditolak Sistem: ${reason}`, updated_at: new Date().toISOString() })
+                                    .eq('id', matched.id);
+                                }
+                              }
+                            } catch (_) {}
+
                             results.push({ id: item.id, status: 'invalid', credit: creditVal, success: false, reason });
                           }
                         } catch (itemErr) {
@@ -1650,6 +1765,7 @@ export default defineConfig(({ mode }) => {
 
                       const validCount = results.filter(r => r.status === 'valid').length;
                       const invalidCount = results.filter(r => r.status === 'invalid').length;
+                      const pendingCount = results.filter(r => r.status === 'pending').length;
 
                       res.statusCode = 200;
                       res.end(JSON.stringify({
@@ -1657,6 +1773,7 @@ export default defineConfig(({ mode }) => {
                         total: list.length,
                         validatedCount: validCount,
                         rejectedCount: invalidCount,
+                        pendingCount: pendingCount,
                         results
                       }));
                       return;

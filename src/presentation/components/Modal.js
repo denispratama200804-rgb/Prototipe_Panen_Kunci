@@ -43,6 +43,8 @@ export class ModalComponent {
       title = 'Pemberitahuan',
       message = '',
       html = '',
+      checkboxText = '',
+      checkboxChecked = false,
       type = 'info', // 'success', 'error', 'info', 'confirm'
       confirmText = 'OK',
       cancelText = 'Batal',
@@ -101,6 +103,17 @@ export class ModalComponent {
           <h3 class="font-headline-md text-xl text-text-heading font-bold">${title}</h3>
           ${message ? `<div class="font-body-md text-sm text-text-body leading-relaxed w-full">${message}</div>` : ''}
           ${html ? `<div class="modal-custom-html w-full text-left my-2">${html}</div>` : ''}
+          ${checkboxText ? `
+            <label class="flex items-center gap-2.5 text-xs text-text-body cursor-pointer select-none mt-2 w-full justify-center group hover:text-text-heading transition-colors">
+              <input
+                type="checkbox"
+                id="modal-checkbox-input"
+                class="w-4 h-4 rounded text-primary focus:ring-primary/30 border-surface-container bg-surface-container-low cursor-pointer transition-all"
+                ${checkboxChecked ? 'checked' : ''}
+              />
+              <span>${checkboxText}</span>
+            </label>
+          ` : ''}
         </div>
 
         <!-- Action Buttons -->
@@ -122,17 +135,21 @@ export class ModalComponent {
     const closeBtn = modalWrapper.querySelector('.modal-close-btn');
     const confirmBtn = modalWrapper.querySelector('.modal-confirm-btn');
     const cancelBtn = modalWrapper.querySelector('.modal-cancel-btn');
+    const chkInput = modalWrapper.querySelector('#modal-checkbox-input');
 
     const handleConfirm = async () => {
       if (confirmBtn) {
         confirmBtn.disabled = true;
       }
+      const isChecked = chkInput ? chkInput.checked : false;
       try {
         if (typeof onConfirm === 'function') {
           const result = await onConfirm({
             close: () => this.close(modalWrapper),
             modal: modalWrapper,
-            confirmBtn
+            confirmBtn,
+            checked: isChecked,
+            isChecked
           });
           if (result === false || options.autoClose === false) {
             return;
