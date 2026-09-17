@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 import dns from 'node:dns';
 import crypto from 'node:crypto';
-import { uploadBase64ToR2 } from './api/r2-uploader.js';
+import { uploadBase64ToR2, isR2Configured } from './api/r2-uploader.js';
 
 // Fix local IPv6 ENETUNREACH issue
 dns.setDefaultResultOrder('ipv4first');
@@ -379,6 +379,11 @@ export default defineConfig(({ mode }) => {
                       res.end(JSON.stringify({ success: false, error: 'Data gambar (base64Data) diperlukan' }));
                       return;
                     }
+                    if (!isR2Configured()) {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: false, fallback: true, message: 'Cloudflare R2 belum dikonfigurasi di environment variables' }));
+                      return;
+                    }
                     try {
                       const result = await uploadBase64ToR2({
                         base64Data,
@@ -388,9 +393,9 @@ export default defineConfig(({ mode }) => {
                       res.statusCode = 200;
                       res.end(JSON.stringify({ success: true, ...result }));
                     } catch (uploadErr) {
-                      console.error('[vite-dev-proxy] R2 upload error:', uploadErr);
-                      res.statusCode = 500;
-                      res.end(JSON.stringify({ success: false, error: uploadErr.message || 'Gagal mengunggah file ke Cloudflare R2' }));
+                      console.warn('[vite-dev-proxy] R2 upload warning/fallback:', uploadErr.message);
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: false, fallback: true, error: uploadErr.message }));
                     }
                     return;
                   }
@@ -505,6 +510,7 @@ export default defineConfig(({ mode }) => {
                     }
                     return;
                   }
+
 
                   if (action === 'get_users' || (action === 'select' && table === 'users')) {
                     if (adminSupabase) {

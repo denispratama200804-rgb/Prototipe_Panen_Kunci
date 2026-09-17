@@ -102,7 +102,8 @@ export async function uploadToR2({ buffer, key, contentType = 'image/png' }) {
       'x-amz-date': amzDate,
       'Authorization': authHeader
     },
-    body: buffer
+    body: buffer,
+    signal: AbortSignal.timeout(4000)
   });
 
   if (!res.ok) {

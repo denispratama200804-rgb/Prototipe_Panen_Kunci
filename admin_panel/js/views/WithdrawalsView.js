@@ -1213,7 +1213,7 @@ export class WithdrawalsView {
       ctx.textAlign = 'center';
       ctx.fillText('Bukti transfer ini sah dan diproses secara otomatis oleh Admin Panen Kunci.', 300, 712);
 
-      const generatedDataUrl = canvas.toDataURL('image/png');
+      const generatedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
       updatePreview(generatedDataUrl);
       this.toast.success('Contoh bukti struk transfer resmi berhasil dibuat!', 'Sampel Terpasang');
     });
@@ -1233,30 +1233,39 @@ export class WithdrawalsView {
       confirmBtn.disabled = true;
       confirmBtn.innerHTML = `
         <span class="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-        <span>Mengunggah bukti ke Cloudflare R2...</span>
+        <span>Memproses persetujuan penarikan...</span>
       `;
 
-      setTimeout(async () => {
-        const res = await this.dataService.approveWithdrawal(tx.id, {
-          proofImage: finalProof,
-          notes,
-          referralDeduction,
-          referralCode: referredBy
-        });
+      (async () => {
+        try {
+          const res = await this.dataService.approveWithdrawal(tx.id, {
+            proofImage: finalProof,
+            notes,
+            referralDeduction,
+            referralCode: referredBy
+          });
 
-        if (res.success) {
-          this.toast.success(`Penarikan #${tx.id} berhasil disetujui & bukti transfer telah dikirim ke pengguna!`, 'Pencairan Sukses');
-          close();
-          refreshCallback();
-        } else {
+          if (res.success) {
+            this.toast.success(`Penarikan #${tx.id} berhasil disetujui & bukti transfer telah dikirim ke pengguna!`, 'Pencairan Sukses');
+            close();
+            refreshCallback();
+          } else {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = `
+              <span class="material-symbols-outlined text-base font-bold">send</span>
+              <span>Setujui & Kirim Bukti ke User</span>
+            `;
+            this.toast.error(res.message);
+          }
+        } catch (err) {
           confirmBtn.disabled = false;
           confirmBtn.innerHTML = `
             <span class="material-symbols-outlined text-base font-bold">send</span>
             <span>Setujui & Kirim Bukti ke User</span>
           `;
-          this.toast.error(res.message);
+          this.toast.error(err.message || 'Gagal memproses persetujuan');
         }
-      }, 400);
+      })();
     });
   }
 

@@ -1688,9 +1688,11 @@ export class AdminDataService {
    * @param {string} [options.proofImage] Base64 data URL atau URL gambar bukti transfer
    * @param {string} [options.notes] Catatan transfer dari admin
   async approveWithdrawal(transactionId, { proofImage = '', notes = '', referralDeduction: optDeduction, referralCode: optRefCode } = {}) {
-    // 0. Jika bukti transfer berupa base64 Data URL, unggah ke Cloudflare R2
+    // 0. Jika bukti transfer berupa base64 Data URL, unggah ke Cloudflare R2 dengan timeout cepat
     if (proofImage && proofImage.startsWith('data:')) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
         const upRes = await fetch('/api/supabase-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1699,8 +1701,10 @@ export class AdminDataService {
             base64Data: proofImage,
             folder: 'proofs',
             fileName: `proof_${transactionId}_${Date.now()}.png`
-          })
+          }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
         if (upRes.ok) {
           const upJson = await upRes.json();
           if (upJson.success && upJson.url) {
@@ -1708,7 +1712,7 @@ export class AdminDataService {
           }
         }
       } catch (r2Err) {
-        console.warn('[AdminDataService] R2 upload fallback:', r2Err);
+        console.warn('[AdminDataService] R2 upload fast fallback to local proof:', r2Err.message);
       }
     }
 

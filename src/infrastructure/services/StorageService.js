@@ -23,28 +23,34 @@ export class StorageService {
       return base64Data.trim();
     }
 
-    const response = await fetch('/api/supabase-proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'upload_r2',
-        base64Data,
-        folder,
-        fileName
-      })
-    });
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || `Gagal mengunggah media ke Cloudflare R2 (HTTP ${response.status})`);
+      const response = await fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'upload_r2',
+          base64Data,
+          folder,
+          fileName
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.url) {
+          return result.url;
+        }
+      }
+    } catch (err) {
+      console.warn('[StorageService] R2 upload fallback to base64:', err.message);
     }
 
-    const result = await response.json();
-    if (!result.success || !result.url) {
-      throw new Error(result.error || 'Gagal memperoleh URL publik Cloudflare R2');
-    }
-
-    return result.url;
+    return base64Data;
   }
 }
 
