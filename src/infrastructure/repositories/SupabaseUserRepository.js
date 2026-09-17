@@ -54,7 +54,20 @@ export class SupabaseUserRepository extends IUserRepository {
       throw new Error(error.message);
     }
 
-    return data ? this._toDomain(data) : null;
+    if (!data) return null;
+
+    // Jika tabel DB belum memiliki kolom referred_by, sinkronkan dari user_metadata session auth
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user && (authData.user.id === data.id || authData.user.email?.toLowerCase() === data.email?.toLowerCase())) {
+        const metaRef = authData.user.user_metadata?.referred_by || authData.user.user_metadata?.referredBy;
+        if (metaRef && !data.referred_by) {
+          data.referred_by = String(metaRef).trim().toUpperCase();
+        }
+      }
+    } catch (_) {}
+
+    return this._toDomain(data);
   }
 
   /**
@@ -76,7 +89,20 @@ export class SupabaseUserRepository extends IUserRepository {
       throw new Error(error.message);
     }
 
-    return data ? this._toDomain(data) : null;
+    if (!data) return null;
+
+    // Jika tabel DB belum memiliki kolom referred_by, sinkronkan dari user_metadata session auth
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user && (authData.user.id === data.id || authData.user.email?.toLowerCase() === data.email?.toLowerCase())) {
+        const metaRef = authData.user.user_metadata?.referred_by || authData.user.user_metadata?.referredBy;
+        if (metaRef && !data.referred_by) {
+          data.referred_by = String(metaRef).trim().toUpperCase();
+        }
+      }
+    } catch (_) {}
+
+    return this._toDomain(data);
   }
 
   /**
@@ -129,7 +155,11 @@ export class SupabaseUserRepository extends IUserRepository {
     }
 
     if (!error && data) {
-      return this._toDomain(data);
+      const domainUser = this._toDomain(data);
+      if (!domainUser.referredBy && userData.referredBy) {
+        domainUser.referredBy = userData.referredBy;
+      }
+      return domainUser;
     }
 
     // 2. Jika terhalang RLS (error 42501 atau violates row-level security policy), gunakan Server Proxy
@@ -143,7 +173,11 @@ export class SupabaseUserRepository extends IUserRepository {
 
         const proxyJson = await proxyRes.json();
         if (proxyJson.success && proxyJson.data) {
-          return this._toDomain(proxyJson.data);
+          const domainUser = this._toDomain(proxyJson.data);
+          if (!domainUser.referredBy && userData.referredBy) {
+            domainUser.referredBy = userData.referredBy;
+          }
+          return domainUser;
         }
         if (proxyJson.error) {
           throw new Error(proxyJson.error);
@@ -159,7 +193,11 @@ export class SupabaseUserRepository extends IUserRepository {
       throw new Error(error.message);
     }
 
-    return this._toDomain(data);
+    const domainUser = this._toDomain(data);
+    if (!domainUser.referredBy && userData.referredBy) {
+      domainUser.referredBy = userData.referredBy;
+    }
+    return domainUser;
   }
 
   /**
@@ -209,7 +247,11 @@ export class SupabaseUserRepository extends IUserRepository {
     }
 
     if (!error && data) {
-      return this._toDomain(data);
+      const domainUser = this._toDomain(data);
+      if (!domainUser.referredBy && updates.referredBy) {
+        domainUser.referredBy = updates.referredBy;
+      }
+      return domainUser;
     }
 
     // 2. Jika terhalang RLS, gunakan Server Proxy
@@ -223,7 +265,11 @@ export class SupabaseUserRepository extends IUserRepository {
 
         const proxyJson = await proxyRes.json();
         if (proxyJson.success && proxyJson.data) {
-          return this._toDomain(proxyJson.data);
+          const domainUser = this._toDomain(proxyJson.data);
+          if (!domainUser.referredBy && updates.referredBy) {
+            domainUser.referredBy = updates.referredBy;
+          }
+          return domainUser;
         }
         if (proxyJson.error) {
           throw new Error(proxyJson.error);
@@ -239,7 +285,11 @@ export class SupabaseUserRepository extends IUserRepository {
       throw new Error(error.message);
     }
 
-    return this._toDomain(data);
+    const domainUser = this._toDomain(data);
+    if (!domainUser.referredBy && updates.referredBy) {
+      domainUser.referredBy = updates.referredBy;
+    }
+    return domainUser;
   }
 
   /**

@@ -457,12 +457,20 @@ export class TarikSaldoView extends IComponent {
                   <span>Biaya Admin</span>
                   <span class="font-bold font-mono text-amber-500" id="summaryFee">Rp ${currentFee.toLocaleString('id-ID')}</span>
                 </div>
-                <div class="flex justify-between items-center text-text-body ${(userReferredBy && refPercent > 0) ? '' : 'hidden'}" id="summaryReferralRow">
-                  <span class="flex items-center gap-1">
+                <!-- Potongan Kode Referral -->
+                <div class="flex justify-between items-center text-text-body" id="summaryReferralRow">
+                  <div class="flex items-center gap-1.5">
                     <span>Potongan Kode Referral</span>
-                    <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.2 rounded font-bold" id="summaryReferralBadge">${userReferredBy ? `${userReferredBy} (${refPercent}%)` : `${refPercent}%`}</span>
+                    <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold ${userReferredBy ? '' : 'hidden'}" id="summaryReferralBadge">
+                      ${userReferredBy ? `${userReferredBy} (${refPercent}%)` : ''}
+                    </span>
+                    <span class="text-[10px] text-outline italic ${userReferredBy ? 'hidden' : ''}" id="summaryReferralUnlinkedBadge">
+                      (Belum ditautkan)
+                    </span>
+                  </div>
+                  <span class="font-bold font-mono ${userReferredBy ? 'text-primary' : 'text-outline'}" id="summaryReferralCut">
+                    ${userReferredBy ? `-Rp ${initialReferralCut.toLocaleString('id-ID')}` : 'Rp 0'}
                   </span>
-                  <span class="font-bold font-mono text-primary" id="summaryReferralCut">-Rp ${initialReferralCut.toLocaleString('id-ID')}</span>
                 </div>
                 <div class="w-full h-px bg-surface-container my-0.5"></div>
                 <div class="flex justify-between items-center text-sm font-extrabold text-text-heading">
@@ -483,6 +491,32 @@ export class TarikSaldoView extends IComponent {
                   <span class="font-bold ${isLocked ? 'text-rose-500' : 'text-primary'} font-mono" id="summaryTotalDeduction">Rp ${(isLocked ? 0 : minWithdrawal).toLocaleString('id-ID')}</span>
                 </div>
               </div>
+
+              <!-- Status Keterikatan Kode Referral -->
+              ${userReferredBy ? `
+                <div class="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-2xl p-2.5 px-3.5 text-xs">
+                  <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-[18px]">verified</span>
+                    <p class="text-[11px] text-text-body">
+                      Akun terikat ke kode: <strong class="text-primary font-mono font-bold">${userReferredBy}</strong> (Potongan ${refPercent}%)
+                    </p>
+                  </div>
+                  <span class="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Aktif</span>
+                </div>
+              ` : `
+                <div class="flex items-center justify-between bg-surface-container-low border border-surface-container rounded-2xl p-2.5 px-3.5 text-xs">
+                  <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-outline text-[18px]">link</span>
+                    <p class="text-[11px] text-text-body">
+                      Belum menautkan kode referral pengundang?
+                    </p>
+                  </div>
+                  <a href="#/profil" class="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5">
+                    <span>Tautkan di Profil</span>
+                    <span class="material-symbols-outlined text-[13px]">arrow_forward</span>
+                  </a>
+                </div>
+              `}
               <div id="breakdownAlertContainer" class="${isLocked ? '' : 'hidden'}">
                 ${
                   isLocked
@@ -544,6 +578,25 @@ export class TarikSaldoView extends IComponent {
       return this._resolveUserPaymentMethod(u);
     };
 
+    // Auto-check jika pengguna memiliki referred_by di auth user_metadata yang belum tersinkron ke session lokal
+    const initialUser = this._authService.getCurrentUser();
+    if (initialUser && !initialUser.referredBy) {
+      import('../../infrastructure/supabase/supabaseClient.js').then(async ({ supabase, isSupabaseConfigured }) => {
+        if (isSupabaseConfigured && isSupabaseConfigured()) {
+          try {
+            const { data: authData } = await supabase.auth.getUser();
+            const metaRef = authData?.user?.user_metadata?.referred_by || authData?.user?.user_metadata?.referredBy;
+            if (metaRef) {
+              const cleanRef = String(metaRef).trim().toUpperCase();
+              initialUser.referredBy = cleanRef;
+              await this._authService.updateProfile({ referredBy: cleanRef });
+              updateBreakdown();
+            }
+          } catch (_) {}
+        }
+      }).catch(() => {});
+    }
+
     // Helper untuk update live summary breakdown biaya
     const updateBreakdown = () => {
       const amount = Number(amountInput?.value) || 0;
@@ -563,6 +616,7 @@ export class TarikSaldoView extends IComponent {
       const summaryReferralRow = container.querySelector('#summaryReferralRow');
       const summaryReferralCut = container.querySelector('#summaryReferralCut');
       const summaryReferralBadge = container.querySelector('#summaryReferralBadge');
+      const summaryReferralUnlinkedBadge = container.querySelector('#summaryReferralUnlinkedBadge');
       const summaryTotal = container.querySelector('#summaryTotalDeduction');
       const summaryNet = container.querySelector('#summaryTotalReceive');
       const breakdownAlertContainer = container.querySelector('#breakdownAlertContainer');
@@ -570,13 +624,29 @@ export class TarikSaldoView extends IComponent {
 
       if (summaryAmount) summaryAmount.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
       if (summaryFee) summaryFee.textContent = `Rp ${fee.toLocaleString('id-ID')}`;
-      if (summaryReferralCut) summaryReferralCut.textContent = `-Rp ${referralCut.toLocaleString('id-ID')}`;
-      if (summaryReferralBadge && userReferredBy) summaryReferralBadge.textContent = `${userReferredBy} (${refPercent}%)`;
-      if (summaryReferralRow) {
-        if (userReferredBy && refPercent > 0) {
-          summaryReferralRow.classList.remove('hidden');
-        } else {
-          summaryReferralRow.classList.add('hidden');
+
+      if (userReferredBy && refPercent > 0) {
+        if (summaryReferralBadge) {
+          summaryReferralBadge.textContent = `${userReferredBy} (${refPercent}%)`;
+          summaryReferralBadge.classList.remove('hidden');
+        }
+        if (summaryReferralUnlinkedBadge) {
+          summaryReferralUnlinkedBadge.classList.add('hidden');
+        }
+        if (summaryReferralCut) {
+          summaryReferralCut.textContent = `-Rp ${referralCut.toLocaleString('id-ID')}`;
+          summaryReferralCut.className = 'font-bold font-mono text-primary';
+        }
+      } else {
+        if (summaryReferralBadge) {
+          summaryReferralBadge.classList.add('hidden');
+        }
+        if (summaryReferralUnlinkedBadge) {
+          summaryReferralUnlinkedBadge.classList.remove('hidden');
+        }
+        if (summaryReferralCut) {
+          summaryReferralCut.textContent = 'Rp 0';
+          summaryReferralCut.className = 'font-bold font-mono text-outline';
         }
       }
 

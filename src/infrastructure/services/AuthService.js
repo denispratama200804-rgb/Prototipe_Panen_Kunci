@@ -203,9 +203,10 @@ export class AuthService {
       // Background sync profil terbaru dari Supabase
       if (this._userRepository && this._currentUser.email) {
         this._userRepository.getByEmail(this._currentUser.email)
-          .then(remote => {
+          .then(async remote => {
             if (remote) {
               const prevNicknameUpdatedAt = this._currentUser?.nicknameUpdatedAt;
+              const prevReferredBy = this._currentUser?.referredBy;
               const isRemoteAdmin = (remote.role === 'admin') ||
                                     (remote.email === 'admin@panenkunci.id') ||
                                     (remote.email === 'admin@panenkunci.com');
@@ -214,6 +215,21 @@ export class AuthService {
               if (!remote.nicknameUpdatedAt && prevNicknameUpdatedAt) {
                 remote.nicknameUpdatedAt = prevNicknameUpdatedAt;
               }
+              if (!remote.referredBy && prevReferredBy) {
+                remote.referredBy = prevReferredBy;
+              }
+
+              // Jika remote belum memiliki referredBy, periksa session auth user_metadata Supabase
+              if (!remote.referredBy && isSupabaseConfigured()) {
+                try {
+                  const { data: authData } = await supabase.auth.getUser();
+                  const metaRef = authData?.user?.user_metadata?.referred_by || authData?.user?.user_metadata?.referredBy;
+                  if (metaRef) {
+                    remote.referredBy = String(metaRef).trim().toUpperCase();
+                  }
+                } catch (_) {}
+              }
+
               this._currentUser = remote;
               this._saveSession(this._currentUser, validatedRole);
               this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
@@ -367,6 +383,11 @@ export class AuthService {
                               email === 'admin@panenkunci.com' ||
                               authData.user.user_metadata?.role === 'admin';
 
+          const metaRef = (authData.user.user_metadata?.referred_by || authData.user.user_metadata?.referredBy || '').trim().toUpperCase();
+          if (userProfile && !userProfile.referredBy && metaRef) {
+            userProfile.referredBy = metaRef;
+          }
+
           const resolvedUser = userProfile || new User({
             id: authData.user.id,
             name: authData.user.user_metadata?.name || email.split('@')[0],
@@ -377,7 +398,9 @@ export class AuthService {
             bankName: '',
             accountNumber: '',
             accountHolder: (authData.user.user_metadata?.name || email.split('@')[0]).toUpperCase(),
-            isVerified: false
+            isVerified: false,
+            referralCode: authData.user.user_metadata?.referral_code || authData.user.user_metadata?.referralCode || User.generateReferralCode(authData.user.id),
+            referredBy: metaRef
           });
 
           const role = isRoleAdmin ? 'admin' : 'user';
@@ -603,6 +626,12 @@ export class AuthService {
       try {
         const updated = await this._userRepository.update(this._currentUser.id, updates);
         if (updated) {
+          if (!updated.referredBy && this._currentUser.referredBy) {
+            updated.referredBy = this._currentUser.referredBy;
+          }
+          if (!updated.nicknameUpdatedAt && this._currentUser.nicknameUpdatedAt) {
+            updated.nicknameUpdatedAt = this._currentUser.nicknameUpdatedAt;
+          }
           this._currentUser = updated;
           this._currentUser.isVerified = hasPayment;
           this._saveSession(this._currentUser, this._currentUser.role || 'user');
@@ -701,8 +730,19 @@ export class AuthService {
     // Simpan penautan ke akun saat ini:
     // A. Update local domain, session, dan repository
     await this.updateProfile({ referredBy: cleanCode });
+    this._currentUser.referredBy = cleanCode;
+    this._saveSession(this._currentUser, this._currentUser.role || 'user');
 
-    // B. Simpan ke Supabase database & Auth user_metadata via Server Proxy (admin bypass RLS)
+    // B. Simpan ke Supabase auth user_metadata di client jika ada session
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.auth.updateUser({
+          data: { referred_by: cleanCode }
+        });
+      } catch (_) {}
+    }
+
+    // C. Simpan ke Supabase database & Auth user_metadata via Server Proxy (admin bypass RLS)
     if (this._currentUser.id) {
       try {
         await fetch('/api/supabase-proxy', {
@@ -718,6 +758,8 @@ export class AuthService {
         console.warn('[AuthService] Bind referral proxy warning:', proxyErr.message);
       }
     }
+
+    this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
 
     return { success: true, message: `Berhasil menautkan akun ke kode referral ${cleanCode}!` };
   }
@@ -1120,6 +1162,12 @@ export class AuthService {
       const defaultRole = isRoleAdmin ? 'admin' : 'user';
 
       let userRecord = null;
+      const metaReferredBy = (authUser.user_metadata?.referred_by || authUser.user_metadata?.referredBy || '').trim().toUpperCase();
+      let storedLocalRef = '';
+      try {
+        storedLocalRef = (localStorage.getItem('pk_referral_code') || sessionStorage.getItem('pk_referral_code') || '').trim().toUpperCase();
+      } catch (_) {}
+      const effectiveOAuthRef = metaReferredBy || storedLocalRef;
 
       if (this._userRepository) {
         try {
@@ -1140,12 +1188,17 @@ export class AuthService {
               accountHolder: fullName.toUpperCase(),
               isVerified: false,
               avatar: avatarUrl,
-              referralCode: User.generateReferralCode(authUser.id || email || fullName)
+              referralCode: User.generateReferralCode(authUser.id || email || fullName),
+              referredBy: effectiveOAuthRef
             };
 
             userRecord = await this._userRepository.create(newUserData);
             console.log('[AuthService] Pengguna baru dari Google berhasil disimpan ke database:', userRecord);
           } else {
+            // Jika user sudah ada, perbarui referredBy jika sebelumnya kosong dan metadata punya
+            if (!userRecord.referredBy && effectiveOAuthRef) {
+              userRecord.referredBy = effectiveOAuthRef;
+            }
             // C. Jika user sudah ada, perbarui foto profil jika sebelumnya kosong
             if ((!userRecord.avatar || userRecord.avatar === '/avatar.png') && avatarUrl) {
               try {
