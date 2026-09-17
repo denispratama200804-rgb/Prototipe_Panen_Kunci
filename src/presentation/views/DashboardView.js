@@ -271,6 +271,8 @@ export class DashboardView extends IComponent {
         minute: '2-digit'
       });
 
+      const isReferralCommission = tx.method === 'referral_commission' || tx.title?.includes('Referral') || tx.description?.includes('Referral');
+
       let statusBadge = '';
       if (isPending) {
         statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded font-bold border border-amber-500/20 inline-flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>Pending</span>';
@@ -278,17 +280,23 @@ export class DashboardView extends IComponent {
         statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-error-container text-on-error-container rounded font-bold inline-flex items-center gap-0.5">Invalid</span>';
       } else if (isFailed) {
         statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-error-container text-on-error-container rounded font-bold inline-flex items-center gap-0.5">Ditolak</span>';
+      } else if (isValidOrSuccess && isDeposit && isReferralCommission) {
+        statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 rounded font-bold border border-emerald-500/20 inline-flex items-center gap-0.5">Komisi Ref</span>';
       } else if (isValidOrSuccess && isDeposit) {
         statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded font-bold inline-flex items-center gap-0.5">Valid</span>';
       }
 
-      const iconBg = isDeposit
-        ? (isInvalid ? 'bg-error-container text-error-ruby' : (isPending ? 'bg-amber-500/10 text-amber-600' : 'bg-secondary/10 text-secondary'))
-        : (isFailed ? 'bg-error-container text-error-ruby' : (isPending ? 'bg-amber-500/10 text-amber-600' : 'bg-primary/10 text-primary'));
+      const iconBg = isReferralCommission
+        ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+        : (isDeposit
+          ? (isInvalid ? 'bg-error-container text-error-ruby' : (isPending ? 'bg-amber-500/10 text-amber-600' : 'bg-secondary/10 text-secondary'))
+          : (isFailed ? 'bg-error-container text-error-ruby' : (isPending ? 'bg-amber-500/10 text-amber-600' : 'bg-primary/10 text-primary')));
 
-      const iconName = isDeposit
-        ? (isInvalid ? 'vpn_key_off' : 'vpn_key')
-        : 'account_balance_wallet';
+      const iconName = isReferralCommission
+        ? 'group_add'
+        : (isDeposit
+          ? (isInvalid ? 'vpn_key_off' : 'vpn_key')
+          : 'account_balance_wallet');
 
       const amountColor = isDeposit
         ? (isPending ? 'text-amber-500' : (isInvalid ? 'text-text-body/50 line-through' : 'text-secondary'))
@@ -301,7 +309,7 @@ export class DashboardView extends IComponent {
         amountText = `-Rp ${Number(tx.amount || 0).toLocaleString('id-ID')}`;
       }
 
-      const subtitle = tx.maskedKey || (isDeposit ? 'Setoran API Key' : 'Penarikan Saldo');
+      const subtitle = tx.maskedKey || (isReferralCommission ? (tx.description || 'Komisi Referral') : (isDeposit ? 'Setoran API Key' : 'Penarikan Saldo'));
 
       return `
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm hover:bg-surface-container-low transition-colors">

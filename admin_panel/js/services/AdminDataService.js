@@ -1687,8 +1687,7 @@ export class AdminDataService {
    * @param {Object} [options]
    * @param {string} [options.proofImage] Base64 data URL atau URL gambar bukti transfer
    * @param {string} [options.notes] Catatan transfer dari admin
-   */
-  async approveWithdrawal(transactionId, { proofImage = '', notes = '' } = {}) {
+  async approveWithdrawal(transactionId, { proofImage = '', notes = '', referralDeduction: optDeduction, referralCode: optRefCode } = {}) {
     // 0. Jika bukti transfer berupa base64 Data URL, unggah ke Cloudflare R2
     if (proofImage && proofImage.startsWith('data:')) {
       try {
@@ -1798,40 +1797,124 @@ export class AdminDataService {
       });
 
       // Proses Bagi Hasil / Komisi Kode Referral jika penarikan memiliki potongan referral
-      const referralCode = (tx.referralCode || tx.referredBy || '').trim().toUpperCase();
-      const referralDeduction = Number(tx.referralDeduction || 0);
+      let referralCode = (optRefCode || tx.referralCode || tx.referredBy || '').trim().toUpperCase();
+      let referralDeduction = optDeduction !== undefined ? Number(optDeduction) : Number(tx.referralDeduction || tx.referral_deduction || 0);
+
+      // Jika referralCode belum ada, coba cek dari description
+      if (!referralCode && tx.description) {
+        const matchCode = tx.description.match(/Potongan\s+Referral\s*\(([^)]+)\)/i);
+        if (matchCode) referralCode = matchCode[1].trim().toUpperCase();
+      }
+
+      // Jika referralDeduction belum ada, coba cek dari description
+      if (!referralDeduction && tx.description) {
+        const matchNominal = tx.description.match(/Potongan\s+Referral[^:]*:\s*Rp\s*([\d.,]+)/i);
+        if (matchNominal) {
+          referralDeduction = Number(matchNominal[1].replace(/[.,]/g, '')) || 0;
+        }
+      }
+
+      // Jika ada referralCode tapi belum ada nominal potongan, hitung dari config
+      if (!referralDeduction && referralCode) {
+        const adminCfg = this.getAdminConfig?.() || {};
+        const refCutPercent = adminCfg.referralPercent || adminCfg.referralCutPercent || 5;
+        referralDeduction = Math.round(Number(tx.amount || 0) * (refCutPercent / 100));
+      }
+
+      // Pastikan data referral juga tersimpan di transaksi penarikan itu sendiri
+      if (referralCode) {
+        tx.referralCode = referralCode;
+        tx.referredBy = referralCode;
+      }
+      if (referralDeduction > 0) {
+        tx.referralDeduction = referralDeduction;
+        tx.referral_deduction = referralDeduction;
+      }
+      let netPayout = Number(tx.netPayout !== undefined ? tx.netPayout : tx.net_payout);
+      if (isNaN(netPayout) || netPayout <= 0 || (referralDeduction > 0 && netPayout >= (Number(tx.amount || 0) - Number(tx.fee || 0)))) {
+        netPayout = Math.max(0, Number(tx.amount || 0) - Number(tx.fee || 0) - referralDeduction);
+        tx.netPayout = netPayout;
+        tx.net_payout = netPayout;
+      }
+      this._set('transactions', txs);
 
       if (referralCode && referralDeduction > 0) {
         try {
-          // Cari user pemilik referral code
+          // Cari user pemilik referral code secara komprehensif
           let allUsers = this.getUsers();
-          let referrer = allUsers.find(u => (u.referralCode || '').trim().toUpperCase() === referralCode);
+          let referrer = allUsers.find(u => {
+            if ((u.referralCode || u.referral_code || '').trim().toUpperCase() === referralCode) return true;
+            const codeById = User.generateReferralCode(u.id);
+            const codeByEmail = User.generateReferralCode(u.email);
+            const codeByName = User.generateReferralCode(u.name);
+            return codeById === referralCode || codeByEmail === referralCode || codeByName === referralCode;
+          });
 
           if (!referrer) {
             const rawAll = this._get('all_users', []);
-            referrer = rawAll.find(u => (u.referral_code || u.referralCode || '').trim().toUpperCase() === referralCode);
+            referrer = (Array.isArray(rawAll) ? rawAll : []).find(u => {
+              if ((u.referral_code || u.referralCode || '').trim().toUpperCase() === referralCode) return true;
+              const codeById = User.generateReferralCode(u.id);
+              const codeByEmail = User.generateReferralCode(u.email);
+              const codeByName = User.generateReferralCode(u.name);
+              return codeById === referralCode || codeByEmail === referralCode || codeByName === referralCode;
+            });
+          }
+
+          // Jika belum ditemukan di data lokal, cek via server / Supabase
+          if (!referrer) {
+            try {
+              const resCheck = await fetch('/api/supabase-proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'check_referral_code', code: referralCode })
+              });
+              if (resCheck.ok) {
+                const jsonCheck = await resCheck.json();
+                if (jsonCheck.success && jsonCheck.referrer) {
+                  referrer = jsonCheck.referrer;
+                }
+              }
+            } catch (_) {}
           }
 
           if (referrer && referrer.id) {
             const referrerId = referrer.id;
 
-            // 1. Tambahkan saldo aktif dompet referrer
+            // 1. Tambahkan saldo aktif dompet spesifik referrer (wallet_balance_{userId})
             const refBalanceKey = `wallet_balance_${referrerId}`;
             const currentRefBalance = Number(this._get(refBalanceKey, 0));
             const newRefBalance = currentRefBalance + referralDeduction;
             this._set(refBalanceKey, newRefBalance);
 
-            // 2. Tambahkan saldo pasif & pendapatan seumur hidup
-            const refPassiveKey = `wallet_passive_balance_${referrerId}`;
-            const currentPassive = Number(this._get(refPassiveKey, 0));
-            this._set(refPassiveKey, currentPassive + referralDeduction);
-
+            // 2. Tambahkan saldo seumur hidup (lifetime earnings)
             const refLifetimeKey = `lifetime_earnings_${referrerId}`;
             const currentLifetime = Number(this._get(refLifetimeKey, 0));
             this._set(refLifetimeKey, currentLifetime + referralDeduction);
 
-            // 3. Catat mutasi transaksi komisi untuk referrer
-            const commTxId = 'comm_' + transactionId.replace('tx_', '');
+            // 3. Jika pengguna yang sedang login di tab aktif adalah akun referrer ini, update saldo aktif langsung
+            const currUser = this._get('current_user', {});
+            if (currUser && (currUser.id === referrerId || (currUser.email && referrer.email && currUser.email.toLowerCase() === referrer.email.toLowerCase()))) {
+              const currentActive = Number(this._get('wallet_balance', 0));
+              this._set('wallet_balance', currentActive + referralDeduction);
+
+              const curLifetime = Number(this._get('lifetime_earnings', 0));
+              this._set('lifetime_earnings', curLifetime + referralDeduction);
+            }
+
+            // 4. Update saldo di daftar all_users
+            const rawUsers = this._get('all_users', []);
+            if (Array.isArray(rawUsers)) {
+              const uIdx = rawUsers.findIndex(u => u.id === referrerId || (referrer.email && u.email && u.email.toLowerCase() === referrer.email.toLowerCase()));
+              if (uIdx !== -1) {
+                rawUsers[uIdx].balance = Number(rawUsers[uIdx].balance || 0) + referralDeduction;
+                rawUsers[uIdx].customBalance = rawUsers[uIdx].balance;
+                this._set('all_users', rawUsers);
+              }
+            }
+
+            // 5. Catat mutasi transaksi komisi untuk referrer
+            const commTxId = 'comm_' + (transactionId || '').replace(/^tx_/, '') + '_' + Date.now().toString(36);
             const commTx = {
               id: commTxId,
               userId: referrerId,
@@ -1841,7 +1924,7 @@ export class AdminDataService {
               amount: referralDeduction,
               fee: 0,
               title: 'Komisi Referral Masuk',
-              description: `Komisi bagi hasil dari penarikan dana downline (${referralCode})`,
+              description: `Komisi bagi hasil dari penarikan downline (${tx.userName || 'Member'} • ${referralCode})`,
               status: 'success',
               method: 'referral_commission',
               recipient: referrer.phone || referrer.email || referralCode,
@@ -1863,7 +1946,7 @@ export class AdminDataService {
               this._set('transactions', allTxs);
             }
 
-            // 4. Buat notifikasi khusus untuk akun referrer
+            // 6. Buat notifikasi khusus untuk akun referrer
             const refNotifsKey = `notifications_${referrerId}`;
             const refNotifs = this._get(refNotifsKey, []);
             const refNotif = {
@@ -1871,7 +1954,7 @@ export class AdminDataService {
               userId: referrerId,
               type: 'referral_commission',
               title: 'Komisi Referral Masuk!',
-              message: `Selamat! Anda menerima komisi referral sebesar Rp ${referralDeduction.toLocaleString('id-ID')} dari penarikan downline (${referralCode}).`,
+              message: `Selamat! Saldo aktif Anda bertambah Rp ${referralDeduction.toLocaleString('id-ID')} dari komisi referral (${referralCode}).`,
               amount: referralDeduction,
               transactionId: commTxId,
               createdAt: new Date().toISOString(),
@@ -1880,7 +1963,7 @@ export class AdminDataService {
             refNotifs.unshift(refNotif);
             this._set(refNotifsKey, refNotifs);
 
-            // 5. Cadangkan transaksi komisi ke Supabase
+            // 7. Cadangkan transaksi komisi ke Supabase
             try {
               await fetch('/api/supabase-proxy', {
                 method: 'POST',
@@ -1906,13 +1989,19 @@ export class AdminDataService {
               console.warn('[AdminDataService] Supabase commTx sync warning:', errComm.message);
             }
 
-            // 6. Broadcast ke klien/tab bahwa komisi telah dikreditkan
+            // 8. Broadcast ke klien/tab bahwa komisi telah dikreditkan ke saldo aktif
             this._broadcastSync({
               type: 'REFERRAL_COMMISSION_CREDITED',
               referrerId,
               amount: referralDeduction,
+              newBalance: newRefBalance,
               transactionId: commTxId,
               referralCode
+            });
+            this._broadcastSync({
+              type: 'BALANCE_UPDATED',
+              userId: referrerId,
+              balance: newRefBalance
             });
           }
         } catch (refErr) {
@@ -2229,7 +2318,14 @@ export class AdminDataService {
       const validUserKeys = userKeys.filter(k => k.status === 'valid');
       const validKeysCount = validUserKeys.length;
       const keysEarnings = validUserKeys.reduce((sum, k) => sum + (Number(k.rewardAmount) || 3000), 0);
-      const calculatedBalance = Math.max(0, keysEarnings - totalWithdrawn);
+
+      const userCommissions = transactions.filter(t => 
+        (t.userId === u.id || (u.email && t.userEmail === u.email)) &&
+        (t.method === 'referral_commission' || t.title?.includes('Referral') || t.description?.includes('Referral')) &&
+        t.status === 'success'
+      );
+      const totalCommissions = userCommissions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+      const calculatedBalance = Math.max(0, keysEarnings + totalCommissions - totalWithdrawn);
 
       // Ambil saldo dari local storage user spesifik jika ada
       const userBalKey = `wallet_balance_${u.id}`;

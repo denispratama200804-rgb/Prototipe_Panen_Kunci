@@ -441,7 +441,11 @@ export class WalletService {
       loadedTxs = savedTx
         .filter(t => t.userId === userId || !t.userId)
         .filter(t => {
-          // Hanya izinkan transaksi deposit jika key terkait ada di combinedKeys
+          // Transaksi komisi referral SELALU diizinkan!
+          if (t.method === 'referral_commission' || t.title?.includes('Referral') || t.description?.includes('Referral')) {
+            return true;
+          }
+          // Hanya izinkan transaksi deposit API key jika key terkait ada di combinedKeys
           if (t.type === 'deposit') {
             return combinedKeys.some(k => {
               const suffix = (k.keyString && k.keyString.length >= 4) ? k.keyString.slice(-4) : '';
@@ -461,6 +465,11 @@ export class WalletService {
         .map(t => new Transaction(t));
     }
 
+    // Hitung total komisi referral aktif yang masuk
+    const totalReferralCommissions = loadedTxs
+      .filter(t => (t.method === 'referral_commission' || t.title?.includes('Referral') || t.description?.includes('Referral')) && t.status === 'success')
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
     // Hitung total penarikan aktif
     const totalWithdrawals = loadedTxs
       .filter(t => t.type === 'withdrawal' && (t.status === 'success' || t.status === 'pending'))
@@ -473,8 +482,8 @@ export class WalletService {
       this._transactions = [];
       this._persist();
     } else {
-      // Saldo aktif adalah akumulasi deposit valid dikurangi penarikan
-      const calculatedActive = Math.max(0, expectedActiveDeposit - totalWithdrawals);
+      // Saldo aktif adalah akumulasi deposit valid + komisi referral dikurangi penarikan
+      const calculatedActive = Math.max(0, expectedActiveDeposit + totalReferralCommissions - totalWithdrawals);
       const finalActive = (rawSavedBal !== null && rawSavedBal > calculatedActive)
         ? rawSavedBal
         : calculatedActive;
@@ -484,7 +493,7 @@ export class WalletService {
       this._passiveBalance = expectedPassiveDeposit;
 
       // Lifetime earnings
-      this._lifetimeEarnings = expectedActiveDeposit;
+      this._lifetimeEarnings = Math.max(calculatedActive + totalWithdrawals, expectedActiveDeposit + totalReferralCommissions);
       this._transactions = loadedTxs;
 
       // Pastikan jika ada key valid/pending yang belum ada di riwayat mutasi transaksi, tambahkan ke transaksi
@@ -661,6 +670,12 @@ export class WalletService {
 
         deduplicatedTxs.forEach(tx => {
           if (tx.type === 'deposit') {
+            // JANGAN hapus jika transaksi berupa komisi referral!
+            if (tx.method === 'referral_commission' || tx.title?.includes('Referral') || tx.description?.includes('Referral')) {
+              reconciledTxs.push(tx);
+              return;
+            }
+
             const hasMatchingKey = combinedKeys.some(k => {
               const suffix = (k.keyString && k.keyString.length >= 4) ? k.keyString.slice(-4) : '';
               const masked = k.keyString && k.keyString.length > 12
@@ -716,18 +731,26 @@ export class WalletService {
         });
 
         // Selaraskan dengan data key agar tidak ada saldo yang hilang atau menggelembung
+        const remoteCommissions = deduplicatedTxs
+          .filter(t => (t.method === 'referral_commission' || t.title?.includes('Referral') || t.description?.includes('Referral')) && t.status === 'success')
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
         this._balance = Math.max(0, calculatedBalance);
         this._passiveBalance = expectedPassive;
-        this._lifetimeEarnings = Math.max(calculatedLifetime, expectedActive);
+        this._lifetimeEarnings = Math.max(calculatedLifetime, expectedActive + remoteCommissions);
       } else {
-        // Jika remoteTxs belum ada/kosong di database, gunakan perhitungan authoritative dari daftar key user!
+        // Jika remoteTxs belum ada/kosong di database, gunakan perhitungan authoritative dari daftar key user + komisi referral!
         const totalWithdrawals = this._transactions
           .filter(t => t.type === 'withdrawal' && (t.status === 'success' || t.status === 'pending'))
           .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        this._balance = Math.max(0, expectedActive - totalWithdrawals);
+        const totalCommissions = this._transactions
+          .filter(t => (t.method === 'referral_commission' || t.title?.includes('Referral') || t.description?.includes('Referral')) && t.status === 'success')
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        this._balance = Math.max(0, expectedActive + totalCommissions - totalWithdrawals);
         this._passiveBalance = expectedPassive;
-        this._lifetimeEarnings = expectedActive;
+        this._lifetimeEarnings = Math.max(expectedActive + totalCommissions, this._lifetimeEarnings || 0);
       }
 
       this._ensureDepositTransactions(combinedKeys);

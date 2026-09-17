@@ -1239,7 +1239,9 @@ export class WithdrawalsView {
       setTimeout(async () => {
         const res = await this.dataService.approveWithdrawal(tx.id, {
           proofImage: finalProof,
-          notes
+          notes,
+          referralDeduction,
+          referralCode: referredBy
         });
 
         if (res.success) {
