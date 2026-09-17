@@ -1,3 +1,5 @@
+import { User } from '../../../src/domain/models/User.js';
+
 /**
  * WithdrawalsView
  * Manajemen Persetujuan Pencairan Dana (Payouts):
@@ -231,9 +233,65 @@ export class WithdrawalsView {
             `
                 : filtered
                     .map(tx => {
+                      const user = (this.dataService.getUserByTransaction && this.dataService.getUserByTransaction(tx)) || {};
                       const amount = Number(tx.amount || 0);
                       const fee = Number(tx.fee || 0);
-                      const netPayout = tx.netPayout !== undefined ? Number(tx.netPayout) : Math.max(0, amount - fee);
+
+                      // Dapatkan kode referral milik pemohon
+                      const userReferralCode = (
+                        tx.userReferralCode ||
+                        user.referralCode ||
+                        user.referral_code ||
+                        (tx.userId ? User.generateReferralCode(tx.userId || tx.userEmail || tx.userName) : '')
+                      ).trim().toUpperCase();
+
+                      // Dapatkan kode referral pengundang yang ditautkan pemohon
+                      let referredBy = (
+                        tx.referredBy ||
+                        tx.referralCode ||
+                        user.referredBy ||
+                        user.referred_by ||
+                        ''
+                      ).trim().toUpperCase();
+
+                      // Fallback local storage jika belum ada di data objek
+                      if (!referredBy && typeof localStorage !== 'undefined') {
+                        try {
+                          referredBy = (
+                            localStorage.getItem('pk_bound_ref_' + (tx.userId || user.id)) ||
+                            localStorage.getItem('pk_bound_ref_' + (tx.userEmail || user.email || '').toLowerCase()) ||
+                            ''
+                          ).trim().toUpperCase();
+                        } catch (_) {}
+                      }
+
+                      // Fallback parsing dari deskripsi mutasi transaksi
+                      if (!referredBy && tx.description) {
+                        const matchCode = tx.description.match(/Potongan\s+Referral\s*\(([^)]+)\)/i);
+                        if (matchCode) referredBy = matchCode[1].trim().toUpperCase();
+                      }
+
+                      // Hitung nominal potongan kode referral
+                      let referralDeduction = Number(tx.referralDeduction || tx.referral_deduction || 0);
+                      if (!referralDeduction && tx.description) {
+                        const matchNominal = tx.description.match(/Potongan\s+Referral[^:]*:\s*Rp\s*([\d.,]+)/i);
+                        if (matchNominal) {
+                          referralDeduction = Number(matchNominal[1].replace(/[.,]/g, '')) || 0;
+                        }
+                      }
+
+                      // Jika ada pengundang tapi potongan belum terhitung di withdrawal
+                      if (!referralDeduction && referredBy && tx.type === 'withdrawal') {
+                        const adminCfg = this.dataService.getAdminConfig?.() || {};
+                        const refCutPercent = adminCfg.referralPercent || adminCfg.referralCutPercent || 5;
+                        referralDeduction = Math.round(amount * (refCutPercent / 100));
+                      }
+
+                      // Transfer Bersih yang diterima user
+                      let netPayout = Number(tx.netPayout !== undefined ? tx.netPayout : tx.net_payout);
+                      if (isNaN(netPayout) || netPayout <= 0 || (referralDeduction > 0 && netPayout >= (amount - fee))) {
+                        netPayout = Math.max(0, amount - fee - referralDeduction);
+                      }
 
                       let methodIcon = 'account_balance';
                       let methodColor = 'text-blue-400';
@@ -388,6 +446,20 @@ export class WithdrawalsView {
                             ${tx.kycStatus ? '✓ Terverifikasi' : 'Belum Verifikasi'}
                           </span>
                         </div>
+                        <div class="flex justify-between text-admin-body gap-1 pt-1 border-t border-slate-800/80">
+                          <span class="text-admin-muted">Kode Referral:</span>
+                          <span class="font-mono font-bold text-indigo-400 text-[11px] select-all">${userReferralCode || '-'}</span>
+                        </div>
+                        <div class="flex justify-between text-admin-body gap-1">
+                          <span class="text-admin-muted">Kode Pengundang:</span>
+                          ${referredBy
+                            ? `<span class="font-mono font-bold text-amber-400 text-[11px] flex items-center gap-1">
+                                <span>${referredBy}</span>
+                                <span class="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Terikat</span>
+                               </span>`
+                            : `<span class="text-slate-500 italic text-[11px]">Belum Ditautkan</span>`
+                          }
+                        </div>
                       </div>
                     </div>
 
@@ -432,6 +504,15 @@ export class WithdrawalsView {
                         <div class="flex justify-between text-admin-muted">
                           <span>Biaya Admin:</span>
                           <span class="font-mono text-rose-500 font-semibold">-Rp ${fee.toLocaleString('id-ID')}</span>
+                        </div>
+                        <div class="flex justify-between items-center text-[11px]">
+                          <span class="text-admin-muted flex items-center gap-1">
+                            <span>Potongan Kode Referral:</span>
+                            ${referredBy ? `<span class="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono border border-amber-500/30">${referredBy}</span>` : ''}
+                          </span>
+                          <span class="font-mono font-semibold ${referralDeduction > 0 ? 'text-amber-400' : 'text-slate-500'}">
+                            ${referralDeduction > 0 ? `-Rp ${referralDeduction.toLocaleString('id-ID')}` : 'Rp 0'}
+                          </span>
                         </div>
                         <div class="flex justify-between text-emerald-500 font-bold border-t border-slate-800/80 pt-1">
                           <span>Transfer Bersih:</span>
@@ -670,7 +751,55 @@ export class WithdrawalsView {
     const user = this.dataService.getUserByTransaction(tx) || {};
     const amount = Number(tx.amount || 0);
     const fee = Number(tx.fee || 0);
-    const netPayout = tx.netPayout !== undefined ? Number(tx.netPayout) : Math.max(0, amount - fee);
+
+    const userReferralCode = (
+      tx.userReferralCode ||
+      user.referralCode ||
+      user.referral_code ||
+      (tx.userId ? User.generateReferralCode(tx.userId || tx.userEmail || tx.userName) : '')
+    ).trim().toUpperCase();
+
+    let referredBy = (
+      tx.referredBy ||
+      tx.referralCode ||
+      user.referredBy ||
+      user.referred_by ||
+      ''
+    ).trim().toUpperCase();
+
+    if (!referredBy && typeof localStorage !== 'undefined') {
+      try {
+        referredBy = (
+          localStorage.getItem('pk_bound_ref_' + (tx.userId || user.id)) ||
+          localStorage.getItem('pk_bound_ref_' + (tx.userEmail || user.email || '').toLowerCase()) ||
+          ''
+        ).trim().toUpperCase();
+      } catch (_) {}
+    }
+
+    if (!referredBy && tx.description) {
+      const matchCode = tx.description.match(/Potongan\s+Referral\s*\(([^)]+)\)/i);
+      if (matchCode) referredBy = matchCode[1].trim().toUpperCase();
+    }
+
+    let referralDeduction = Number(tx.referralDeduction || tx.referral_deduction || 0);
+    if (!referralDeduction && tx.description) {
+      const matchNominal = tx.description.match(/Potongan\s+Referral[^:]*:\s*Rp\s*([\d.,]+)/i);
+      if (matchNominal) {
+        referralDeduction = Number(matchNominal[1].replace(/[.,]/g, '')) || 0;
+      }
+    }
+
+    if (!referralDeduction && referredBy && tx.type === 'withdrawal') {
+      const adminCfg = this.dataService.getAdminConfig?.() || {};
+      const refCutPercent = adminCfg.referralPercent || adminCfg.referralCutPercent || 5;
+      referralDeduction = Math.round(amount * (refCutPercent / 100));
+    }
+
+    let netPayout = Number(tx.netPayout !== undefined ? tx.netPayout : tx.net_payout);
+    if (isNaN(netPayout) || netPayout <= 0 || (referralDeduction > 0 && netPayout >= (amount - fee))) {
+      netPayout = Math.max(0, amount - fee - referralDeduction);
+    }
 
     let currentProofImage = tx.proofImage || '';
 
@@ -743,10 +872,24 @@ export class WithdrawalsView {
                 <span class="text-slate-500 block text-[10px]">Atas Nama Rekening:</span>
                 <span class="font-semibold text-white uppercase text-xs">${user.accountHolder || user.name || 'BUDI SANTOSO'}</span>
               </div>
+
+              <div class="grid grid-cols-2 gap-2 text-slate-300 pt-1.5 border-t border-slate-800/80">
+                <div>
+                  <span class="text-slate-500 block text-[10px]">Kode Referral Pemohon:</span>
+                  <span class="font-mono font-bold text-indigo-400 text-xs">${userReferralCode || '-'}</span>
+                </div>
+                <div>
+                  <span class="text-slate-500 block text-[10px]">Kode Pengundang:</span>
+                  ${referredBy
+                    ? `<span class="font-mono font-bold text-amber-400 text-xs">${referredBy} (Terikat)</span>`
+                    : `<span class="text-slate-500 italic text-xs">Belum Ditautkan</span>`
+                  }
+                </div>
+              </div>
             </div>
 
             <!-- Section 2: Ringkasan Finansial -->
-            <div class="grid ${tx.referralDeduction > 0 ? 'grid-cols-4' : 'grid-cols-3'} gap-2 p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800 text-center">
+            <div class="grid ${referralDeduction > 0 ? 'grid-cols-4' : 'grid-cols-3'} gap-2 p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800 text-center">
               <div>
                 <span class="text-[10px] text-slate-400 block">Nominal</span>
                 <span class="font-mono text-xs font-bold text-slate-200">Rp ${amount.toLocaleString('id-ID')}</span>
@@ -755,10 +898,10 @@ export class WithdrawalsView {
                 <span class="text-[10px] text-slate-400 block">Biaya Admin</span>
                 <span class="font-mono text-xs text-rose-400 font-semibold">-Rp ${fee.toLocaleString('id-ID')}</span>
               </div>
-              ${tx.referralDeduction > 0 ? `
+              ${referralDeduction > 0 ? `
               <div>
-                <span class="text-[10px] text-amber-400 block truncate" title="Komisi untuk pemilik referral">Komisi Ref</span>
-                <span class="font-mono text-xs text-amber-400 font-semibold truncate">-Rp ${Number(tx.referralDeduction).toLocaleString('id-ID')}</span>
+                <span class="text-[10px] text-amber-400 block truncate" title="Komisi untuk pemilik referral (${referredBy})">Komisi Ref</span>
+                <span class="font-mono text-xs text-amber-400 font-semibold truncate">-Rp ${Number(referralDeduction).toLocaleString('id-ID')}</span>
               </div>
               ` : ''}
               <div class="border-l border-slate-800 pl-2">
@@ -1037,7 +1180,8 @@ export class WithdrawalsView {
         ['Metode Transfer:', (tx.method || 'DANA').toUpperCase()],
         ['Nominal Diminta:', `Rp ${amount.toLocaleString('id-ID')}`],
         ['Biaya Transaksi:', `Rp ${fee.toLocaleString('id-ID')}`],
-        ...(tx.referralDeduction > 0 ? [['Komisi Referral:', `Rp ${Number(tx.referralDeduction).toLocaleString('id-ID')}`]] : []),
+        ...(referralDeduction > 0 ? [[`Potongan Referral (${referredBy || 'Pengundang'}):`, `-Rp ${Number(referralDeduction).toLocaleString('id-ID')}`]] : []),
+        ['Total Transfer Bersih:', `Rp ${netPayout.toLocaleString('id-ID')}`],
         ['Status:', 'DITRANSFER / SUKSES']
       ];
 
@@ -1121,9 +1265,51 @@ export class WithdrawalsView {
     // Kunci scroll background body saat modal aktif
     document.body.style.overflow = 'hidden';
 
+    const user = (this.dataService.getUserByTransaction && this.dataService.getUserByTransaction(tx)) || {};
     const amount = Number(tx.amount || 0);
     const fee = Number(tx.fee || 0);
-    const netPayout = tx.netPayout !== undefined ? Number(tx.netPayout) : Math.max(0, amount - fee);
+
+    let referredBy = (
+      tx.referredBy ||
+      tx.referralCode ||
+      user.referredBy ||
+      user.referred_by ||
+      ''
+    ).trim().toUpperCase();
+
+    if (!referredBy && typeof localStorage !== 'undefined') {
+      try {
+        referredBy = (
+          localStorage.getItem('pk_bound_ref_' + (tx.userId || user.id)) ||
+          localStorage.getItem('pk_bound_ref_' + (tx.userEmail || user.email || '').toLowerCase()) ||
+          ''
+        ).trim().toUpperCase();
+      } catch (_) {}
+    }
+
+    if (!referredBy && tx.description) {
+      const matchCode = tx.description.match(/Potongan\s+Referral\s*\(([^)]+)\)/i);
+      if (matchCode) referredBy = matchCode[1].trim().toUpperCase();
+    }
+
+    let referralDeduction = Number(tx.referralDeduction || tx.referral_deduction || 0);
+    if (!referralDeduction && tx.description) {
+      const matchNominal = tx.description.match(/Potongan\s+Referral[^:]*:\s*Rp\s*([\d.,]+)/i);
+      if (matchNominal) {
+        referralDeduction = Number(matchNominal[1].replace(/[.,]/g, '')) || 0;
+      }
+    }
+
+    if (!referralDeduction && referredBy && tx.type === 'withdrawal') {
+      const adminCfg = this.dataService.getAdminConfig?.() || {};
+      const refCutPercent = adminCfg.referralPercent || adminCfg.referralCutPercent || 5;
+      referralDeduction = Math.round(amount * (refCutPercent / 100));
+    }
+
+    let netPayout = Number(tx.netPayout !== undefined ? tx.netPayout : tx.net_payout);
+    if (isNaN(netPayout) || netPayout <= 0 || (referralDeduction > 0 && netPayout >= (amount - fee))) {
+      netPayout = Math.max(0, amount - fee - referralDeduction);
+    }
 
     modalMount.innerHTML = `
       <div id="receipt-modal-overlay" class="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
@@ -1180,7 +1366,16 @@ export class WithdrawalsView {
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-sans">Biaya Admin:</span>
-                <span class="text-slate-400">Rp ${fee.toLocaleString('id-ID')}</span>
+                <span class="text-rose-400 font-semibold">-Rp ${fee.toLocaleString('id-ID')}</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800">
+                <span class="text-slate-400 font-sans flex items-center gap-1">
+                  <span>Potongan Referral:</span>
+                  ${referredBy ? `<span class="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono border border-amber-500/30">${referredBy}</span>` : ''}
+                </span>
+                <span class="font-semibold ${referralDeduction > 0 ? 'text-amber-400' : 'text-slate-500'}">
+                  ${referralDeduction > 0 ? `-Rp ${referralDeduction.toLocaleString('id-ID')}` : 'Rp 0'}
+                </span>
               </div>
               <div class="flex justify-between pt-1 text-xs font-bold">
                 <span class="text-slate-200 font-sans">Total Transfer Bersih:</span>

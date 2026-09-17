@@ -1506,7 +1506,10 @@ export class AdminDataService {
       if (rawAuth) authUser = JSON.parse(rawAuth);
     } catch (e) {}
 
-    // Perkaya data transaksi dengan data profil pengguna pemohon
+    // Perkaya data transaksi dengan data profil pengguna pemohon & sinkronisasi referral
+    const adminCfg = this.getAdminConfig?.() || {};
+    const refCutPercent = adminCfg.referralPercent || adminCfg.referralCutPercent || 5;
+
     const enriched = txs.map(t => {
       const u = (Array.isArray(users) ? users : []).find(user => 
         (user && user.id && t.userId && user.id === t.userId) || 
@@ -1521,6 +1524,43 @@ export class AdminDataService {
       const userAccountNumber = t.userAccountNumber || u?.accountNumber || u?.account_number || (authUser && authUser.id === t.userId ? authUser.accountNumber : null) || t.recipient;
       const kycStatus = Boolean(u?.isVerified || u?.status === 'verified' || (authUser && authUser.id === t.userId && authUser.isVerified));
 
+      // Dapatkan kode referral milik pemohon
+      const userReferralCode = t.userReferralCode || u?.referralCode || u?.referral_code || (t.userId ? User.generateReferralCode(t.userId || t.userEmail || userName) : '');
+
+      // Dapatkan kode pengundang yang ditautkan pemohon
+      let referredBy = (t.referredBy || t.referralCode || u?.referredBy || u?.referred_by || '').trim().toUpperCase();
+      if (!referredBy && typeof localStorage !== 'undefined') {
+        try {
+          referredBy = (localStorage.getItem('pk_bound_ref_' + t.userId) ||
+                        localStorage.getItem('pk_bound_ref_' + (userEmail || '').toLowerCase()) ||
+                        '').trim().toUpperCase();
+        } catch (_) {}
+      }
+      if (!referredBy && t.description) {
+        const matchCode = t.description.match(/Potongan\s+Referral\s*\(([^)]+)\)/i);
+        if (matchCode) referredBy = matchCode[1].trim().toUpperCase();
+      }
+
+      const amount = Number(t.amount || 0);
+      const fee = Number(t.fee || 0);
+      let referralDeduction = Number(t.referralDeduction || t.referral_deduction || 0);
+
+      if (!referralDeduction && t.description) {
+        const matchNominal = t.description.match(/Potongan\s+Referral[^:]*:\s*Rp\s*([\d.,]+)/i);
+        if (matchNominal) {
+          referralDeduction = Number(matchNominal[1].replace(/[.,]/g, '')) || 0;
+        }
+      }
+
+      if (!referralDeduction && referredBy && refCutPercent > 0 && t.type === 'withdrawal') {
+        referralDeduction = Math.round(amount * (refCutPercent / 100));
+      }
+
+      let netPayout = Number(t.netPayout !== undefined ? t.netPayout : t.net_payout);
+      if (isNaN(netPayout) || netPayout <= 0 || (referralDeduction > 0 && netPayout >= (amount - fee))) {
+        netPayout = Math.max(0, amount - fee - referralDeduction);
+      }
+
       return {
         ...t,
         userName,
@@ -1529,7 +1569,14 @@ export class AdminDataService {
         accountHolder,
         userBank,
         userAccountNumber,
-        kycStatus
+        kycStatus,
+        userReferralCode,
+        referredBy,
+        referralCode: referredBy,
+        referralDeduction,
+        referral_deduction: referralDeduction,
+        netPayout,
+        net_payout: netPayout
       };
     });
 
@@ -1544,7 +1591,9 @@ export class AdminDataService {
         (t.userEmail && t.userEmail.toLowerCase().includes(q)) ||
         (t.accountHolder && t.accountHolder.toLowerCase().includes(q)) ||
         (t.recipient && t.recipient.toLowerCase().includes(q)) ||
-        (t.title && t.title.toLowerCase().includes(q));
+        (t.title && t.title.toLowerCase().includes(q)) ||
+        (t.referredBy && t.referredBy.toLowerCase().includes(q)) ||
+        (t.userReferralCode && t.userReferralCode.toLowerCase().includes(q));
       return matchType && matchStatus && matchSearch;
     }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
@@ -1563,12 +1612,34 @@ export class AdminDataService {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
+          const adminCfg = this.getAdminConfig?.() || {};
+          const refCutPercent = adminCfg.referralPercent || adminCfg.referralCutPercent || 5;
+
           const normalized = json.data.map(t => {
             const amount = Number(t.amount || 0);
             const fee = Number(t.fee || 0);
-            const netPayout = t.netPayout !== undefined
-              ? Number(t.netPayout)
-              : (t.net_payout !== undefined ? Number(t.net_payout) : Math.max(0, amount - fee));
+            let referralCode = (t.referralCode || t.referral_code || t.referredBy || t.referred_by || '').trim().toUpperCase();
+            let referralDeduction = Number(t.referralDeduction || t.referral_deduction || 0);
+
+            if (!referralCode && t.description) {
+              const matchCode = t.description.match(/Potongan\s+Referral\s*\(([^)]+)\)/i);
+              if (matchCode) referralCode = matchCode[1].trim().toUpperCase();
+            }
+            if (!referralDeduction && t.description) {
+              const matchNominal = t.description.match(/Potongan\s+Referral[^:]*:\s*Rp\s*([\d.,]+)/i);
+              if (matchNominal) {
+                referralDeduction = Number(matchNominal[1].replace(/[.,]/g, '')) || 0;
+              }
+            }
+
+            if (!referralDeduction && referralCode && t.type === 'withdrawal') {
+              referralDeduction = Math.round(amount * (refCutPercent / 100));
+            }
+
+            let netPayout = Number(t.netPayout !== undefined ? t.netPayout : t.net_payout);
+            if (isNaN(netPayout) || netPayout <= 0 || (referralDeduction > 0 && netPayout >= (amount - fee))) {
+              netPayout = Math.max(0, amount - fee - referralDeduction);
+            }
 
             return {
               ...t,
@@ -1583,6 +1654,11 @@ export class AdminDataService {
               type: t.type,
               amount,
               fee,
+              referralCode,
+              referral_code: referralCode,
+              referredBy: referralCode,
+              referralDeduction,
+              referral_deduction: referralDeduction,
               netPayout,
               net_payout: netPayout,
               title: t.title || 'Transaksi Saldo',
@@ -1857,20 +1933,28 @@ export class AdminDataService {
   getUserByTransaction(tx) {
     if (!tx) return null;
     const users = this.getUsers();
-    const user = users.find(u => u.id === tx.userId);
+    const user = users.find(u => 
+      (u.id && tx.userId && u.id === tx.userId) ||
+      (u.email && tx.userEmail && u.email.toLowerCase() === tx.userEmail.toLowerCase())
+    );
     if (user) return user;
 
     const curr = this._get('current_user');
-    if (curr && curr.id === tx.userId) return curr;
+    if (curr && (curr.id === tx.userId || (curr.email && tx.userEmail && curr.email.toLowerCase() === tx.userEmail.toLowerCase()))) {
+      return curr;
+    }
 
     return {
       id: tx.userId || 'usr_budi_01',
       name: tx.userName || 'Budi Santoso',
+      email: tx.userEmail || '',
       phone: tx.recipient || '081234567890',
       bankName: tx.method ? tx.method.toUpperCase() : 'DANA',
       accountNumber: tx.recipient || '081234567890',
       accountHolder: (tx.userName || 'BUDI SANTOSO').toUpperCase(),
-      isVerified: true
+      referralCode: tx.userReferralCode || '',
+      referredBy: tx.referredBy || tx.referralCode || '',
+      isVerified: Boolean(tx.kycStatus)
     };
   }
 

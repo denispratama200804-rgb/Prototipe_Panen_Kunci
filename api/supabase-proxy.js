@@ -647,6 +647,33 @@ export default async function handler(req, res) {
           });
         }
       } catch (_) {}
+
+      // Sinkronkan juga dari central store REFERRAL_STORE_ID (tabel users)
+      try {
+        const { data: storeRow } = await adminSupabase
+          .from('users')
+          .select('avatar')
+          .eq('id', REFERRAL_STORE_ID)
+          .maybeSingle();
+
+        let storeMap = {};
+        if (storeRow && storeRow.avatar) {
+          try {
+            storeMap = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+          } catch (_) {}
+        }
+        if (typeof storeMap === 'object' && storeMap) {
+          cleanUsers.forEach(u => {
+            const foundRef = storeMap[u.id] || storeMap[(u.email || '').toLowerCase()];
+            if (foundRef) {
+              const cleanFound = String(foundRef).trim().toUpperCase();
+              if (!u.referred_by) u.referred_by = cleanFound;
+              if (!u.referredBy) u.referredBy = cleanFound;
+            }
+          });
+        }
+      } catch (_) {}
+
       return res.status(200).json({ success: true, data: cleanUsers });
     }
 
@@ -712,12 +739,46 @@ export default async function handler(req, res) {
         txs = fallback.data;
       }
 
+      let storeMap = {};
+      try {
+        const { data: storeRow } = await adminSupabase
+          .from('users')
+          .select('avatar')
+          .eq('id', REFERRAL_STORE_ID)
+          .maybeSingle();
+        if (storeRow && storeRow.avatar) {
+          storeMap = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+        }
+      } catch (_) {}
+      if (typeof storeMap !== 'object' || !storeMap) storeMap = {};
+
       const formatted = (txs || []).map(row => {
         const amount = Number(row.amount || 0);
         const fee = Number(row.fee || 0);
-        const netPayout = row.net_payout !== null && row.net_payout !== undefined
+
+        let referralCode = row.referral_code || row.referred_by || storeMap[row.user_id] || storeMap[(row.users?.email || '').toLowerCase()] || '';
+        let referralDeduction = Number(row.referral_deduction || 0);
+
+        // Ekstrak dari description jika tersimpan di sana
+        if (!referralCode && row.description) {
+          const matchCode = row.description.match(/Potongan\s+Referral\s*\(([^)]+)\)/i);
+          if (matchCode) referralCode = matchCode[1].trim().toUpperCase();
+        }
+        if (!referralDeduction && row.description) {
+          const matchNominal = row.description.match(/Potongan\s+Referral[^:]*:\s*Rp\s*([\d.,]+)/i);
+          if (matchNominal) {
+            referralDeduction = Number(matchNominal[1].replace(/[.,]/g, '')) || 0;
+          }
+        }
+
+        // Jika user memiliki referralCode tapi nominal potongan belum terhitung di withdrawal
+        if (!referralDeduction && referralCode && row.type === 'withdrawal') {
+          referralDeduction = Math.round(amount * 0.05);
+        }
+
+        const netPayout = row.net_payout !== null && row.net_payout !== undefined && row.net_payout < (amount - fee)
           ? Number(row.net_payout)
-          : Math.max(0, amount - fee);
+          : Math.max(0, amount - fee - referralDeduction);
 
         return {
           id: row.id,
@@ -731,6 +792,11 @@ export default async function handler(req, res) {
           type: row.type,
           amount: amount,
           fee: fee,
+          referralCode: referralCode,
+          referral_code: referralCode,
+          referredBy: referralCode,
+          referralDeduction: referralDeduction,
+          referral_deduction: referralDeduction,
           netPayout: netPayout,
           net_payout: netPayout,
           title: row.title,
