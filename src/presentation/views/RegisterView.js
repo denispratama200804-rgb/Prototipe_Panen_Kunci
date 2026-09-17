@@ -24,7 +24,54 @@ export class RegisterView extends IComponent {
     this._countdownTimer = null;
   }
 
+  /**
+   * Mengambil kode referral dari URL (query string atau hash fragment) atau cache lokal
+   * @returns {string}
+   * @private
+   */
+  _getReferralCodeFromUrl() {
+    try {
+      // 1. Cek parameter di hash (misal: #/register?ref=PK-XXXXXX atau #/register?referral=PK-XXXXXX)
+      const hash = (typeof window !== 'undefined' && window.location.hash) ? window.location.hash : '';
+      if (hash.includes('?')) {
+        const hashQuery = hash.split('?')[1];
+        const params = new URLSearchParams(hashQuery);
+        const ref = params.get('ref') || params.get('refCode') || params.get('referral');
+        if (ref && ref.trim()) {
+          const cleanRef = ref.trim().toUpperCase();
+          try { localStorage.setItem('pk_referral_code', cleanRef); } catch (_) {}
+          return cleanRef;
+        }
+      }
+
+      // 2. Cek parameter di search/query string biasa (misal: ?ref=PK-XXXXXX)
+      if (typeof window !== 'undefined' && window.location.search) {
+        const searchParams = new URLSearchParams(window.location.search);
+        const ref = searchParams.get('ref') || searchParams.get('refCode') || searchParams.get('referral');
+        if (ref && ref.trim()) {
+          const cleanRef = ref.trim().toUpperCase();
+          try { localStorage.setItem('pk_referral_code', cleanRef); } catch (_) {}
+          return cleanRef;
+        }
+      }
+
+      // 3. Cek localStorage / sessionStorage jika pernah disimpan dari link referral
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const storedRef = localStorage.getItem('pk_referral_code') || sessionStorage.getItem('pk_referral_code');
+          if (storedRef && storedRef.trim()) {
+            return storedRef.trim().toUpperCase();
+          }
+        }
+      } catch (_) {}
+    } catch (e) {
+      console.warn('Gagal membaca kode referral:', e);
+    }
+    return '';
+  }
+
   render() {
+    const refCodeFromUrl = this._getReferralCodeFromUrl();
     return `
       <div class="flex flex-col w-full min-h-screen bg-surface items-center justify-center py-12 px-margin-mobile relative overflow-hidden">
         <!-- Ambient Glow -->
@@ -181,7 +228,7 @@ export class RegisterView extends IComponent {
                   id="regReferralCode"
                   type="text"
                   placeholder="Contoh: PK-85E4ZD"
-                  value="${refCodeFromUrl.toUpperCase()}"
+                  value="${refCodeFromUrl ? refCodeFromUrl.toUpperCase() : ''}"
                   autocomplete="off"
                   class="w-full bg-bg-subtle text-text-heading font-body-md text-sm rounded-xl py-3 pl-11 pr-4 border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all font-mono uppercase"
                 />
@@ -288,6 +335,13 @@ export class RegisterView extends IComponent {
     const s2 = container.querySelector('#str2');
     const s3 = container.querySelector('#str3');
     const strLabel = container.querySelector('#strLabel');
+
+    const refInput = container.querySelector('#regReferralCode');
+    if (refInput) {
+      refInput.addEventListener('input', () => {
+        refInput.value = refInput.value.toUpperCase();
+      });
+    }
 
     // ── Logika Verifikasi OTP Email ──
     const doVerify = async () => {
@@ -633,6 +687,10 @@ export class RegisterView extends IComponent {
           clearInterval(this._countdownTimer);
           this._countdownTimer = null;
         }
+        try {
+          localStorage.removeItem('pk_referral_code');
+          sessionStorage.removeItem('pk_referral_code');
+        } catch (_) {}
         this._notification.showModal({
           title: 'Pendaftaran Berhasil!',
           message: res.message || 'Pendaftaran Anda telah berhasil! Silahkan setor Key API dan hasilkan uang sebanyak banyak nya!',
