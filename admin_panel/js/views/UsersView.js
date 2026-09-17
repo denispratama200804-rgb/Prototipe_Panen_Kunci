@@ -519,7 +519,9 @@ export class UsersView {
 
     // Toggle KYC Verification (disinkronkan langsung ke Supabase)
     container.querySelectorAll('[data-action="toggle-kyc"]').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
         const id = btn.getAttribute('data-id');
         const current = btn.getAttribute('data-status') === 'true';
         btn.disabled = true;
@@ -529,30 +531,26 @@ export class UsersView {
       });
     });
 
-    // Adjust Balance
+    // Adjust Balance (Buka Modal Custom Interaktif Tanpa Menggunakan Browser Prompt)
     container.querySelectorAll('[data-action="adjust-balance"]').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
         const id = btn.getAttribute('data-id');
         const name = btn.getAttribute('data-name');
         const currentBal = Number(btn.getAttribute('data-balance') || 0);
 
-        const input = prompt(
-          `Atur Saldo Baru untuk ${name}:\nSaldo saat ini: Rp ${currentBal.toLocaleString('id-ID')}\n(Masukkan nominal angka saldo baru)`,
-          currentBal
-        );
-
-        if (input !== null && !isNaN(Number(input))) {
-          const newBal = Number(input);
-          await this.dataService.updateUser(id, { balance: newBal, manualBalance: newBal });
-          this.toast.success(`Saldo ${name} berhasil disesuaikan menjadi Rp ${newBal.toLocaleString('id-ID')}`, 'Saldo Diperbarui');
-          refreshCallback();
-        }
+        const allUsers = this.dataService.getUsers();
+        const user = allUsers.find(u => u.id === id) || { id, name, balance: currentBal };
+        this._openAdjustBalanceModal(container, user, refreshCallback);
       });
     });
 
     // View User Details
     container.querySelectorAll('[data-action="view-user-details"]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
         const id = btn.getAttribute('data-id');
         const user = this.dataService.getUsers().find(u => u.id === id);
         if (user) {
@@ -560,6 +558,168 @@ export class UsersView {
         }
       });
     });
+  }
+
+  /**
+   * Modal Interaktif Pengaturan Saldo Pengguna (Atur Saldo Promo/Bonus)
+   */
+  _openAdjustBalanceModal(container, user, refreshCallback) {
+    const modalMount = container.querySelector('#user-detail-modal-container');
+    if (!modalMount) return;
+
+    const currentBal = Number(user.balance || 0);
+    const initial = (user.name || 'User').slice(0, 2).toUpperCase();
+
+    modalMount.innerHTML = `
+      <div id="balance-modal-backdrop" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div class="admin-card rounded-3xl max-w-md w-full p-6 relative border border-slate-700 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+          <!-- Close Button -->
+          <button
+            type="button"
+            id="btn-close-balance-modal"
+            class="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-lg">close</span>
+          </button>
+
+          <!-- Header -->
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-bold text-lg overflow-hidden shrink-0">
+              ${user.avatar ? `<img src="${user.avatar}" class="w-full h-full object-cover" />` : initial}
+            </div>
+            <div class="min-w-0 flex-1">
+              <h3 class="text-base font-bold text-white font-['Plus_Jakarta_Sans']">Atur Saldo Pengguna</h3>
+              <p class="text-xs text-slate-400 truncate">${user.name || 'Pengguna'}${user.email ? ` • ${user.email}` : ''}</p>
+            </div>
+          </div>
+
+          <!-- Saldo Saat Ini -->
+          <div class="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-amber-400 text-lg">account_balance_wallet</span>
+              <span class="text-xs text-slate-400">Saldo Dompet Saat Ini:</span>
+            </div>
+            <span class="font-mono font-bold text-sm text-indigo-300">Rp ${currentBal.toLocaleString('id-ID')}</span>
+          </div>
+
+          <!-- Form Input Saldo Baru -->
+          <div class="space-y-2">
+            <label for="input-new-balance" class="block text-xs font-semibold text-slate-300">Masukkan Saldo Baru (Rp):</label>
+            <div class="relative">
+              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-indigo-400 font-mono">Rp</span>
+              <input
+                type="number"
+                id="input-new-balance"
+                value="${currentBal}"
+                min="0"
+                step="1000"
+                class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-11 pr-4 py-2.5 text-white font-mono text-sm focus:border-indigo-500 focus:outline-none transition-colors"
+                placeholder="0"
+              />
+            </div>
+
+            <!-- Tombol Preset Cepat -->
+            <div class="flex items-center gap-1.5 flex-wrap pt-1">
+              <button type="button" class="btn-preset-bal px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer transition-colors" data-val="0">Rp 0</button>
+              <button type="button" class="btn-preset-bal px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer transition-colors" data-val="10000">10rb</button>
+              <button type="button" class="btn-preset-bal px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer transition-colors" data-val="50000">50rb</button>
+              <button type="button" class="btn-preset-bal px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer transition-colors" data-val="100000">100rb</button>
+              <button type="button" class="btn-preset-add px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-500/30 cursor-pointer transition-colors" data-add="10000">+10rb</button>
+              <button type="button" class="btn-preset-add px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-500/30 cursor-pointer transition-colors" data-add="50000">+50rb</button>
+            </div>
+          </div>
+
+          <!-- Tombol Aksi -->
+          <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+            <button
+              type="button"
+              id="btn-cancel-balance"
+              class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700/60 transition-colors cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              id="btn-save-balance"
+              class="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <span class="material-symbols-outlined text-sm">check_circle</span>
+              <span>Simpan Perubahan</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const inputBal = modalMount.querySelector('#input-new-balance');
+    const closeBtn = modalMount.querySelector('#btn-close-balance-modal');
+    const cancelBtn = modalMount.querySelector('#btn-cancel-balance');
+    const saveBtn = modalMount.querySelector('#btn-save-balance');
+    const backdrop = modalMount.querySelector('#balance-modal-backdrop');
+
+    const closeModal = () => {
+      modalMount.innerHTML = '';
+    };
+
+    closeBtn?.addEventListener('click', closeModal);
+    cancelBtn?.addEventListener('click', closeModal);
+    backdrop?.addEventListener('click', (e) => {
+      if (e.target === backdrop) closeModal();
+    });
+
+    // Listener tombol preset
+    modalMount.querySelectorAll('.btn-preset-bal').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v = Number(btn.getAttribute('data-val') || 0);
+        if (inputBal) inputBal.value = v;
+      });
+    });
+
+    modalMount.querySelectorAll('.btn-preset-add').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const add = Number(btn.getAttribute('data-add') || 0);
+        if (inputBal) {
+          const cur = Number(inputBal.value || 0);
+          inputBal.value = Math.max(0, cur + add);
+        }
+      });
+    });
+
+    saveBtn?.addEventListener('click', async () => {
+      const rawVal = inputBal?.value;
+      if (rawVal === '' || rawVal === null || isNaN(Number(rawVal))) {
+        this.toast.error('Masukkan nominal angka saldo yang valid.', 'Validasi Gagal');
+        inputBal?.focus();
+        return;
+      }
+      const newBal = Math.max(0, Math.floor(Number(rawVal)));
+
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span><span>Menyimpan...</span>';
+
+      try {
+        await this.dataService.updateUser(user.id, { balance: newBal, manualBalance: newBal, customBalance: newBal });
+        this.toast.success(`Saldo ${user.name || 'Pengguna'} berhasil diubah menjadi Rp ${newBal.toLocaleString('id-ID')}!`, 'Saldo Diperbarui');
+        closeModal();
+        refreshCallback();
+      } catch (err) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<span class="material-symbols-outlined text-sm">check_circle</span><span>Simpan Perubahan</span>';
+        this.toast.error(err.message || 'Gagal memperbarui saldo.', 'Error');
+      }
+    });
+
+    inputBal?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveBtn?.click();
+      }
+    });
+
+    setTimeout(() => {
+      inputBal?.focus();
+      inputBal?.select();
+    }, 60);
   }
 
   _openUserModal(container, user) {
