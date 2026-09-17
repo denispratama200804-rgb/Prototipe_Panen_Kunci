@@ -259,54 +259,54 @@ export class ApiKeysView {
             </div>
 
             <!-- Right: Tombol Validasi Otomatis Kie.ai, Tombol Sinkron Kie.ai & Supabase -->
-            <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <button
                 type="button"
                 id="btn-midnight-kie-inspection"
                 title="Jalankan inspeksi jam 12 malam WIB: Cek seluruh key pending ke Kie.ai, tolak jika kredit berkurang (<80 cr), dan validasi jika sudah melewati 3 hari"
-                class="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-500/20 hover:bg-indigo-500/30 active:scale-95 text-indigo-200 border border-indigo-500/50 flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-indigo-500/20 ${
+                class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-500/20 hover:bg-indigo-500/30 active:scale-95 text-indigo-200 border border-indigo-500/50 flex items-center gap-1 transition-all cursor-pointer shadow-md shadow-indigo-500/20 ${
                   this.isInspectingMidnight ? 'opacity-70 cursor-not-allowed' : ''
                 }"
                 ${this.isInspectingMidnight ? 'disabled' : ''}
               >
-                <span class="material-symbols-outlined text-sm ${this.isInspectingMidnight ? 'animate-spin text-indigo-400' : 'text-indigo-400'}">dark_mode</span>
-                <span>${this.isInspectingMidnight ? 'Menginspeksi 00:00 WIB...' : '🌙 Inspeksi 00:00 WIB & Validasi 3 Hari'}</span>
+                <span class="material-symbols-outlined text-sm ${this.isInspectingMidnight ? 'animate-spin text-indigo-400' : 'text-indigo-400'}">nightlight</span>
+                <span>${this.isInspectingMidnight ? 'Inspeksi...' : 'Inspeksi 00:00 WIB'}</span>
               </button>
               <button
                 type="button"
                 id="btn-auto-validate-all-keys"
                 title="Cek langsung ke Kie.ai: Validasi otomatis semua key pending yang aktif dan memiliki 80 kredit"
-                class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-500/10 ${
+                class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/40 flex items-center gap-1 transition-all cursor-pointer shadow-md shadow-amber-500/10 ${
                   this.isAutoValidating ? 'opacity-70 cursor-not-allowed' : ''
                 }"
                 ${this.isAutoValidating ? 'disabled' : ''}
               >
                 <span class="material-symbols-outlined text-sm ${this.isAutoValidating ? 'animate-spin text-amber-400' : 'text-amber-400'}">bolt</span>
-                <span>${this.isAutoValidating ? 'Memvalidasi...' : '⚡ Validasi Otomatis (80 cr)'}</span>
+                <span>${this.isAutoValidating ? 'Memvalidasi...' : 'Auto Validasi (80 cr)'}</span>
               </button>
               <button
                 type="button"
                 id="btn-sync-all-kie-credits"
                 title="Sinkronkan kredit semua API Key langsung ke server resmi Kie.ai"
-                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 text-sky-300 border border-sky-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 text-sky-300 border border-sky-500/30 flex items-center gap-1 transition-all cursor-pointer shadow-sm ${
                   this.isSyncingKie ? 'opacity-70 cursor-not-allowed' : ''
                 }"
                 ${this.isSyncingKie ? 'disabled' : ''}
               >
                 <span class="material-symbols-outlined text-sm ${this.isSyncingKie ? 'animate-spin text-sky-400' : ''}">sync_saved_locally</span>
-                <span>${this.isSyncingKie ? 'Sinkron Kie.ai...' : '🔄 Sinkronkan Semua Kredit'}</span>
+                <span>${this.isSyncingKie ? 'Sinkron Kie...' : 'Sinkron Kie.ai'}</span>
               </button>
               <button
                 type="button"
                 id="btn-sync-supabase-keys"
                 title="Sinkronkan data API Key langsung dari database Supabase"
-                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 transition-all cursor-pointer shadow-sm ${
                   this.isSyncing ? 'opacity-70 cursor-not-allowed' : ''
                 }"
                 ${this.isSyncing ? 'disabled' : ''}
               >
                 <span class="material-symbols-outlined text-sm ${this.isSyncing ? 'animate-spin text-emerald-400' : ''}">sync</span>
-                <span>${this.isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Supabase'}</span>
+                <span>${this.isSyncing ? 'Sinkron DB...' : 'Sinkron DB'}</span>
               </button>
               <div class="text-[11px] text-slate-500 font-mono hidden sm:block">
                 Total: ${allKeys.length} Kunci
@@ -318,16 +318,16 @@ export class ApiKeysView {
         <!-- Table Container -->
         <div class="admin-card rounded-2xl overflow-hidden w-full max-w-full min-w-0 border border-slate-800/80 shadow-xl">
           <!-- Card Header (Satu baris rapi) -->
-          <div class="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center ${
+          <div class="px-4 sm:px-5 py-3 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 sm:gap-2.5">
+              <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center ${
                 this.currentFilter === 'pending'
                   ? 'bg-amber-500/20 text-amber-400'
                   : this.currentFilter === 'valid'
                   ? 'bg-emerald-500/20 text-emerald-400'
                   : 'bg-indigo-500/20 text-indigo-400'
               }">
-                <span class="material-symbols-outlined text-lg">
+                <span class="material-symbols-outlined text-base sm:text-lg">
                   ${
                     this.currentFilter === 'pending'
                       ? 'hourglass_top'
@@ -339,7 +339,7 @@ export class ApiKeysView {
               </div>
               <div class="min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-bold text-white text-sm">
+                  <span class="font-bold text-white text-xs sm:text-sm">
                     ${
                       this.currentFilter === 'pending'
                         ? 'Daftar Kunci Pasif (Perlu Verifikasi)'
@@ -348,14 +348,14 @@ export class ApiKeysView {
                         : 'Daftar Semua API Key'
                     }
                   </span>
-                  <span class="text-xs text-slate-400 font-mono">(${keys.length} baris)</span>
+                  <span class="text-[11px] sm:text-xs text-slate-400 font-mono">(${keys.length} baris)</span>
                 </div>
               </div>
             </div>
 
             <!-- Right Info Badge -->
             <div class="flex items-center gap-2">
-              <span class="text-[11px] text-slate-400 font-mono bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 hidden sm:inline">
+              <span class="text-[11px] text-slate-400 font-mono bg-slate-800/80 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg border border-slate-700/60 hidden sm:inline">
                 ${keys.length} data ditampilkan
               </span>
             </div>
@@ -366,13 +366,13 @@ export class ApiKeysView {
             <table class="w-full text-left admin-table">
               <thead>
                 <tr>
-                  <th class="pl-5 whitespace-nowrap">API Key String</th>
-                  <th class="whitespace-nowrap">Pemilik / User</th>
+                  <th class="whitespace-nowrap">API Key</th>
+                  <th class="whitespace-nowrap">Pemilik</th>
                   <th class="whitespace-nowrap">Status</th>
-                  <th class="whitespace-nowrap">Kredit Kie</th>
+                  <th class="whitespace-nowrap">Kredit</th>
                   <th class="whitespace-nowrap">Reward</th>
-                  <th class="whitespace-nowrap">Waktu Setor</th>
-                  <th class="text-right pr-5 whitespace-nowrap">Aksi</th>
+                  <th class="whitespace-nowrap">Waktu</th>
+                  <th class="text-right pr-4 sm:pr-5 whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -433,68 +433,65 @@ export class ApiKeysView {
                           const displayKey = isRevealed
                             ? k.keyString
                             : k.keyString
-                            ? `${k.keyString.slice(0, 8)}••••••••••••${k.keyString.slice(-4)}`
+                            ? `${k.keyString.slice(0, 6)}...${k.keyString.slice(-4)}`
                             : '-';
 
                           let statusBadge = '';
                           if (k.status === 'valid') {
-                            statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 whitespace-nowrap">Valid</span>';
+                            statusBadge = '<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 whitespace-nowrap">Valid</span>';
                           } else if (k.status === 'pending') {
                             const holdTime = new Date(k.holdUntil || (new Date(k.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000)).getTime();
                             const diffMs = holdTime - Date.now();
                             const isReady = diffMs <= 0;
                             let holdText = '';
                             if (isReady) {
-                              holdText = '⚡ Siap Validasi (3 Hari Selesai)';
+                              holdText = '⚡ Siap Validasi';
                             } else {
                               const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
                               const hours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
-                              holdText = days > 0 ? `⏳ Pantau: Sisa ${days}h ${hours}j` : `⏳ Pantau: Sisa ${hours}j`;
+                              holdText = days > 0 ? `⏳ Sisa ${days}h ${hours}j` : `⏳ Sisa ${hours}j`;
                             }
                             statusBadge = `
-                              <div class="flex flex-col gap-1 items-start">
-                                <span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${isReady ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/15 text-amber-300 border-amber-500/40'} inline-flex items-center gap-1 whitespace-nowrap">
-                                  <span class="w-1.5 h-1.5 rounded-full ${isReady ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse"></span>
-                                  <span>${holdText}</span>
-                                </span>
-                                <span class="text-[10px] text-slate-400 font-mono">Dipantau 00:00 WIB</span>
-                              </div>
+                              <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border ${isReady ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/15 text-amber-300 border-amber-500/40'} inline-flex items-center gap-1 whitespace-nowrap" title="Dipantau otomatis setiap 00:00 WIB">
+                                <span class="w-1.5 h-1.5 rounded-full ${isReady ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse"></span>
+                                <span>${holdText}</span>
+                              </span>
                             `;
                           } else if (k.status === 'used') {
-                            statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-blue-500/10 text-blue-400 border-blue-500/30 whitespace-nowrap">Digunakan</span>';
+                            statusBadge = '<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-blue-500/10 text-blue-400 border-blue-500/30 whitespace-nowrap">Used</span>';
                           } else {
-                            statusBadge = '<span class="text-xs px-2.5 py-1 rounded-full font-semibold border bg-rose-500/10 text-rose-400 border-rose-500/30 whitespace-nowrap">Invalid</span>';
+                            statusBadge = '<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-rose-500/10 text-rose-400 border-rose-500/30 whitespace-nowrap">Invalid</span>';
                           }
 
                           return `
                     <tr data-key-id="${k.id}">
-                      <td class="pl-5">
-                        <div class="flex items-center gap-1.5 flex-nowrap">
-                          <span class="font-mono text-xs font-semibold text-slate-200 select-all tracking-wider">${displayKey}</span>
-                          <div class="flex items-center gap-0.5 shrink-0">
+                      <td>
+                        <div class="flex items-center gap-1 flex-nowrap">
+                          <span class="font-mono text-xs font-semibold text-slate-200 select-all tracking-normal truncate max-w-[130px] sm:max-w-[150px]" title="${k.keyString || ''}">${displayKey}</span>
+                          <div class="flex items-center shrink-0">
                             <button
                               type="button"
                               data-action="toggle-reveal"
                               data-id="${k.id}"
                               title="${isRevealed ? 'Sembunyikan Kunci' : 'Tampilkan Kunci Lengkap'}"
-                              class="p-1 rounded text-slate-400 hover:text-indigo-400 transition-colors cursor-pointer"
+                              class="p-0.5 rounded text-slate-400 hover:text-indigo-400 transition-colors cursor-pointer"
                             >
-                              <span class="material-symbols-outlined text-sm">${isRevealed ? 'visibility_off' : 'visibility'}</span>
+                              <span class="material-symbols-outlined text-[15px]">${isRevealed ? 'visibility_off' : 'visibility'}</span>
                             </button>
                             <button
                               type="button"
                               data-action="copy-key"
                               data-keystring="${k.keyString}"
                               title="Salin ke Clipboard"
-                              class="p-1 rounded text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                              class="p-0.5 rounded text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
                             >
-                              <span class="material-symbols-outlined text-sm">content_copy</span>
+                              <span class="material-symbols-outlined text-[15px]">content_copy</span>
                             </button>
                           </div>
                         </div>
                         ${
                           k.errorMessage
-                            ? `<div class="text-[11px] text-rose-400 mt-1 flex items-center gap-1 truncate max-w-[240px]" title="${k.errorMessage}">
+                            ? `<div class="text-[10px] text-rose-400 mt-0.5 flex items-center gap-0.5 truncate max-w-[150px]" title="${k.errorMessage}">
                                 <span class="material-symbols-outlined text-xs shrink-0">info</span>
                                 <span class="truncate">${k.errorMessage}</span>
                               </div>`
@@ -502,15 +499,14 @@ export class ApiKeysView {
                         }
                       </td>
                       <td>
-                        <div class="font-bold text-xs text-white">${k.userName || 'Pengguna'}</div>
-                        <div class="font-mono text-[11px] text-indigo-300 font-medium truncate max-w-[170px]" title="${k.userEmail || k.userId || ''}">${k.userEmail || k.userId || '-'}</div>
-                        ${k.id ? `<div class="text-[10px] text-slate-500 font-mono truncate max-w-[140px]" title="${k.id}">ID: ${k.id.slice(0, 8)}...</div>` : ''}
+                        <div class="font-bold text-xs text-white truncate max-w-[120px] sm:max-w-[140px]">${k.userName || 'Pengguna'}</div>
+                        <div class="font-mono text-[10px] text-indigo-300/80 truncate max-w-[120px] sm:max-w-[140px]" title="${k.userEmail || k.userId || ''}">${k.userEmail || k.userId || '-'}</div>
                       </td>
                       <td>
                         ${statusBadge}
                       </td>
                       <td>
-                        <div class="flex items-center gap-1.5 whitespace-nowrap">
+                        <div class="flex items-center gap-1 whitespace-nowrap">
                           <span class="font-mono text-xs font-bold text-slate-200">${k.credits !== undefined ? k.credits : 80} cr</span>
                           <button
                             type="button"
@@ -518,7 +514,7 @@ export class ApiKeysView {
                             data-id="${k.id}"
                             data-keystring="${k.keyString}"
                             title="Sinkronkan kredit key ini langsung dari Kie.ai"
-                            class="p-1 rounded text-sky-400 hover:text-sky-300 hover:bg-sky-500/15 active:scale-90 transition-all cursor-pointer"
+                            class="p-0.5 rounded text-sky-400 hover:text-sky-300 hover:bg-sky-500/15 active:scale-90 transition-all cursor-pointer"
                           >
                             <span class="material-symbols-outlined text-xs">sync</span>
                           </button>
@@ -528,22 +524,11 @@ export class ApiKeysView {
                         <div class="font-mono text-xs font-semibold text-emerald-400 whitespace-nowrap">Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</div>
                       </td>
                       <td class="whitespace-nowrap">
-                        <div class="text-xs text-slate-300">${new Date(k.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                        <div class="text-[11px] text-slate-500">${new Date(k.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
+                        <div class="text-[11px] text-slate-300 font-medium">${new Date(k.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">${new Date(k.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
                       </td>
-                      <td class="text-right pr-5 whitespace-nowrap">
-                        <div class="flex items-center justify-end gap-1.5 flex-nowrap">
-                          <button
-                            type="button"
-                            data-action="sync-single-credit"
-                            data-id="${k.id}"
-                            data-keystring="${k.keyString}"
-                            title="Cek & Sinkronkan Kredit ke Kie.ai"
-                            class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 text-sky-300 border border-sky-500/30 flex items-center gap-1 transition-all cursor-pointer shrink-0"
-                          >
-                            <span class="material-symbols-outlined text-xs">sync</span>
-                            <span>Kie</span>
-                          </button>
+                      <td class="text-right pr-4 sm:pr-5 whitespace-nowrap">
+                        <div class="flex items-center justify-end gap-1 flex-nowrap">
                           ${
                             k.status === 'pending'
                               ? `
@@ -552,19 +537,19 @@ export class ApiKeysView {
                               data-action="auto-validate-key"
                               data-id="${k.id}"
                               title="Validasi Otomatis: Cek Kie.ai aktif & kredit 80"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 active:scale-95 text-amber-300 border border-amber-500/40 flex items-center gap-1 transition-all shadow-sm cursor-pointer shrink-0"
+                              class="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 active:scale-95 text-amber-300 border border-amber-500/40 flex items-center gap-0.5 transition-all shadow-sm cursor-pointer shrink-0"
                             >
                               <span class="material-symbols-outlined text-xs">bolt</span>
-                              <span>Auto Validasi</span>
+                              <span>Auto</span>
                             </button>
                             <button
                               type="button"
                               data-action="approve-key"
                               data-id="${k.id}"
                               title="Setujui API Key & Cairkan ke Saldo Aktif"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 transition-all shadow-sm cursor-pointer shrink-0"
+                              class="px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-emerald-300 border border-emerald-500/40 flex items-center gap-0.5 transition-all shadow-sm cursor-pointer shrink-0"
                             >
-                              <span class="material-symbols-outlined text-xs">check_circle</span>
+                              <span class="material-symbols-outlined text-xs">check</span>
                               <span>Setujui</span>
                             </button>
                             <button
@@ -572,10 +557,9 @@ export class ApiKeysView {
                               data-action="reject-key"
                               data-id="${k.id}"
                               title="Tolak API Key & Batalkan Saldo Pasif"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 border border-rose-500/30 flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                              class="p-1 rounded-lg text-rose-400 hover:bg-rose-500/20 active:scale-95 border border-rose-500/30 transition-all cursor-pointer shrink-0 flex items-center justify-center"
                             >
-                              <span class="material-symbols-outlined text-xs">cancel</span>
-                              <span>Tolak</span>
+                              <span class="material-symbols-outlined text-xs">close</span>
                             </button>
                           `
                               : k.status === 'valid'
@@ -586,9 +570,9 @@ export class ApiKeysView {
                               data-id="${k.id}"
                               data-status="used"
                               title="Tandai Sudah Digunakan / Dijual"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 text-blue-300 border border-blue-500/30 transition-all cursor-pointer shrink-0"
+                              class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 text-blue-300 border border-blue-500/30 transition-all cursor-pointer shrink-0"
                             >
-                              Tandai Used
+                              Used
                             </button>
                           `
                               : k.status === 'used'
@@ -599,9 +583,9 @@ export class ApiKeysView {
                               data-id="${k.id}"
                               data-status="valid"
                               title="Kembalikan ke Valid"
-                              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer shrink-0"
+                              class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer shrink-0"
                             >
-                              Reset Valid
+                              Valid
                             </button>
                           `
                               : ''
@@ -611,9 +595,9 @@ export class ApiKeysView {
                             data-action="delete-key"
                             data-id="${k.id}"
                             title="Hapus Kunci dari Database"
-                            class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-colors cursor-pointer shrink-0"
+                            class="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-colors cursor-pointer shrink-0 flex items-center justify-center"
                           >
-                            <span class="material-symbols-outlined text-sm">delete</span>
+                            <span class="material-symbols-outlined text-xs">delete</span>
                           </button>
                         </div>
                       </td>

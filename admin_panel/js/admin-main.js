@@ -250,7 +250,7 @@ class AdminApp {
         </div>
 
         <!-- Dynamic Main Content View Area: min-w-0 prevents flex horizontal expansion -->
-        <main class="flex-1 w-full max-w-7xl mx-auto min-w-0 ${this.currentTab === 'chat' ? 'px-2 sm:px-4 py-2' : 'p-3 sm:p-6 md:p-8'}" id="admin-view-mount">
+        <main class="flex-1 w-full max-w-[1440px] mx-auto min-w-0 ${this.currentTab === 'chat' ? 'px-2 sm:px-4 py-2' : 'p-3 sm:p-5 md:p-6'}" id="admin-view-mount">
           <!-- View content will be injected here -->
         </main>
       </div>
@@ -330,9 +330,9 @@ class AdminApp {
 
     // Sesuaikan padding container agar tampilan live chat pas dengan viewport layar tanpa terpotong
     if (tab === 'chat') {
-      viewMount.className = 'flex-1 w-full max-w-7xl mx-auto min-w-0 px-2 sm:px-4 py-2';
+      viewMount.className = 'flex-1 w-full max-w-[1440px] mx-auto min-w-0 px-2 sm:px-4 py-2';
     } else {
-      viewMount.className = 'flex-1 w-full max-w-7xl mx-auto min-w-0 p-3 sm:p-6 md:p-8';
+      viewMount.className = 'flex-1 w-full max-w-[1440px] mx-auto min-w-0 p-3 sm:p-5 md:p-6';
     }
 
     // Simpan status elemen yang sedang fokus (focus & posisi kursor) agar tidak hilang saat re-render

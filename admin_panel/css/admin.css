@@ -327,13 +327,13 @@ input[type="number"] {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 600;
-  padding: 0.75rem 0.75rem;
+  padding: 0.625rem 0.5rem;
   border-bottom: 1px solid var(--admin-border);
   white-space: nowrap;
 }
 
 .admin-table td {
-  padding: 0.75rem 0.75rem;
+  padding: 0.625rem 0.5rem;
   border-bottom: 1px solid rgba(148, 163, 184, 0.08);
   font-size: 0.8125rem;
   color: #e2e8f0;
@@ -341,12 +341,12 @@ input[type="number"] {
 
 .admin-table th:first-child,
 .admin-table td:first-child {
-  padding-left: 1.25rem !important;
+  padding-left: 1rem !important;
 }
 
 .admin-table th:last-child,
 .admin-table td:last-child {
-  padding-right: 1.25rem !important;
+  padding-right: 1rem !important;
 }
 
 .admin-table tr:hover td {
