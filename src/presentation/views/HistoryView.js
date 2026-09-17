@@ -549,7 +549,7 @@ export class HistoryView extends IComponent {
     this._bindProofLightbox(container);
     this._bindReferralDetailModal(container);
 
-    // Auto-update daftar riwayat secara real-time saat ada setoran baru atau verifikasi dari admin
+    // Auto-update daftar riwayat secara real-time saat ada setoran baru, penarikan, atau verifikasi dari admin
     this._unsubBalance = this._eventBus.on(AppEvents.BALANCE_UPDATED, () => {
       this._updateContentUI(container);
     });
@@ -557,6 +557,17 @@ export class HistoryView extends IComponent {
     this._unsubKey = this._eventBus.on(AppEvents.API_KEY_SUBMITTED, () => {
       this._updateContentUI(container);
     });
+
+    this._unsubPayout = this._eventBus.on('PAYOUT_PROCESSED', () => {
+      this._updateContentUI(container);
+    });
+
+    this._storageHandler = (e) => {
+      if (e.key && (e.key.includes('transactions') || e.key.includes('wallet_balance') || e.key.includes('referral_transactions'))) {
+        this._updateContentUI(container);
+      }
+    };
+    window.addEventListener('storage', this._storageHandler);
   }
 
   destroy() {
@@ -567,6 +578,14 @@ export class HistoryView extends IComponent {
     if (this._unsubKey) {
       this._unsubKey();
       this._unsubKey = null;
+    }
+    if (this._unsubPayout) {
+      this._unsubPayout();
+      this._unsubPayout = null;
+    }
+    if (this._storageHandler) {
+      window.removeEventListener('storage', this._storageHandler);
+      this._storageHandler = null;
     }
   }
 }

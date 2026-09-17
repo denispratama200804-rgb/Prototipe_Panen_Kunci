@@ -463,6 +463,18 @@ export class WalletService {
           return true;
         })
         .map(t => new Transaction(t));
+
+      // Deduplikasi transaksi agar tidak ada ID atau entri ganda
+      const seenTxIds = new Set();
+      const dedupedTxs = [];
+      loadedTxs.forEach(t => {
+        const txId = t.id || `${t.type}_${t.amount}_${t.createdAt}`;
+        if (!seenTxIds.has(txId)) {
+          seenTxIds.add(txId);
+          dedupedTxs.push(t);
+        }
+      });
+      loadedTxs = dedupedTxs;
     }
 
     // Hitung total komisi referral aktif yang masuk
@@ -842,16 +854,25 @@ export class WalletService {
   }
 
   /**
-   * Ambil transaksi penarikan saja
+   * Ambil transaksi penarikan saja (terdeduplikasi)
    * @returns {Transaction[]}
    */
   getWithdrawals() {
-    return this.getTransactions().filter(t => t.type === 'withdrawal');
+    const seen = new Set();
+    return this.getTransactions()
+      .filter(t => t.type === 'withdrawal')
+      .filter(t => {
+        const key = t.id || `${t.amount}_${t.createdAt}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
   }
 
   /**
    * Ambil riwayat potongan kode referral pada saat penarikan dana
    * Berfungsi saat akun terikat oleh akun lain melalui kode referral saat daftar akun
+   * Selaras 100% dengan data transaksi penarikan (Single Source of Truth)
    * @returns {Array<Object>}
    */
   getReferralHistory() {
@@ -859,61 +880,81 @@ export class WalletService {
     const currentUser = this._storage.get('current_user');
     const userReferredBy = (currentUser?.referredBy || '').trim().toUpperCase();
 
-    // 1. Ambil dari log transaksi referral spesifik user
-    const refKey = `referral_transactions_${userId}`;
-    const loggedRef = this._storage.get(refKey) || [];
-
-    // 2. Ambil dari transaksi penarikan yang memiliki potongan referral atau dari akun terikat
+    // Transaksi penarikan adalah Single Source of Truth untuk potongan kode referral
     const withdrawals = this.getWithdrawals();
+    const currentRefPercent = this.referralCutPercent;
+
     const withdrawalRef = withdrawals
-      .filter(w => (w.referralDeduction > 0 || (userReferredBy && w.amount > 0)))
+      .filter(w => {
+        if (Number(w.referralDeduction) > 0) return true;
+        if (w.description && /Potongan\s+Referral/i.test(w.description)) return true;
+        if (userReferredBy && Number(w.amount) > 0) return true;
+        return false;
+      })
       .map(w => {
-        const refCode = w.referralCode || userReferredBy;
-        const currentRefPercent = this.referralCutPercent;
-        const deduction = w.referralDeduction > 0 ? w.referralDeduction : Math.round(w.amount * (currentRefPercent / 100));
-        const effectivePercent = w.referralDeduction > 0 && w.amount > 0 ? Math.round((w.referralDeduction / w.amount) * 100) : currentRefPercent;
+        let refCode = (w.referralCode || w.referredBy || userReferredBy || '').trim().toUpperCase();
+        if (!refCode && w.description) {
+          const match = w.description.match(/Potongan\s+Referral\s*\(([^)]+)\)/i);
+          if (match) refCode = match[1].trim().toUpperCase();
+        }
+        if (!refCode) refCode = 'TERIKAT';
+
+        let deduction = Number(w.referralDeduction || 0);
+        if (!deduction && w.description) {
+          const matchNominal = w.description.match(/Potongan\s+Referral[^:]*:\s*Rp\s*([\d.,]+)/i);
+          if (matchNominal) {
+            deduction = Number(matchNominal[1].replace(/[.,]/g, '')) || 0;
+          }
+        }
+        if (!deduction) {
+          deduction = Math.round(Number(w.amount || 0) * (currentRefPercent / 100));
+        }
+
+        const effectivePercent = (deduction > 0 && w.amount > 0)
+          ? Math.round((deduction / w.amount) * 100)
+          : currentRefPercent;
+
         return {
-          id: 'ref_' + (w.id || '').replace('tx_', ''),
+          id: 'ref_' + String(w.id || '').replace('tx_', ''),
           withdrawalId: w.id,
           userId: w.userId || userId,
           userName: w.userName || currentUser?.name || 'Pengguna',
           type: 'referral_deduction',
           referralCode: refCode,
-          withdrawalAmount: w.amount,
+          withdrawalAmount: Number(w.amount || 0),
           deductionAmount: deduction,
           deductionPercent: effectivePercent,
           status: w.status || 'pending',
           method: w.method || 'dana',
           recipient: w.recipient || '',
           createdAt: w.createdAt,
+          proofImage: w.proofImage || '',
+          proofNotes: w.proofNotes || '',
+          rejectionReason: w.rejectionReason || '',
           title: 'Potongan Kode Referral',
           description: `Potongan ${refCode} saat penarikan ${w.title || 'Dana'}`
         };
       });
 
-    // Gabungkan berdasarkan withdrawalId / id agar tidak duplikasi
-    const mergedMap = new Map();
-    [...loggedRef, ...withdrawalRef].forEach(item => {
-      const key = item.withdrawalId || item.id;
-      if (!mergedMap.has(key)) {
-        mergedMap.set(key, item);
-      }
-    });
+    // Simpan data bersih dan tersinkron ke storage agar konsisten
+    if (userId) {
+      const refKey = `referral_transactions_${userId}`;
+      this._storage.set(refKey, withdrawalRef);
+    }
 
-    return Array.from(mergedMap.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return withdrawalRef.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
   /**
-   * Mencatat mutasi riwayat potongan referral ke local storage
-   * @param {Object} item
+   * Mencatat mutasi riwayat potongan referral ke local storage (sinkron otomatis)
+   * @param {Object} [item]
    * @private
    */
   _recordReferralTransaction(item) {
     const userId = this._getUserId();
     if (!userId) return;
     const refKey = `referral_transactions_${userId}`;
-    const list = this._storage.get(refKey) || [];
-    list.unshift(item);
+    const list = this.getReferralHistory();
     this._storage.set(refKey, list);
   }
 
