@@ -648,7 +648,29 @@ export class AuthService {
 
     // Validasi apakah kode referral yang dimasukkan benar-benar ada di sistem
     let referralExists = false;
-    if (isSupabaseConfigured()) {
+
+    // 1. Validasi via Server Proxy (menggunakan Service Role admin untuk bypass RLS & mendeteksi generator hash)
+    try {
+      const proxyRes = await fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'check_referral_code',
+          referralCode: cleanCode
+        })
+      });
+      if (proxyRes.ok) {
+        const proxyJson = await proxyRes.json();
+        if (proxyJson.success && proxyJson.exists) {
+          referralExists = true;
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('[AuthService] Cek kode referral via proxy warning:', proxyErr.message);
+    }
+
+    // 2. Fallback query direct Supabase (jika proxy offline dan kolom referral_code tersedia)
+    if (!referralExists && isSupabaseConfigured()) {
       try {
         const { data, error } = await supabase
           .from('users')
@@ -664,6 +686,7 @@ export class AuthService {
       }
     }
 
+    // 3. Fallback akun lokal
     if (!referralExists) {
       const localAccounts = this._storage.get('registered_accounts') || [];
       if (localAccounts.some(acc => (acc.referralCode || '').toUpperCase() === cleanCode)) {
@@ -675,7 +698,27 @@ export class AuthService {
       return { success: false, message: `Kode referral "${cleanCode}" tidak ditemukan atau tidak valid.` };
     }
 
+    // Simpan penautan ke akun saat ini:
+    // A. Update local domain, session, dan repository
     await this.updateProfile({ referredBy: cleanCode });
+
+    // B. Simpan ke Supabase database & Auth user_metadata via Server Proxy (admin bypass RLS)
+    if (this._currentUser.id) {
+      try {
+        await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'bind_referral',
+            userId: this._currentUser.id,
+            referralCode: cleanCode
+          })
+        });
+      } catch (proxyErr) {
+        console.warn('[AuthService] Bind referral proxy warning:', proxyErr.message);
+      }
+    }
+
     return { success: true, message: `Berhasil menautkan akun ke kode referral ${cleanCode}!` };
   }
 

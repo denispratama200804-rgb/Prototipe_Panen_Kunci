@@ -213,6 +213,32 @@ export default defineConfig(({ mode }) => {
             next();
           });
 
+          // Algoritma deterministik kode referral unik (PK-XXXXXX)
+          function generateReferralCode(identifier) {
+            if (!identifier) return 'PK-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+            const str = String(identifier).trim().toLowerCase();
+            let h1 = 0x811c9dc5;
+            let h2 = 5381;
+            for (let i = 0; i < str.length; i++) {
+              const c = str.charCodeAt(i);
+              h1 = Math.imul(h1 ^ c, 0x01000193);
+              h2 = ((h2 << 5) + h2) ^ c;
+            }
+            const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+            let code = '';
+            let n1 = Math.abs(h1);
+            let n2 = Math.abs(h2);
+            for (let i = 0; i < 3; i++) {
+              code += chars[n1 % chars.length];
+              n1 = Math.floor(n1 / chars.length);
+            }
+            for (let i = 0; i < 3; i++) {
+              code += chars[n2 % chars.length];
+              n2 = Math.floor(n2 / chars.length);
+            }
+            return `PK-${code}`;
+          }
+
           // 2. Server Proxy untuk operasi database Supabase jika client terhalang RLS
           server.middlewares.use('/api/supabase-proxy', async (req, res) => {
             res.setHeader('Content-Type', 'application/json');
@@ -624,6 +650,126 @@ export default defineConfig(({ mode }) => {
                           key: data || null
                         }));
                       }
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                    }
+                    return;
+                  }
+
+                  // Validasi & Cek Keberadaan Kode Referral (Bypass RLS)
+                  if (action === 'check_referral_code') {
+                    if (adminSupabase) {
+                      const code = (parsed.referralCode || parsed.referral_code || data?.referralCode || data?.referral_code || '').trim().toUpperCase();
+                      if (!code) {
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({ success: true, exists: false, message: 'Kode referral kosong' }));
+                        return;
+                      }
+
+                      // 1. Coba cari di kolom referral_code jika sudah ada
+                      let directFound = null;
+                      try {
+                        const { data: dbUser, error: dbErr } = await adminSupabase
+                          .from('users')
+                          .select('id, name, email, referral_code')
+                          .ilike('referral_code', code)
+                          .maybeSingle();
+                        if (!dbErr && dbUser && dbUser.id) directFound = dbUser;
+                      } catch (_) {}
+
+                      if (directFound) {
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({
+                          success: true,
+                          exists: true,
+                          referrer: {
+                            id: directFound.id,
+                            name: directFound.name || 'Pengguna',
+                            email: directFound.email || '',
+                            referralCode: code
+                          }
+                        }));
+                        return;
+                      }
+
+                      // 2. Cocokkan via generator deterministik ke seluruh pengguna di Supabase
+                      try {
+                        const { data: users, error: usersErr } = await adminSupabase
+                          .from('users')
+                          .select('id, name, email, role');
+
+                        if (!usersErr && Array.isArray(users)) {
+                          const cleanUsers = users.filter(u => u.role !== 'system_config' && !u.email?.includes('system_config') && !u.email?.includes('panenkunci.internal'));
+                          const found = cleanUsers.find(u => {
+                            if (u.referral_code && u.referral_code.toUpperCase() === code) return true;
+                            const codeById = generateReferralCode(u.id);
+                            const codeByEmail = generateReferralCode(u.email);
+                            const codeByName = generateReferralCode(u.name);
+                            return codeById === code || codeByEmail === code || codeByName === code;
+                          });
+
+                          if (found) {
+                            try {
+                              await adminSupabase.from('users').update({ referral_code: code }).eq('id', found.id);
+                            } catch (_) {}
+
+                            res.statusCode = 200;
+                            res.end(JSON.stringify({
+                              success: true,
+                              exists: true,
+                              referrer: {
+                                id: found.id,
+                                name: found.name || 'Pengguna',
+                                email: found.email || '',
+                                referralCode: code
+                              }
+                            }));
+                            return;
+                          }
+                        }
+                      } catch (err) {
+                        console.warn('[vite proxy] check_referral_code error:', err.message);
+                      }
+
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true, exists: false, message: 'Kode referral tidak ditemukan atau tidak valid' }));
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
+                    }
+                    return;
+                  }
+
+                  // Menautkan Kode Referral Pengundang ke Akun Pengguna (Bypass RLS)
+                  if (action === 'bind_referral') {
+                    if (adminSupabase) {
+                      const targetUserId = parsed.userId || parsed.user_id || data?.userId || data?.user_id;
+                      const code = (parsed.referralCode || parsed.referral_code || data?.referralCode || data?.referral_code || '').trim().toUpperCase();
+
+                      if (!targetUserId || !code) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: 'User ID dan Kode Referral diperlukan.' }));
+                        return;
+                      }
+
+                      try {
+                        await adminSupabase
+                          .from('users')
+                          .update({ referred_by: code, updated_at: new Date().toISOString() })
+                          .eq('id', targetUserId);
+                      } catch (_) {}
+
+                      try {
+                        await adminSupabase.auth.admin.updateUserById(targetUserId, {
+                          user_metadata: { referred_by: code }
+                        });
+                      } catch (authErr) {
+                        console.warn('[vite proxy] update user_metadata referred_by warning:', authErr.message);
+                      }
+
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true, message: `Berhasil menautkan ke kode referral ${code}` }));
                     } else {
                       res.statusCode = 500;
                       res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));

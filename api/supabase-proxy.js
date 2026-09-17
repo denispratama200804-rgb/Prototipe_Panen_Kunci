@@ -350,6 +350,32 @@ async function getOnlineUserIdsFromSupabase() {
   return [];
 }
 
+// Algoritma deterministik kode referral unik (PK-XXXXXX)
+function generateReferralCode(identifier) {
+  if (!identifier) return 'PK-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+  const str = String(identifier).trim().toLowerCase();
+  let h1 = 0x811c9dc5;
+  let h2 = 5381;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193);
+    h2 = ((h2 << 5) + h2) ^ c;
+  }
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let code = '';
+  let n1 = Math.abs(h1);
+  let n2 = Math.abs(h2);
+  for (let i = 0; i < 3; i++) {
+    code += chars[n1 % chars.length];
+    n1 = Math.floor(n1 / chars.length);
+  }
+  for (let i = 0; i < 3; i++) {
+    code += chars[n2 % chars.length];
+    n2 = Math.floor(n2 / chars.length);
+  }
+  return `PK-${code}`;
+}
+
 export default async function handler(req, res) {
   // Pastikan header CORS dan Content-Type terpasang
   res.setHeader('Content-Type', 'application/json');
@@ -712,6 +738,109 @@ export default async function handler(req, res) {
         exists: !!data,
         key: data || null
       });
+    }
+
+    // 2d-2. Validasi & Cek Keberadaan Kode Referral (Bypass RLS)
+    if (action === 'check_referral_code') {
+      const code = (body.referralCode || body.referral_code || data?.referralCode || data?.referral_code || '').trim().toUpperCase();
+      if (!code) {
+        return res.status(200).json({ success: true, exists: false, message: 'Kode referral kosong' });
+      }
+
+      // 1. Coba cek langsung via kolom referral_code jika sudah ada di database
+      let directFound = null;
+      try {
+        const { data: dbUser, error: dbErr } = await adminSupabase
+          .from('users')
+          .select('id, name, email, referral_code')
+          .ilike('referral_code', code)
+          .maybeSingle();
+        if (!dbErr && dbUser && dbUser.id) {
+          directFound = dbUser;
+        }
+      } catch (_) {}
+
+      if (directFound) {
+        return res.status(200).json({
+          success: true,
+          exists: true,
+          referrer: {
+            id: directFound.id,
+            name: directFound.name || 'Pengguna',
+            email: directFound.email || '',
+            referralCode: code
+          }
+        });
+      }
+
+      // 2. Cocokkan via generator deterministik ke seluruh pengguna di Supabase
+      try {
+        const { data: users, error: usersErr } = await adminSupabase
+          .from('users')
+          .select('id, name, email, role');
+
+        if (!usersErr && Array.isArray(users)) {
+          const cleanUsers = users.filter(u => u.role !== 'system_config' && !u.email?.includes('system_config') && !u.email?.includes('panenkunci.internal'));
+          const found = cleanUsers.find(u => {
+            if (u.referral_code && u.referral_code.toUpperCase() === code) return true;
+            const codeById = generateReferralCode(u.id);
+            const codeByEmail = generateReferralCode(u.email);
+            const codeByName = generateReferralCode(u.name);
+            return codeById === code || codeByEmail === code || codeByName === code;
+          });
+
+          if (found) {
+            // Jika kolom referral_code di database sudah tersedia, sinkronkan nilai ini
+            try {
+              await adminSupabase.from('users').update({ referral_code: code }).eq('id', found.id);
+            } catch (_) {}
+
+            return res.status(200).json({
+              success: true,
+              exists: true,
+              referrer: {
+                id: found.id,
+                name: found.name || 'Pengguna',
+                email: found.email || '',
+                referralCode: code
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[supabase-proxy] check_referral_code error:', err.message);
+      }
+
+      return res.status(200).json({ success: true, exists: false, message: 'Kode referral tidak ditemukan atau tidak valid' });
+    }
+
+    // 2d-3. Menautkan Kode Referral Pengundang ke Akun Pengguna (Bypass RLS)
+    if (action === 'bind_referral') {
+      const targetUserId = body.userId || body.user_id || data?.userId || data?.user_id;
+      const code = (body.referralCode || body.referral_code || data?.referralCode || data?.referral_code || '').trim().toUpperCase();
+
+      if (!targetUserId || !code) {
+        return res.status(400).json({ success: false, error: 'User ID dan Kode Referral diperlukan.' });
+      }
+
+      // 1. Coba simpan ke kolom referred_by di tabel users jika ada
+      try {
+        await adminSupabase
+          .from('users')
+          .update({ referred_by: code, updated_at: new Date().toISOString() })
+          .eq('id', targetUserId);
+      } catch (_) {}
+
+      // 2. Simpan secara permanen ke Auth user_metadata
+      try {
+        await adminSupabase.auth.admin.updateUserById(targetUserId, {
+          user_metadata: { referred_by: code }
+        });
+      } catch (authErr) {
+        console.warn('[supabase-proxy] update user_metadata referred_by warning:', authErr.message);
+      }
+
+      return res.status(200).json({ success: true, message: `Berhasil menautkan ke kode referral ${code}` });
     }
 
     // 2e. Sinkronisasi kuota kredit API Key langsung ke server Kie.ai (https://api.kie.ai/api/v1/chat/credit)
