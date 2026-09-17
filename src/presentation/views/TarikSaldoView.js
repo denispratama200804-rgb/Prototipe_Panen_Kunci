@@ -145,7 +145,9 @@ export class TarikSaldoView extends IComponent {
     ];
 
     const currentFee = getFee(resolved.method);
-    const currentReceive = Math.max(0, minWithdrawal - currentFee);
+    const userReferredBy = (user?.referredBy || '').trim().toUpperCase();
+    const initialReferralCut = userReferredBy ? Math.round(minWithdrawal * 0.05) : 0;
+    const currentReceive = Math.max(0, minWithdrawal - currentFee - initialReferralCut);
 
     return `
       <div class="flex flex-col w-full min-h-screen bg-background pb-28 pt-20">
@@ -454,6 +456,13 @@ export class TarikSaldoView extends IComponent {
                   <span>Biaya Admin</span>
                   <span class="font-bold font-mono text-amber-500" id="summaryFee">Rp ${currentFee.toLocaleString('id-ID')}</span>
                 </div>
+                <div class="flex justify-between items-center text-text-body ${userReferredBy ? '' : 'hidden'}" id="summaryReferralRow">
+                  <span class="flex items-center gap-1">
+                    <span>Potongan Kode Referral</span>
+                    <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.2 rounded font-bold" id="summaryReferralBadge">${userReferredBy ? `${userReferredBy} (5%)` : '5%'}</span>
+                  </span>
+                  <span class="font-bold font-mono text-primary" id="summaryReferralCut">-Rp ${initialReferralCut.toLocaleString('id-ID')}</span>
+                </div>
                 <div class="w-full h-px bg-surface-container my-0.5"></div>
                 <div class="flex justify-between items-center text-sm font-extrabold text-text-heading">
                   <span>Total Diterima</span>
@@ -541,11 +550,17 @@ export class TarikSaldoView extends IComponent {
       const minWithdrawal = this._walletService.minWithdrawal;
       const resolved = getCurrentResolved();
       const method = resolved.method;
+      const currentUser = this._authService.getCurrentUser();
+      const userReferredBy = (currentUser?.referredBy || '').trim().toUpperCase();
       const fee = this._walletService.getFeeForMethod(method, amount);
-      const totalReceive = Math.max(0, amount - fee);
+      const referralCut = userReferredBy ? Math.round(amount * 0.05) : 0;
+      const totalReceive = Math.max(0, amount - fee - referralCut);
 
       const summaryAmount = container.querySelector('#summaryAmount');
       const summaryFee = container.querySelector('#summaryFee');
+      const summaryReferralRow = container.querySelector('#summaryReferralRow');
+      const summaryReferralCut = container.querySelector('#summaryReferralCut');
+      const summaryReferralBadge = container.querySelector('#summaryReferralBadge');
       const summaryTotal = container.querySelector('#summaryTotalDeduction');
       const summaryNet = container.querySelector('#summaryTotalReceive');
       const breakdownAlertContainer = container.querySelector('#breakdownAlertContainer');
@@ -553,6 +568,15 @@ export class TarikSaldoView extends IComponent {
 
       if (summaryAmount) summaryAmount.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
       if (summaryFee) summaryFee.textContent = `Rp ${fee.toLocaleString('id-ID')}`;
+      if (summaryReferralCut) summaryReferralCut.textContent = `-Rp ${referralCut.toLocaleString('id-ID')}`;
+      if (summaryReferralBadge && userReferredBy) summaryReferralBadge.textContent = `${userReferredBy} (5%)`;
+      if (summaryReferralRow) {
+        if (userReferredBy) {
+          summaryReferralRow.classList.remove('hidden');
+        } else {
+          summaryReferralRow.classList.add('hidden');
+        }
+      }
 
       // Validasi kesesuaian saldo dengan nominal yang ingin ditarik
       const isExcessive = amount > currentBalance;
@@ -733,8 +757,10 @@ export class TarikSaldoView extends IComponent {
       const account = resolved.registeredAccount;
 
       const methodLabel = resolved.label;
+      const userReferredBy = (user?.referredBy || '').trim().toUpperCase();
       const fee = this._walletService.getFeeForMethod(method, amount);
-      const totalReceive = Math.max(0, amount - fee);
+      const referralCut = userReferredBy ? Math.round(amount * 0.05) : 0;
+      const totalReceive = Math.max(0, amount - fee - referralCut);
 
       if (!account) {
         this._notification.error('Nomor rekening atau e-wallet di profil belum terdaftar. Silakan lengkapi di profil.');
@@ -772,6 +798,12 @@ export class TarikSaldoView extends IComponent {
                 <span class="text-text-body font-medium">Biaya Admin</span>
                 <span class="font-semibold text-error font-mono">${fee > 0 ? '-Rp ' + fee.toLocaleString('id-ID') : 'Gratis'}</span>
               </div>
+              ${userReferredBy ? `
+                <div class="flex justify-between items-center text-xs">
+                  <span class="text-text-body font-medium">Potongan Kode Referral (${userReferredBy})</span>
+                  <span class="font-semibold text-primary font-mono">-Rp ${referralCut.toLocaleString('id-ID')}</span>
+                </div>
+              ` : ''}
               <div class="h-[1px] w-full bg-outline-variant/30 my-1"></div>
               <div class="flex justify-between items-center bg-primary/10 p-2.5 rounded-xl border border-primary/20">
                 <span class="text-xs text-primary font-bold">Total Diterima</span>
@@ -819,7 +851,9 @@ export class TarikSaldoView extends IComponent {
             userName: currentUser ? currentUser.name : (resolved.accountHolder || 'Pengguna'),
             userEmail: currentUser ? currentUser.email : '',
             userPhone: currentUser ? currentUser.phone : account,
-            accountHolder: resolved.accountHolder || (currentUser ? currentUser.name : '')
+            accountHolder: resolved.accountHolder || (currentUser ? currentUser.name : ''),
+            referredBy: userReferredBy,
+            referralDeduction: referralCut
           });
 
           // Tutup popup konfirmasi
@@ -843,6 +877,12 @@ export class TarikSaldoView extends IComponent {
                     <span class="text-text-body">Biaya Admin</span>
                     <strong class="font-mono ${fee > 0 ? 'text-amber-500' : 'text-slate-500'}">Rp ${fee.toLocaleString('id-ID')}</strong>
                   </div>
+                  ${userReferredBy ? `
+                    <div class="flex justify-between items-center">
+                      <span class="text-text-body">Potongan Referral (${userReferredBy})</span>
+                      <strong class="font-mono text-primary font-bold">-Rp ${referralCut.toLocaleString('id-ID')}</strong>
+                    </div>
+                  ` : ''}
                   <div class="h-[1px] bg-outline-variant/30 my-0.5"></div>
                   <div class="flex justify-between items-center text-sm font-extrabold">
                     <span class="text-text-heading">Total Dana Masuk</span>

@@ -254,6 +254,62 @@ export class ProfileView extends IComponent {
                 </div>
               </div>
 
+              <!-- Status Akun Terikat Kode Referral -->
+              <div class="bg-surface-container-low rounded-2xl p-3.5 border border-surface-container/80 flex flex-col gap-2.5" id="boxAccountReferralStatus">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold uppercase tracking-wider text-text-heading flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px] text-primary">link</span>
+                    <span>Status Keterikatan Akun</span>
+                  </span>
+                  ${user.referredBy ? `
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30 flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                      <span>Terikat</span>
+                    </span>
+                  ` : `
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-container-high text-outline">
+                      Belum Terikat
+                    </span>
+                  `}
+                </div>
+
+                ${user.referredBy ? `
+                  <div class="flex items-center justify-between bg-surface-card p-2.5 rounded-xl border border-surface-container">
+                    <div class="flex flex-col">
+                      <span class="text-[10px] text-text-body">Terikat ke Kode Pengundang:</span>
+                      <span class="font-mono text-xs font-black text-primary">${user.referredBy}</span>
+                    </div>
+                    <span class="text-[10px] font-semibold text-secondary bg-secondary/10 px-2 py-1 rounded-lg">
+                      Potongan Penarikan Aktif
+                    </span>
+                  </div>
+                  <p class="text-[10px] text-text-body leading-relaxed">
+                    Akun Anda terikat oleh kode rujukan ini. Riwayat potongan kode referral pada saat penarikan dana dapat dilihat di <a href="#/riwayat?tab=referral" class="text-primary font-bold hover:underline">Riwayat Transaksi</a>.
+                  </p>
+                ` : `
+                  <p class="text-[11px] text-text-body leading-relaxed">
+                    Belum menautkan kode rujukan pengundang saat pendaftaran? Masukkan kode referral teman Anda di bawah ini:
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <input
+                      type="text"
+                      id="inputBindReferralCode"
+                      placeholder="Contoh: PK-78A9B2"
+                      maxlength="12"
+                      class="flex-1 uppercase font-mono text-xs font-bold px-3 py-2 rounded-xl bg-surface-card border border-surface-container focus:border-primary focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      id="btnBindReferralCode"
+                      class="px-3.5 py-2 bg-primary text-white rounded-xl text-xs font-bold shadow-xs hover:bg-primary-container active:scale-95 transition-all cursor-pointer whitespace-nowrap flex items-center gap-1"
+                    >
+                      <span class="material-symbols-outlined text-[15px]">link</span>
+                      <span>Tautkan</span>
+                    </button>
+                  </div>
+                `}
+              </div>
+
               <!-- Benefit Highlights -->
               <div class="bg-surface-container-low rounded-2xl p-3.5 border border-surface-container/60 flex items-start gap-3">
                 <div class="w-8 h-8 rounded-xl bg-secondary/15 text-secondary flex items-center justify-center shrink-0 mt-0.5">
@@ -614,6 +670,34 @@ export class ProfileView extends IComponent {
         }
       } else {
         await copyTextToClipboard(code, `Kode referral ${code} berhasil disalin! Bagikan kode ini ke rekan Anda.`);
+      }
+    });
+
+    // Handler Tautkan Kode Referral Pengundang
+    const btnBindReferralCode = container.querySelector('#btnBindReferralCode');
+    const inputBindReferralCode = container.querySelector('#inputBindReferralCode');
+
+    btnBindReferralCode?.addEventListener('click', async () => {
+      const code = (inputBindReferralCode?.value || '').trim().toUpperCase();
+      if (!code) {
+        this._notification.error('Silakan masukkan kode referral pengundang.');
+        inputBindReferralCode?.focus();
+        return;
+      }
+      btnBindReferralCode.disabled = true;
+      btnBindReferralCode.innerHTML = '<span class="material-symbols-outlined text-[15px] animate-spin">progress_activity</span>';
+
+      const res = await this._authService.bindReferralCode(code);
+      if (res.success) {
+        this._notification.success(res.message);
+        setTimeout(() => {
+          window.location.hash = '#/profil';
+          window.location.reload();
+        }, 500);
+      } else {
+        this._notification.error(res.message);
+        btnBindReferralCode.disabled = false;
+        btnBindReferralCode.innerHTML = '<span class="material-symbols-outlined text-[15px]">link</span><span>Tautkan</span>';
       }
     });
 

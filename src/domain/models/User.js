@@ -19,6 +19,7 @@ export class User {
    * @param {string} [params.avatar]
    * @param {string} [params.nicknameUpdatedAt]
    * @param {string} [params.referralCode]
+   * @param {string} [params.referredBy]
    */
   constructor({
     id,
@@ -34,7 +35,8 @@ export class User {
     createdAt = new Date().toISOString(),
     avatar = '',
     nicknameUpdatedAt = null,
-    referralCode = ''
+    referralCode = '',
+    referredBy = ''
   }) {
     this.id = id;
     this.name = name;
@@ -49,6 +51,7 @@ export class User {
     this.avatar = (avatar && avatar !== '/avatar.png') ? avatar : '';
     this.nicknameUpdatedAt = nicknameUpdatedAt || null;
     this.referralCode = referralCode || User.generateReferralCode(id || email || name);
+    this.referredBy = referredBy || '';
 
     // Akun terverifikasi jika sudah mendaftarkan rekening e-wallet atau merupakan administrator
     const hasPayment = this.hasPaymentDetails();
@@ -173,7 +176,8 @@ export class User {
       createdAt: this.createdAt,
       avatar: this.avatar,
       nicknameUpdatedAt: this.nicknameUpdatedAt,
-      referralCode: this.referralCode
+      referralCode: this.referralCode,
+      referredBy: this.referredBy
     };
   }
 }

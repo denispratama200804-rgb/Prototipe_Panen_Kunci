@@ -20,6 +20,9 @@ export class Transaction {
    * @param {string} [params.processedAt]
    * @param {string} [params.proofImage]
    * @param {string} [params.proofNotes]
+   * @param {string} [params.referralCode]
+   * @param {number} [params.referralDeduction]
+   * @param {string} [params.referredBy]
    */
   constructor({
     id,
@@ -32,6 +35,9 @@ export class Transaction {
     method = '',
     recipient = '',
     fee = 0,
+    referralCode = '',
+    referralDeduction = 0,
+    referredBy = '',
     netPayout = null,
     createdAt = new Date().toISOString(),
     processedAt = '',
@@ -49,7 +55,12 @@ export class Transaction {
     this.method = method;
     this.recipient = recipient;
     this.fee = fee;
-    this.netPayout = netPayout !== null && netPayout !== undefined ? Number(netPayout) : Math.max(0, Number(amount || 0) - Number(fee || 0));
+    this.referralCode = referralCode || '';
+    this.referralDeduction = Number(referralDeduction || 0);
+    this.referredBy = referredBy || '';
+    this.netPayout = netPayout !== null && netPayout !== undefined
+      ? Number(netPayout)
+      : Math.max(0, Number(amount || 0) - Number(fee || 0) - Number(this.referralDeduction || 0));
     this.createdAt = createdAt;
     this.processedAt = processedAt;
     this.proofImage = proofImage;
@@ -82,6 +93,9 @@ export class Transaction {
       method: this.method,
       recipient: this.recipient,
       fee: this.fee,
+      referralCode: this.referralCode,
+      referralDeduction: this.referralDeduction,
+      referredBy: this.referredBy,
       netPayout: this.netPayout,
       createdAt: this.createdAt,
       processedAt: this.processedAt,

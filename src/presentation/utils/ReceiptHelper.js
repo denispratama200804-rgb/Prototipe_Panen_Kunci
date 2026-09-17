@@ -100,10 +100,15 @@ export class ReceiptHelper {
       ['Rekening / E-Wallet:', recipient],
       ['Nama Penerima:', recipientName],
       ['Jumlah Penarikan (Gross):', `Rp ${amount.toLocaleString('id-ID')}`],
-      ['Biaya Admin:', `Rp ${fee.toLocaleString('id-ID')}`],
-      ['Total Bersih (Net):', `Rp ${netPayout.toLocaleString('id-ID')}`],
-      ['Status:', 'DITRANSFER / SUKSES']
+      ['Biaya Admin:', `Rp ${fee.toLocaleString('id-ID')}`]
     ];
+
+    if (details.referralDeduction) {
+      rows.push([`Potongan Referral (${details.referralCode || 'Terikat'}):`, `-Rp ${Number(details.referralDeduction).toLocaleString('id-ID')}`]);
+    }
+
+    rows.push(['Total Bersih (Net):', `Rp ${netPayout.toLocaleString('id-ID')}`]);
+    rows.push(['Status:', 'DITRANSFER / SUKSES']);
 
     let y = 360;
     ctx.textAlign = 'left';
@@ -284,6 +289,12 @@ export class ReceiptHelper {
               <span>Biaya Transaksi:</span>
               <span class="font-mono text-error-ruby">-Rp ${fee.toLocaleString('id-ID')}</span>
             </div>
+            ${item.referralDeduction ? `
+              <div class="flex justify-between items-center text-text-body">
+                <span>Potongan Referral (${item.referralCode || 'Terikat'}):</span>
+                <span class="font-mono text-primary font-bold">-Rp ${Number(item.referralDeduction).toLocaleString('id-ID')}</span>
+              </div>
+            ` : ''}
             <div class="pt-1.5 border-t border-surface-container flex justify-between items-center">
               <span class="font-bold text-text-heading">Total Dana Ditransfer:</span>
               <span class="font-mono font-extrabold text-sm text-emerald-600 dark:text-emerald-400">Rp ${netPayout.toLocaleString('id-ID')}</span>

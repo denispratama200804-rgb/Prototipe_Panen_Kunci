@@ -802,6 +802,72 @@ export class WalletService {
   }
 
   /**
+   * Ambil riwayat potongan kode referral pada saat penarikan dana
+   * Berfungsi saat akun terikat oleh akun lain melalui kode referral saat daftar akun
+   * @returns {Array<Object>}
+   */
+  getReferralHistory() {
+    const userId = this._getUserId();
+    const currentUser = this._storage.get('current_user');
+    const userReferredBy = (currentUser?.referredBy || '').trim().toUpperCase();
+
+    // 1. Ambil dari log transaksi referral spesifik user
+    const refKey = `referral_transactions_${userId}`;
+    const loggedRef = this._storage.get(refKey) || [];
+
+    // 2. Ambil dari transaksi penarikan yang memiliki potongan referral atau dari akun terikat
+    const withdrawals = this.getWithdrawals();
+    const withdrawalRef = withdrawals
+      .filter(w => (w.referralDeduction > 0 || (userReferredBy && w.amount > 0)))
+      .map(w => {
+        const refCode = w.referralCode || userReferredBy;
+        const deduction = w.referralDeduction > 0 ? w.referralDeduction : Math.round(w.amount * 0.05);
+        return {
+          id: 'ref_' + (w.id || '').replace('tx_', ''),
+          withdrawalId: w.id,
+          userId: w.userId || userId,
+          userName: w.userName || currentUser?.name || 'Pengguna',
+          type: 'referral_deduction',
+          referralCode: refCode,
+          withdrawalAmount: w.amount,
+          deductionAmount: deduction,
+          deductionPercent: 5,
+          status: w.status || 'pending',
+          method: w.method || 'dana',
+          recipient: w.recipient || '',
+          createdAt: w.createdAt,
+          title: 'Potongan Kode Referral',
+          description: `Potongan ${refCode} saat penarikan ${w.title || 'Dana'}`
+        };
+      });
+
+    // Gabungkan berdasarkan withdrawalId / id agar tidak duplikasi
+    const mergedMap = new Map();
+    [...loggedRef, ...withdrawalRef].forEach(item => {
+      const key = item.withdrawalId || item.id;
+      if (!mergedMap.has(key)) {
+        mergedMap.set(key, item);
+      }
+    });
+
+    return Array.from(mergedMap.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  /**
+   * Mencatat mutasi riwayat potongan referral ke local storage
+   * @param {Object} item
+   * @private
+   */
+  _recordReferralTransaction(item) {
+    const userId = this._getUserId();
+    if (!userId) return;
+    const refKey = `referral_transactions_${userId}`;
+    const list = this._storage.get(refKey) || [];
+    list.unshift(item);
+    this._storage.set(refKey, list);
+  }
+
+  /**
    * Ambil transaksi setoran saja
    * @returns {Transaction[]}
    */
@@ -971,13 +1037,36 @@ export class WalletService {
    * @param {string} [params.userId]
    * @returns {Promise<{ success: boolean, message: string, transaction?: Transaction, fee?: number, totalReceive?: number }>}
    */
-  async withdraw({ amount, method, accountIdentifier, userId = 'usr_current', userName = '', userEmail = '', userPhone = '', accountHolder = '', bankName = '' }) {
+  async withdraw({
+    amount,
+    method,
+    accountIdentifier,
+    userId = 'usr_current',
+    userName = '',
+    userEmail = '',
+    userPhone = '',
+    accountHolder = '',
+    bankName = '',
+    referredBy = '',
+    referralDeduction = 0
+  }) {
     const numAmount = Number(amount);
 
     // 1. Dapatkan strategi dan hitung biaya admin sesuai pengaturan
     const strategy = this._strategyFactory.get(method);
     const fee = strategy ? strategy.calculateFee(numAmount) : 0;
-    const totalReceive = Math.max(0, numAmount - fee);
+
+    // Evaluasi potongan kode referral (aktif jika akun terikat kode referral)
+    const currentUser = this._storage.get('current_user');
+    const effectiveReferredBy = (referredBy || currentUser?.referredBy || '').trim().toUpperCase();
+    let finalReferralDeduction = Number(referralDeduction || 0);
+    const referralCutPercent = 5; // Standar 5% dari nominal penarikan
+
+    if (effectiveReferredBy && finalReferralDeduction <= 0) {
+      finalReferralDeduction = Math.round(numAmount * (referralCutPercent / 100));
+    }
+
+    const totalReceive = Math.max(0, numAmount - fee - finalReferralDeduction);
 
     // 2. Validasi penarikan
     this._validator.minWithdrawal = this.minWithdrawal;
@@ -1002,6 +1091,12 @@ export class WalletService {
     this._balance -= numAmount;
 
     // 5. Catat transaksi dengan status 'pending' (perlu konfirmasi admin)
+    const descParts = [`Penarikan ke ${accountIdentifier}`];
+    if (fee > 0) descParts.push(`Biaya Admin: Rp ${fee.toLocaleString('id-ID')}`);
+    if (finalReferralDeduction > 0 && effectiveReferredBy) {
+      descParts.push(`Potongan Referral (${effectiveReferredBy}): Rp ${finalReferralDeduction.toLocaleString('id-ID')}`);
+    }
+
     const tx = new Transaction({
       id: result.transactionId || 'tx_' + Math.random().toString(36).substring(2, 9),
       userId,
@@ -1013,9 +1108,12 @@ export class WalletService {
       type: 'withdrawal',
       amount: numAmount,
       fee,
+      referralCode: effectiveReferredBy,
+      referralDeduction: finalReferralDeduction,
+      referredBy: effectiveReferredBy,
       netPayout: totalReceive,
       title: `${strategy.getLabel()}`,
-      description: `Penarikan ke ${accountIdentifier}${fee > 0 ? ` (Biaya Admin: Rp ${fee.toLocaleString('id-ID')})` : ''}`,
+      description: descParts.join(' • '),
       status: 'pending',
       method,
       recipient: accountIdentifier,
@@ -1023,6 +1121,28 @@ export class WalletService {
     });
 
     this._transactions.unshift(tx);
+
+    // Jika ada potongan kode referral, catat ke riwayat potongan referral
+    if (finalReferralDeduction > 0 && effectiveReferredBy) {
+      this._recordReferralTransaction({
+        id: 'ref_' + tx.id.replace('tx_', ''),
+        withdrawalId: tx.id,
+        userId,
+        userName,
+        type: 'referral_deduction',
+        referralCode: effectiveReferredBy,
+        withdrawalAmount: numAmount,
+        deductionAmount: finalReferralDeduction,
+        deductionPercent: referralCutPercent,
+        status: 'pending',
+        method,
+        recipient: accountIdentifier,
+        createdAt: tx.createdAt,
+        title: 'Potongan Kode Referral',
+        description: `Potongan ${effectiveReferredBy} saat penarikan ${strategy.getLabel()}`
+      });
+    }
+
     this._persist();
 
     // Simpan ke Supabase jika repositori aktif

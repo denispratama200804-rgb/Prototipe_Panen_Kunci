@@ -489,7 +489,8 @@ export class AuthService {
           accountNumber: '',
           accountHolder: name.toUpperCase(),
           isVerified: false,
-          referralCode: User.generateReferralCode(authUserId || email || name)
+          referralCode: User.generateReferralCode(authUserId || email || name),
+          referredBy: (data.referredBy || '').trim().toUpperCase()
         };
 
         if (authUserId) {
@@ -548,7 +549,9 @@ export class AuthService {
       bankName: '',
       accountNumber: '',
       accountHolder: name.toUpperCase(),
-      isVerified: false
+      isVerified: false,
+      referralCode: User.generateReferralCode(email || name),
+      referredBy: (data.referredBy || '').trim().toUpperCase()
     });
 
     localAccounts.push({
@@ -621,6 +624,30 @@ export class AuthService {
     }
 
     this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
+  }
+
+  /**
+   * Menautkan akun saat ini ke kode referral akun lain (pengundang)
+   * @param {string} referralCode
+   * @returns {Promise<{ success: boolean, message: string }>}
+   */
+  async bindReferralCode(referralCode) {
+    if (!this._currentUser) {
+      return { success: false, message: 'Anda harus masuk akun terlebih dahulu.' };
+    }
+    const cleanCode = (referralCode || '').trim().toUpperCase();
+    if (!cleanCode) {
+      return { success: false, message: 'Kode referral tidak boleh kosong.' };
+    }
+    if (cleanCode === (this._currentUser.referralCode || '').toUpperCase()) {
+      return { success: false, message: 'Tidak dapat mengikat kode referral milik akun sendiri.' };
+    }
+    if (this._currentUser.referredBy) {
+      return { success: false, message: `Akun Anda sudah terikat ke kode rujukan ${this._currentUser.referredBy}.` };
+    }
+
+    await this.updateProfile({ referredBy: cleanCode });
+    return { success: true, message: `Berhasil menautkan akun ke kode referral ${cleanCode}!` };
   }
 
   /**
