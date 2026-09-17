@@ -271,17 +271,16 @@ export class TarikSaldoView extends IComponent {
                 <input
                   id="withdrawAmount"
                   type="number"
-                  readonly
-                  inputmode="none"
+                  inputmode="numeric"
                   placeholder="${minWithdrawal.toLocaleString('id-ID')}"
                   min="${minWithdrawal}"
                   step="1000"
                   value="${isLocked ? '' : minWithdrawal}"
-                  ${isLocked ? 'disabled' : ''}
-                  class="w-full rounded-2xl py-3.5 pl-12 pr-28 text-lg font-bold border font-mono transition-all cursor-default select-none ${
+                  ${isLocked ? 'disabled readonly' : ''}
+                  class="w-full rounded-2xl py-3.5 pl-12 pr-28 text-lg font-bold border font-mono transition-all ${
                     isLocked
-                      ? 'bg-surface-container-low/50 text-outline border-surface-container cursor-not-allowed'
-                      : 'bg-surface-container-low text-text-heading border-surface-container focus:outline-none'
+                      ? 'bg-surface-container-low/50 text-outline border-surface-container cursor-not-allowed select-none'
+                      : 'bg-surface-container-low text-text-heading border-surface-container focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none'
                   }"
                 />
                 <button
@@ -746,21 +745,12 @@ export class TarikSaldoView extends IComponent {
     // Panggil updateBreakdown saat inisialisasi untuk sinkronisasi tampilan awal
     updateBreakdown();
 
-    // Kunci pengetikan manual agar user hanya memilih melalui tombol chip atau Tarik Semua
-    amountInput?.addEventListener('keydown', (e) => {
-      if (e.key !== 'Tab') {
-        e.preventDefault();
-      }
-    });
-    amountInput?.addEventListener('paste', (e) => {
-      e.preventDefault();
-    });
-
-    // Helper untuk update styling chip aktif
+    // Helper untuk update styling chip aktif sesuai nominal
     const highlightChip = (amount) => {
+      const numVal = Number(amount) || 0;
       quickAmountBtns.forEach(b => {
         const chipAmount = Number(b.getAttribute('data-amount'));
-        if (chipAmount === Number(amount)) {
+        if (numVal > 0 && chipAmount === numVal) {
           b.classList.remove('bg-surface-container-low', 'border-surface-container', 'text-text-heading');
           b.classList.add('bg-primary', 'text-white', 'border-primary', 'shadow-xs');
         } else {
@@ -770,8 +760,35 @@ export class TarikSaldoView extends IComponent {
       });
     };
 
-    // Listen amount input change
-    amountInput?.addEventListener('input', updateBreakdown);
+    // Izinkan pengetikan manual angka dengan proteksi karakter non-angka
+    amountInput?.addEventListener('keydown', (e) => {
+      // Tombol kontrol keyboard yang diizinkan
+      if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Home', 'End'].includes(e.key)) {
+        return;
+      }
+      // Shortcut keyboard (Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X)
+      if (e.ctrlKey || e.metaKey) {
+        return;
+      }
+      // Tolak karakter non-angka seperti 'e', 'E', '+', '-', '.', dll
+      if (!/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+      }
+    });
+
+    // Validasi saat paste agar hanya angka bulat yang masuk
+    amountInput?.addEventListener('paste', (e) => {
+      const pastedData = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+      if (!/^\d+$/.test(pastedData.trim())) {
+        e.preventDefault();
+      }
+    });
+
+    // Update real-time breakdown biaya saat user mengetik manual
+    amountInput?.addEventListener('input', () => {
+      highlightChip(amountInput.value);
+      updateBreakdown();
+    });
 
     // Tarik Semua
     withdrawAllBtn?.addEventListener('click', () => {
