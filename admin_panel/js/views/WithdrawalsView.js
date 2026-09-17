@@ -746,7 +746,7 @@ export class WithdrawalsView {
             </div>
 
             <!-- Section 2: Ringkasan Finansial -->
-            <div class="grid grid-cols-3 gap-2 p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800 text-center">
+            <div class="grid ${tx.referralDeduction > 0 ? 'grid-cols-4' : 'grid-cols-3'} gap-2 p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800 text-center">
               <div>
                 <span class="text-[10px] text-slate-400 block">Nominal</span>
                 <span class="font-mono text-xs font-bold text-slate-200">Rp ${amount.toLocaleString('id-ID')}</span>
@@ -755,6 +755,12 @@ export class WithdrawalsView {
                 <span class="text-[10px] text-slate-400 block">Biaya Admin</span>
                 <span class="font-mono text-xs text-rose-400 font-semibold">-Rp ${fee.toLocaleString('id-ID')}</span>
               </div>
+              ${tx.referralDeduction > 0 ? `
+              <div>
+                <span class="text-[10px] text-amber-400 block truncate" title="Komisi untuk pemilik referral">Komisi Ref</span>
+                <span class="font-mono text-xs text-amber-400 font-semibold truncate">-Rp ${Number(tx.referralDeduction).toLocaleString('id-ID')}</span>
+              </div>
+              ` : ''}
               <div class="border-l border-slate-800 pl-2">
                 <span class="text-[10px] text-emerald-400 font-bold block">Transfer Bersih</span>
                 <span class="font-mono text-xs sm:text-sm font-extrabold text-emerald-400">Rp ${netPayout.toLocaleString('id-ID')}</span>
@@ -1031,6 +1037,7 @@ export class WithdrawalsView {
         ['Metode Transfer:', (tx.method || 'DANA').toUpperCase()],
         ['Nominal Diminta:', `Rp ${amount.toLocaleString('id-ID')}`],
         ['Biaya Transaksi:', `Rp ${fee.toLocaleString('id-ID')}`],
+        ...(tx.referralDeduction > 0 ? [['Komisi Referral:', `Rp ${Number(tx.referralDeduction).toLocaleString('id-ID')}`]] : []),
         ['Status:', 'DITRANSFER / SUKSES']
       ];
 

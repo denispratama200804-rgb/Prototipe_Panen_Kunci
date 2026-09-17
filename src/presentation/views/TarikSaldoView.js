@@ -146,7 +146,8 @@ export class TarikSaldoView extends IComponent {
 
     const currentFee = getFee(resolved.method);
     const userReferredBy = (user?.referredBy || '').trim().toUpperCase();
-    const initialReferralCut = userReferredBy ? Math.round(minWithdrawal * 0.05) : 0;
+    const refPercent = this._walletService.referralCutPercent;
+    const initialReferralCut = (userReferredBy && refPercent > 0) ? Math.round(minWithdrawal * (refPercent / 100)) : 0;
     const currentReceive = Math.max(0, minWithdrawal - currentFee - initialReferralCut);
 
     return `
@@ -456,10 +457,10 @@ export class TarikSaldoView extends IComponent {
                   <span>Biaya Admin</span>
                   <span class="font-bold font-mono text-amber-500" id="summaryFee">Rp ${currentFee.toLocaleString('id-ID')}</span>
                 </div>
-                <div class="flex justify-between items-center text-text-body ${userReferredBy ? '' : 'hidden'}" id="summaryReferralRow">
+                <div class="flex justify-between items-center text-text-body ${(userReferredBy && refPercent > 0) ? '' : 'hidden'}" id="summaryReferralRow">
                   <span class="flex items-center gap-1">
                     <span>Potongan Kode Referral</span>
-                    <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.2 rounded font-bold" id="summaryReferralBadge">${userReferredBy ? `${userReferredBy} (5%)` : '5%'}</span>
+                    <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.2 rounded font-bold" id="summaryReferralBadge">${userReferredBy ? `${userReferredBy} (${refPercent}%)` : `${refPercent}%`}</span>
                   </span>
                   <span class="font-bold font-mono text-primary" id="summaryReferralCut">-Rp ${initialReferralCut.toLocaleString('id-ID')}</span>
                 </div>
@@ -552,8 +553,9 @@ export class TarikSaldoView extends IComponent {
       const method = resolved.method;
       const currentUser = this._authService.getCurrentUser();
       const userReferredBy = (currentUser?.referredBy || '').trim().toUpperCase();
+      const refPercent = this._walletService.referralCutPercent;
       const fee = this._walletService.getFeeForMethod(method, amount);
-      const referralCut = userReferredBy ? Math.round(amount * 0.05) : 0;
+      const referralCut = (userReferredBy && refPercent > 0) ? Math.round(amount * (refPercent / 100)) : 0;
       const totalReceive = Math.max(0, amount - fee - referralCut);
 
       const summaryAmount = container.querySelector('#summaryAmount');
@@ -569,9 +571,9 @@ export class TarikSaldoView extends IComponent {
       if (summaryAmount) summaryAmount.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
       if (summaryFee) summaryFee.textContent = `Rp ${fee.toLocaleString('id-ID')}`;
       if (summaryReferralCut) summaryReferralCut.textContent = `-Rp ${referralCut.toLocaleString('id-ID')}`;
-      if (summaryReferralBadge && userReferredBy) summaryReferralBadge.textContent = `${userReferredBy} (5%)`;
+      if (summaryReferralBadge && userReferredBy) summaryReferralBadge.textContent = `${userReferredBy} (${refPercent}%)`;
       if (summaryReferralRow) {
-        if (userReferredBy) {
+        if (userReferredBy && refPercent > 0) {
           summaryReferralRow.classList.remove('hidden');
         } else {
           summaryReferralRow.classList.add('hidden');
@@ -758,8 +760,9 @@ export class TarikSaldoView extends IComponent {
 
       const methodLabel = resolved.label;
       const userReferredBy = (user?.referredBy || '').trim().toUpperCase();
+      const refPercent = this._walletService.referralCutPercent;
       const fee = this._walletService.getFeeForMethod(method, amount);
-      const referralCut = userReferredBy ? Math.round(amount * 0.05) : 0;
+      const referralCut = (userReferredBy && refPercent > 0) ? Math.round(amount * (refPercent / 100)) : 0;
       const totalReceive = Math.max(0, amount - fee - referralCut);
 
       if (!account) {
@@ -798,9 +801,9 @@ export class TarikSaldoView extends IComponent {
                 <span class="text-text-body font-medium">Biaya Admin</span>
                 <span class="font-semibold text-error font-mono">${fee > 0 ? '-Rp ' + fee.toLocaleString('id-ID') : 'Gratis'}</span>
               </div>
-              ${userReferredBy ? `
+              ${(userReferredBy && refPercent > 0) ? `
                 <div class="flex justify-between items-center text-xs">
-                  <span class="text-text-body font-medium">Potongan Kode Referral (${userReferredBy})</span>
+                  <span class="text-text-body font-medium">Potongan Kode Referral (${userReferredBy} - ${refPercent}%)</span>
                   <span class="font-semibold text-primary font-mono">-Rp ${referralCut.toLocaleString('id-ID')}</span>
                 </div>
               ` : ''}

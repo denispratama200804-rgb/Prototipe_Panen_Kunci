@@ -301,7 +301,7 @@ export class HistoryView extends IComponent {
         </div>
         <span class="text-[10px] font-bold text-secondary bg-secondary/15 border border-secondary/30 px-2 py-0.5 rounded-full flex items-center gap-1">
           <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
-          <span>Potongan Aktif (5%)</span>
+          <span>Potongan Aktif (${this._walletService.referralCutPercent}%)</span>
         </span>
       </div>
     `;
@@ -322,7 +322,7 @@ export class HistoryView extends IComponent {
       let stripeColor = 'bg-primary';
       let statusBadge = `
         <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/30">
-          Potongan ${ref.deductionPercent || 5}%
+          Potongan ${ref.deductionPercent ?? this._walletService.referralCutPercent}%
         </span>
       `;
 

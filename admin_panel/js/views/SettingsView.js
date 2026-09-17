@@ -79,6 +79,91 @@ export class SettingsView {
               </div>
             </div>
 
+            <!-- Pengaturan Komisi / Bagi Hasil Kode Referral (%) -->
+            <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-slate-900/90 to-slate-900/60 border border-amber-500/30 space-y-3.5 relative overflow-hidden shadow-lg">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30 shadow-xs">
+                    <span class="material-symbols-outlined text-xl">percent</span>
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <label class="block text-xs font-bold text-amber-300 uppercase tracking-wider">
+                        Komisi Kode Referral (%)
+                      </label>
+                      <span class="px-2 py-0.2 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        Bagi Hasil Penarikan
+                      </span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                      Persentase komisi yang dipotong saat user menarik saldo & dihadiahkan ke pengguna pemilik kode referral.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Quick Preset Chips -->
+                <div class="flex items-center gap-1.5 self-start sm:self-auto flex-wrap">
+                  <span class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mr-0.5">Preset:</span>
+                  <button type="button" class="btn-ref-preset px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-slate-800/90 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="0">0%</button>
+                  <button type="button" class="btn-ref-preset px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-slate-800/90 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="2.5">2.5%</button>
+                  <button type="button" class="btn-ref-preset px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-slate-800/90 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="5">5%</button>
+                  <button type="button" class="btn-ref-preset px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-slate-800/90 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="7.5">7.5%</button>
+                  <button type="button" class="btn-ref-preset px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-slate-800/90 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="10">10%</button>
+                </div>
+              </div>
+
+              <!-- Stepper Controls & Simulation Preview -->
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center pt-1">
+                <div class="sm:col-span-6 md:col-span-5 flex items-center gap-2">
+                  <!-- Button Turunkan Persen (-) -->
+                  <button
+                    type="button"
+                    id="btnDecReferral"
+                    title="Turunkan persen (-0.5%)"
+                    class="w-11 h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-amber-400 flex items-center justify-center font-bold text-xl border border-slate-700 active:scale-95 transition-all cursor-pointer select-none shrink-0"
+                  >
+                    <span class="material-symbols-outlined text-xl">remove</span>
+                  </button>
+
+                  <!-- Input Number Persen -->
+                  <div class="relative flex-1">
+                    <input
+                      type="number"
+                      name="referralPercent"
+                      id="inputReferralPercent"
+                      value="${config.referralPercent ?? 5}"
+                      step="0.5"
+                      min="0"
+                      max="100"
+                      class="w-full text-center pl-3 pr-8 py-2.5 bg-slate-950 border border-amber-500/40 rounded-xl text-base sm:text-sm font-extrabold text-amber-400 focus:outline-none focus:border-amber-400 font-mono transition-colors"
+                    />
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-400 font-mono">%</span>
+                  </div>
+
+                  <!-- Button Naikkan Persen (+) -->
+                  <button
+                    type="button"
+                    id="btnIncReferral"
+                    title="Naikkan persen (+0.5%)"
+                    class="w-11 h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-amber-400 flex items-center justify-center font-bold text-xl border border-slate-700 active:scale-95 transition-all cursor-pointer select-none shrink-0"
+                  >
+                    <span class="material-symbols-outlined text-xl">add</span>
+                  </button>
+                </div>
+
+                <!-- Live Simulation Preview Box -->
+                <div class="sm:col-span-6 md:col-span-7 bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 px-3.5 flex items-center justify-between text-xs font-mono">
+                  <span class="text-slate-400 font-sans text-[11px] flex items-center gap-1 truncate">
+                    <span class="material-symbols-outlined text-amber-400 text-sm shrink-0">calculate</span>
+                    <span class="truncate">Simulasi Payout Rp 100.000:</span>
+                  </span>
+                  <span class="font-bold text-amber-400 shrink-0" id="referralSimulationPreview">
+                    Komisi Referrer: Rp ${(100000 * ((config.referralPercent ?? 5) / 100)).toLocaleString('id-ID')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <!-- Biaya Admin E-Wallet & Bank Grid -->
             <div>
               <div class="flex items-center justify-between mb-3">
@@ -219,15 +304,76 @@ export class SettingsView {
   }
 
   bindEvents(container, refreshCallback) {
+    const form = container.querySelector('#settings-form');
+    const inputRef = container.querySelector('#inputReferralPercent');
+    const previewEl = container.querySelector('#referralSimulationPreview');
+    const btnDec = container.querySelector('#btnDecReferral');
+    const btnInc = container.querySelector('#btnIncReferral');
+    const presetBtns = container.querySelectorAll('.btn-ref-preset');
+
+    const updatePreview = (percent) => {
+      const p = Math.max(0, Math.min(100, Number(percent) || 0));
+      if (previewEl) {
+        const comm = Math.round(100000 * (p / 100));
+        previewEl.textContent = `Komisi Referrer: Rp ${comm.toLocaleString('id-ID')} (${p}%)`;
+      }
+    };
+
+    // Event listener untuk input percent manual
+    if (inputRef) {
+      inputRef.addEventListener('input', () => {
+        updatePreview(inputRef.value);
+      });
+      inputRef.addEventListener('change', () => {
+        let val = Math.max(0, Math.min(100, Number(inputRef.value) || 0));
+        inputRef.value = val;
+        updatePreview(val);
+      });
+    }
+
+    // Button stepper turun (-)
+    if (btnDec && inputRef) {
+      btnDec.addEventListener('click', () => {
+        let cur = Number(inputRef.value) || 0;
+        let next = Math.max(0, Math.round((cur - 0.5) * 10) / 10);
+        inputRef.value = next;
+        updatePreview(next);
+      });
+    }
+
+    // Button stepper naik (+)
+    if (btnInc && inputRef) {
+      btnInc.addEventListener('click', () => {
+        let cur = Number(inputRef.value) || 0;
+        let next = Math.min(100, Math.round((cur + 0.5) * 10) / 10);
+        inputRef.value = next;
+        updatePreview(next);
+      });
+    }
+
+    // Preset buttons
+    presetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-val');
+        if (inputRef && val !== null) {
+          inputRef.value = val;
+          updatePreview(val);
+        }
+      });
+    });
+
     // Sinkronkan form dengan config terbaru dari database di background
     this.dataService.fetchConfigFromSupabase().then(latestCfg => {
       if (!latestCfg || !container) return;
-      const form = container.querySelector('#settings-form');
       if (!form) return;
       // Jangan timpa jika admin sedang aktif mengetik di dalam form
       if (document.activeElement && form.contains(document.activeElement)) return;
       if (form.elements['rewardPerKey']) form.elements['rewardPerKey'].value = latestCfg.rewardPerKey || 3000;
       if (form.elements['minWithdrawal']) form.elements['minWithdrawal'].value = latestCfg.minWithdrawal || 50000;
+      if (form.elements['referralPercent']) {
+        form.elements['referralPercent'].value = latestCfg.referralPercent ?? 5;
+        updatePreview(latestCfg.referralPercent ?? 5);
+      }
       if (form.elements['feeDana']) form.elements['feeDana'].value = latestCfg.feeDana ?? 1000;
       if (form.elements['feeGopay']) form.elements['feeGopay'].value = latestCfg.feeGopay ?? 1000;
       if (form.elements['feeOvo']) form.elements['feeOvo'].value = latestCfg.feeOvo ?? 1000;
@@ -236,7 +382,6 @@ export class SettingsView {
     }).catch(() => {});
 
     // Form submit
-    const form = container.querySelector('#settings-form');
     if (form) {
       form.addEventListener('submit', async e => {
         e.preventDefault();
@@ -252,6 +397,7 @@ export class SettingsView {
         const newConfig = {
           rewardPerKey: getNum(fd.get('rewardPerKey'), 3000),
           minWithdrawal: getNum(fd.get('minWithdrawal'), 50000),
+          referralPercent: getNum(fd.get('referralPercent'), 5),
           feeDana: getNum(fd.get('feeDana'), 1000),
           feeGopay: getNum(fd.get('feeGopay'), 1000),
           feeOvo: getNum(fd.get('feeOvo'), 1000),
@@ -268,8 +414,12 @@ export class SettingsView {
         // Kunci nilai input agar tetap konsisten dengan yang baru disimpan
         if (form.elements['minWithdrawal']) form.elements['minWithdrawal'].value = newConfig.minWithdrawal;
         if (form.elements['rewardPerKey']) form.elements['rewardPerKey'].value = newConfig.rewardPerKey;
+        if (form.elements['referralPercent']) {
+          form.elements['referralPercent'].value = newConfig.referralPercent;
+          updatePreview(newConfig.referralPercent);
+        }
 
-        this.toast.success(`Target penarikan Rp ${newConfig.minWithdrawal.toLocaleString('id-ID')} & konfigurasi sistem berhasil disimpan dan disinkronkan ke seluruh pengguna!`, 'Tersimpan');
+        this.toast.success(`Pengaturan tersimpan! Min penarikan Rp ${newConfig.minWithdrawal.toLocaleString('id-ID')} & komisi referral ${newConfig.referralPercent}% berhasil disinkronkan ke seluruh aplikasi!`, 'Tersimpan');
       });
     }
   }

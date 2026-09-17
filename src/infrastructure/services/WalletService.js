@@ -66,7 +66,8 @@ export class WalletService {
                 data.type === 'KEY_DELETED' ||
                 data.type === 'BALANCE_UPDATED' ||
                 data.type === 'WITHDRAWAL_CREATED' ||
-                data.type === 'TRANSACTION_UPDATED'
+                data.type === 'TRANSACTION_UPDATED' ||
+                data.type === 'REFERRAL_COMMISSION_CREDITED'
               ) {
                 this._loadWallet();
                 await this._syncFromRemote();
@@ -75,6 +76,17 @@ export class WalletService {
                   passiveBalance: this._passiveBalance,
                   lifetime: this._lifetimeEarnings
                 });
+
+                if (data.type === 'REFERRAL_COMMISSION_CREDITED' && (!data.referrerId || data.referrerId === this._getUserId())) {
+                  const commAmountStr = data.amount ? `Rp ${Number(data.amount).toLocaleString('id-ID')}` : '';
+                  this._eventBus.emit('PAYOUT_PROCESSED', {
+                    type: 'success',
+                    status: 'success',
+                    amount: data.amount,
+                    title: 'Komisi Referral Masuk!',
+                    message: `Selamat! Anda menerima komisi referral ${commAmountStr} dari penarikan downline Anda.`
+                  });
+                }
               } else if (data.type === 'WITHDRAWAL_APPROVED') {
                 this._loadWallet();
                 await this._syncFromRemote();
@@ -268,6 +280,18 @@ export class WalletService {
   }
 
   /**
+   * Persentase komisi / potongan kode referral dinamis dari konfigurasi admin panel (%)
+   * @returns {number}
+   */
+  get referralCutPercent() {
+    const config = this.getAdminConfig();
+    if (config && config.referralPercent !== undefined && !isNaN(Number(config.referralPercent))) {
+      return Math.max(0, Number(config.referralPercent));
+    }
+    return 5;
+  }
+
+  /**
    * Ambil seluruh konfigurasi sistem admin
    * @returns {Object}
    */
@@ -279,6 +303,7 @@ export class WalletService {
       feeGopay: 1000,
       feeOvo: 1000,
       feeBank: 2500,
+      referralPercent: 5,
       validationMode: 'simulation'
     };
   }
@@ -821,7 +846,9 @@ export class WalletService {
       .filter(w => (w.referralDeduction > 0 || (userReferredBy && w.amount > 0)))
       .map(w => {
         const refCode = w.referralCode || userReferredBy;
-        const deduction = w.referralDeduction > 0 ? w.referralDeduction : Math.round(w.amount * 0.05);
+        const currentRefPercent = this.referralCutPercent;
+        const deduction = w.referralDeduction > 0 ? w.referralDeduction : Math.round(w.amount * (currentRefPercent / 100));
+        const effectivePercent = w.referralDeduction > 0 && w.amount > 0 ? Math.round((w.referralDeduction / w.amount) * 100) : currentRefPercent;
         return {
           id: 'ref_' + (w.id || '').replace('tx_', ''),
           withdrawalId: w.id,
@@ -831,7 +858,7 @@ export class WalletService {
           referralCode: refCode,
           withdrawalAmount: w.amount,
           deductionAmount: deduction,
-          deductionPercent: 5,
+          deductionPercent: effectivePercent,
           status: w.status || 'pending',
           method: w.method || 'dana',
           recipient: w.recipient || '',
@@ -1060,9 +1087,9 @@ export class WalletService {
     const currentUser = this._storage.get('current_user');
     const effectiveReferredBy = (referredBy || currentUser?.referredBy || '').trim().toUpperCase();
     let finalReferralDeduction = Number(referralDeduction || 0);
-    const referralCutPercent = 5; // Standar 5% dari nominal penarikan
+    const referralCutPercent = this.referralCutPercent;
 
-    if (effectiveReferredBy && finalReferralDeduction <= 0) {
+    if (effectiveReferredBy && finalReferralDeduction <= 0 && referralCutPercent > 0) {
       finalReferralDeduction = Math.round(numAmount * (referralCutPercent / 100));
     }
 
