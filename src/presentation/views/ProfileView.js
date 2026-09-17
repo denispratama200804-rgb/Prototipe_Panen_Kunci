@@ -265,7 +265,7 @@ export class ProfileView extends IComponent {
                   ${user.referredBy ? `
                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30 flex items-center gap-1">
                       <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-                      <span>Terikat</span>
+                      <span>Terikat Permanen</span>
                     </span>
                   ` : `
                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-container-high text-outline">
@@ -275,17 +275,18 @@ export class ProfileView extends IComponent {
                 </div>
 
                 ${user.referredBy ? `
-                  <div class="flex items-center justify-between bg-surface-card p-2.5 rounded-xl border border-surface-container">
+                  <div class="flex items-center justify-between bg-surface-card p-3 rounded-xl border border-surface-container shadow-xs">
                     <div class="flex flex-col">
                       <span class="text-[10px] text-text-body">Terikat ke Kode Pengundang:</span>
-                      <span class="font-mono text-xs font-black text-primary">${user.referredBy}</span>
+                      <span class="font-mono text-sm font-black text-primary">${user.referredBy}</span>
                     </div>
-                    <span class="text-[10px] font-semibold text-secondary bg-secondary/10 px-2 py-1 rounded-lg">
-                      Potongan Penarikan Aktif
+                    <span class="text-[10px] font-bold text-secondary bg-secondary/10 px-2.5 py-1 rounded-lg border border-secondary/20 flex items-center gap-1">
+                      <span class="material-symbols-outlined text-[13px]">check_circle</span>
+                      <span>Terkunci</span>
                     </span>
                   </div>
                   <p class="text-[10px] text-text-body leading-relaxed">
-                    Akun Anda terikat oleh kode rujukan ini. Riwayat potongan kode referral pada saat penarikan dana dapat dilihat di <a href="#/riwayat?tab=referral" class="text-primary font-bold hover:underline">Riwayat Transaksi</a>.
+                    <span class="font-bold text-text-heading">Ketentuan:</span> Akun Anda telah terikat secara permanen pada kode referral ini dan tidak dapat diubah kembali. Riwayat bonus potongan referral saat penarikan dapat dipantau di <a href="#/riwayat?tab=referral" class="text-primary font-bold hover:underline">Riwayat Transaksi</a>.
                   </p>
                 ` : `
                   <p class="text-[11px] text-text-body leading-relaxed">
@@ -295,7 +296,7 @@ export class ProfileView extends IComponent {
                     <input
                       type="text"
                       id="inputBindReferralCode"
-                      placeholder="Contoh: PK-78A9B2"
+                      placeholder="CONTOH: PK-78A9B2"
                       maxlength="12"
                       class="flex-1 uppercase font-mono text-xs font-bold px-3 py-2 rounded-xl bg-surface-card border border-surface-container focus:border-primary focus:outline-none"
                     />
@@ -308,6 +309,9 @@ export class ProfileView extends IComponent {
                       <span>Tautkan</span>
                     </button>
                   </div>
+                  <p class="text-[10px] text-outline italic">
+                    * Catatan: Penautan kode pengundang hanya dapat dilakukan 1 kali dan tidak dapat diubah.
+                  </p>
                 `}
               </div>
 
@@ -692,6 +696,7 @@ export class ProfileView extends IComponent {
     // Handler Tautkan Kode Referral Pengundang
     const btnBindReferralCode = container.querySelector('#btnBindReferralCode');
     const inputBindReferralCode = container.querySelector('#inputBindReferralCode');
+    const boxAccountReferralStatus = container.querySelector('#boxAccountReferralStatus');
 
     btnBindReferralCode?.addEventListener('click', async () => {
       const code = (inputBindReferralCode?.value || '').trim().toUpperCase();
@@ -701,18 +706,45 @@ export class ProfileView extends IComponent {
         return;
       }
       btnBindReferralCode.disabled = true;
+      btnBindReferralCode.classList.add('opacity-70', 'cursor-not-allowed');
       btnBindReferralCode.innerHTML = '<span class="material-symbols-outlined text-[15px] animate-spin">progress_activity</span>';
 
       const res = await this._authService.bindReferralCode(code);
       if (res.success) {
         this._notification.success(res.message);
-        setTimeout(() => {
-          window.location.hash = '#/profil';
-          window.location.reload();
-        }, 500);
+
+        // Langsung transformasikan UI tanpa menunggu reload: form hilang & hanya menampilkan kode rujukan terkunci
+        if (boxAccountReferralStatus) {
+          boxAccountReferralStatus.innerHTML = `
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-text-heading flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px] text-primary">link</span>
+                <span>Status Keterikatan Akun</span>
+              </span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                <span>Terikat Permanen</span>
+              </span>
+            </div>
+            <div class="flex items-center justify-between bg-surface-card p-3 rounded-xl border border-surface-container shadow-xs animate-in fade-in duration-300">
+              <div class="flex flex-col">
+                <span class="text-[10px] text-text-body">Terikat ke Kode Pengundang:</span>
+                <span class="font-mono text-sm font-black text-primary">${code}</span>
+              </div>
+              <span class="text-[10px] font-bold text-secondary bg-secondary/10 px-2.5 py-1 rounded-lg border border-secondary/20 flex items-center gap-1">
+                <span class="material-symbols-outlined text-[13px]">check_circle</span>
+                <span>Terkunci</span>
+              </span>
+            </div>
+            <p class="text-[10px] text-text-body leading-relaxed">
+              <span class="font-bold text-text-heading">Ketentuan:</span> Akun Anda telah terikat secara permanen pada kode referral ini dan tidak dapat diubah kembali. Riwayat bonus potongan referral saat penarikan dapat dipantau di <a href="#/riwayat?tab=referral" class="text-primary font-bold hover:underline">Riwayat Transaksi</a>.
+            </p>
+          `;
+        }
       } else {
         this._notification.error(res.message);
         btnBindReferralCode.disabled = false;
+        btnBindReferralCode.classList.remove('opacity-70', 'cursor-not-allowed');
         btnBindReferralCode.innerHTML = '<span class="material-symbols-outlined text-[15px]">link</span><span>Tautkan</span>';
       }
     });

@@ -643,7 +643,36 @@ export class AuthService {
       return { success: false, message: 'Tidak dapat mengikat kode referral milik akun sendiri.' };
     }
     if (this._currentUser.referredBy) {
-      return { success: false, message: `Akun Anda sudah terikat ke kode rujukan ${this._currentUser.referredBy}.` };
+      return { success: false, message: `Akun Anda sudah terikat ke kode rujukan ${this._currentUser.referredBy}. Penautan hanya dapat dilakukan 1 kali.` };
+    }
+
+    // Validasi apakah kode referral yang dimasukkan benar-benar ada di sistem
+    let referralExists = false;
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, referral_code')
+          .ilike('referral_code', cleanCode)
+          .maybeSingle();
+
+        if (!error && data && data.referral_code) {
+          referralExists = true;
+        }
+      } catch (err) {
+        console.warn('[AuthService] Cek kode referral Supabase warning:', err.message);
+      }
+    }
+
+    if (!referralExists) {
+      const localAccounts = this._storage.get('registered_accounts') || [];
+      if (localAccounts.some(acc => (acc.referralCode || '').toUpperCase() === cleanCode)) {
+        referralExists = true;
+      }
+    }
+
+    if (!referralExists) {
+      return { success: false, message: `Kode referral "${cleanCode}" tidak ditemukan atau tidak valid.` };
     }
 
     await this.updateProfile({ referredBy: cleanCode });
