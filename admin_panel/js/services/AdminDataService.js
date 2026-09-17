@@ -11,6 +11,8 @@ export class AdminDataService {
   constructor(prefix = 'panenkunci:') {
     this.prefix = prefix;
     this._listeners = {};
+    this._validatingKeyIds = new Set();
+    this._isAutoValidating = false;
     this._cleanDummyUsers();
     this._cleanDummyKeys();
     this._initRealtimeSync();
@@ -52,6 +54,13 @@ export class AdminDataService {
             this.emit('withdrawal_received', data);
           } else if (data.type === 'KEY_SUBMITTED' || data.type === 'KEY_DEPOSITED') {
             await this.fetchApiKeysFromSupabase();
+            // Otomatis validasi key yang baru disetorkan pengguna
+            const newKeyId = data.apiKey?.id || data.keyId;
+            if (newKeyId) {
+              this.autoValidateApiKey(newKeyId).catch(() => {});
+            } else {
+              this.autoValidateAllPendingKeys().catch(() => {});
+            }
             this.emit('key_received', data);
           } else if (data.type === 'USER_NICKNAME_CHANGED' || data.type === 'USER_UPDATED') {
             await this.fetchUsersFromSupabase();
@@ -85,6 +94,22 @@ export class AdminDataService {
             async (payload) => {
               await this.fetchUsersFromSupabase();
               this.emit('users_updated', payload);
+            }
+          )
+          .subscribe();
+
+        this._supabaseKeysChannel = supabase
+          .channel('admin_api_keys_realtime')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'api_keys' },
+            async (payload) => {
+              // Jika ada baris baru berstatus pending, jalankan auto-validasi
+              if (payload.new && payload.new.status === 'pending') {
+                this.autoValidateApiKey(payload.new.id).catch(() => {});
+              }
+              await this.fetchApiKeysFromSupabase();
+              this.emit('keys_updated', payload);
             }
           )
           .subscribe();
@@ -362,6 +387,15 @@ export class AdminDataService {
         });
 
         this._set('api_keys', mappedKeys);
+
+        // Jika ada kunci berstatus pending, jalankan validasi otomatis di background
+        const hasPending = mappedKeys.some(k => k.status === 'pending');
+        if (hasPending && !this._isAutoValidating) {
+          setTimeout(() => {
+            this.autoValidateAllPendingKeys().catch(() => {});
+          }, 300);
+        }
+
         return mappedKeys;
       }
 
@@ -788,11 +822,13 @@ export class AdminDataService {
       this._set('transactions', txs);
     }
 
+    let userTxs = [];
+    let uTxIdx = -1;
     if (targetUserId) {
       const userTxKey = `transactions_${targetUserId}`;
-      const userTxs = this._get(userTxKey, []);
+      userTxs = this._get(userTxKey, []);
       if (Array.isArray(userTxs)) {
-        const uTxIdx = userTxs.findIndex(t =>
+        uTxIdx = userTxs.findIndex(t =>
           t.type === 'deposit' &&
           t.status === 'pending' &&
           (t.description?.includes(masked) || t.description?.includes(key.id))
@@ -1022,6 +1058,174 @@ export class AdminDataService {
     } catch (err) {
       console.error('[AdminDataService] syncAllKieCredits error:', err);
       return { success: false, message: err.message };
+    }
+  }
+
+  /**
+   * Validasi Otomatis satu API Key ke server Kie.ai
+   * Mengecek apakah kunci aktif dan memiliki kuota 80 kredit.
+   * Jika aktif & kredit 80 (atau >= 80): otomatis disetujui, reward dicairkan ke saldo aktif.
+   * Jika tidak aktif / kredit bukan 80: otomatis ditolak dan saldo pasif dibatalkan.
+   * @param {string} keyId
+   * @returns {Promise<{ success: boolean, validated: boolean, status: string, credit: number, message: string }>}
+   */
+  async autoValidateApiKey(keyId) {
+    if (!keyId || this._validatingKeyIds.has(keyId)) {
+      return { success: false, message: 'Key sedang divalidasi...' };
+    }
+
+    const keys = this.getApiKeys();
+    const key = keys.find(k => k.id === keyId);
+    if (!key) {
+      return { success: false, message: 'API Key tidak ditemukan' };
+    }
+
+    if (key.status !== 'pending') {
+      return {
+        success: true,
+        validated: key.status === 'valid',
+        status: key.status,
+        credit: key.credits || 80,
+        message: `Key sudah berstatus ${key.status}`
+      };
+    }
+
+    this._validatingKeyIds.add(keyId);
+
+    try {
+      // 1. Cek langsung ke server Kie.ai via proxy
+      let syncRes = null;
+      try {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'sync_kie_credit',
+            apiKey: key.keyString,
+            keyId: key.id
+          })
+        });
+        if (res.ok) {
+          syncRes = await res.json();
+        }
+      } catch (e) {
+        console.warn('[AdminDataService] Auto-validate proxy fetch warning:', e.message);
+      }
+
+      if (!syncRes) {
+        syncRes = await this.syncKieCredit(key.id, key.keyString);
+      }
+
+      const liveCredit = Number(syncRes.credit) || 0;
+      const isKieActive = syncRes.isValidKey === true;
+      const isCredit80 = (liveCredit === 80 || liveCredit >= 80);
+      const isValid = isKieActive && isCredit80;
+
+      // Pastikan data key tetap sinkron di local storage sebelum approval
+      const freshKeys = this.getApiKeys();
+      let freshKey = freshKeys.find(k => k.id === keyId);
+      if (!freshKey) {
+        freshKeys.unshift({ ...key });
+        freshKey = freshKeys[0];
+      }
+      freshKey.credits = liveCredit;
+      this._set('api_keys', freshKeys);
+
+      if (isValid) {
+        // Kunci Sah & 80 Kredit: Setujui & cairkan reward ke Saldo Aktif
+        const appRes = await this.approveApiKey(keyId);
+        console.log(`[AdminDataService] Auto-validated: Key ${keyId} VALID (${liveCredit} cr)`);
+        return {
+          success: true,
+          validated: true,
+          status: 'valid',
+          credit: liveCredit,
+          rewardAmount: appRes.rewardAmount || 3000,
+          message: `Kie.ai Aktif & Kredit ${liveCredit} cr: Berhasil divalidasi dan dicairkan ke Saldo Aktif!`
+        };
+      } else {
+        // Kunci Tidak Sah atau Kredit bukan 80: Tolak & batalkan dari Saldo Pasif
+        let reason = '';
+        if (!isKieActive) {
+          reason = `Otomatis Ditolak: Kie.ai tidak aktif atau API Key tidak sah (${syncRes.error || syncRes.message || '401 Unauthorized'})`;
+        } else {
+          reason = `Otomatis Ditolak: Kredit Kie.ai hanya ${liveCredit} cr (Syarat: 80 cr)`;
+        }
+        await this.rejectApiKey(keyId, reason);
+        console.log(`[AdminDataService] Auto-rejected: Key ${keyId} INVALID (${reason})`);
+        return {
+          success: false,
+          validated: false,
+          status: 'invalid',
+          credit: liveCredit,
+          reason,
+          message: reason
+        };
+      }
+    } catch (err) {
+      console.error('[AdminDataService] autoValidateApiKey exception:', err);
+      return { success: false, message: err.message };
+    } finally {
+      this._validatingKeyIds.delete(keyId);
+    }
+  }
+
+  /**
+   * Validasi Otomatis SEMUA API Key yang masih berstatus 'pending'
+   * @returns {Promise<{ success: boolean, total: number, validatedCount: number, rejectedCount: number, results: Array, message: string }>}
+   */
+  async autoValidateAllPendingKeys() {
+    if (this._isAutoValidating) {
+      return { success: false, message: 'Validasi massal sedang berjalan...' };
+    }
+    this._isAutoValidating = true;
+    try {
+      const keys = this.getApiKeys();
+      const pendingKeys = keys.filter(k => k.status === 'pending');
+      if (pendingKeys.length === 0) {
+        return {
+          success: true,
+          total: 0,
+          validatedCount: 0,
+          rejectedCount: 0,
+          message: 'Tidak ada API Key yang menunggu validasi.',
+          results: []
+        };
+      }
+
+      const results = [];
+      for (const key of pendingKeys) {
+        try {
+          const res = await this.autoValidateApiKey(key.id);
+          results.push({ id: key.id, ...res });
+        } catch (err) {
+          results.push({ id: key.id, success: false, error: err.message });
+        }
+      }
+
+      const validatedCount = results.filter(r => r.validated || r.status === 'valid').length;
+      const rejectedCount = results.filter(r => r.status === 'invalid').length;
+
+      // Sinkronkan ulang data dari Supabase
+      await this.fetchApiKeysFromSupabase();
+
+      this.emit('api_keys_auto_validated', {
+        total: pendingKeys.length,
+        validatedCount,
+        rejectedCount,
+        results
+      });
+
+      return {
+        success: true,
+        total: pendingKeys.length,
+        validatedCount,
+        rejectedCount,
+        results,
+        message: `Selesai: ${validatedCount} kunci tervalidasi (80 cr), ${rejectedCount} kunci ditolak.`
+      };
+    } finally {
+      this._isAutoValidating = false;
     }
   }
 

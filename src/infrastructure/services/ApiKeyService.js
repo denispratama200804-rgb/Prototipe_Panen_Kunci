@@ -334,15 +334,24 @@ export class ApiKeyService {
 
     try {
       const kieSync = await this.syncKieCredit(trimmed);
-      if (kieSync.isValidKey === false) {
-        const errorReason = kieSync.message || 'Verifikasi server Kie.ai gagal: API Key tidak sah atau tidak diizinkan.';
+      const isCredit80 = typeof kieSync.credit === 'number' ? (kieSync.credit === 80 || kieSync.credit >= 80) : false;
+
+      if (kieSync.isValidKey === false || !isCredit80) {
+        let errorReason = kieSync.message;
+        if (kieSync.isValidKey !== false && !isCredit80) {
+          errorReason = `Verifikasi server Kie.ai gagal: Kuota kredit tidak mencukupi (${kieSync.credit || 0} cr / syarat: 80 cr).`;
+        }
+        if (!errorReason) {
+          errorReason = 'Verifikasi server Kie.ai gagal: API Key tidak sah atau tidak diizinkan.';
+        }
+
         const invalidEntry = new ApiKey({
           id: 'key_' + Math.random().toString(36).substring(2, 9),
           keyString: trimmed,
           userId,
           status: 'invalid',
           rewardAmount: 0,
-          credits: 0,
+          credits: Number(kieSync.credit) || 0,
           errorMessage: errorReason,
           createdAt: new Date().toISOString()
         });
@@ -371,7 +380,7 @@ export class ApiKeyService {
       liveCredit = 80;
     }
 
-    // 4. Sukses: Kuota kredit terverifikasi dari Kie.ai
+    // 4. Sukses: Kuota kredit terverifikasi dari Kie.ai (Aktif & Kredit 80)
     const config = this._storage.get('admin_config');
     const rewardAmount = (config && config.rewardPerKey && !isNaN(Number(config.rewardPerKey)))
       ? Number(config.rewardPerKey)
@@ -417,14 +426,34 @@ export class ApiKeyService {
     // 5. Kreditkan saldo ke dompet pengguna sebagai Saldo Pasif HANYA setelah key terbukti valid dan tersimpan
     this._walletService.addPassiveDeposit(rewardAmount, newApiKey);
 
-    // 6. Emit event
+    // 6. Emit event lokal dan BroadcastChannel agar Admin Panel seketika memvalidasi otomatis
     this._eventBus.emit(AppEvents.API_KEY_SUBMITTED, { apiKey: newApiKey, reward: rewardAmount });
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('panenkunci_sync');
+        bc.postMessage({
+          type: 'KEY_SUBMITTED',
+          keyId: newApiKey.id,
+          apiKey: {
+            id: newApiKey.id,
+            keyString: newApiKey.keyString,
+            userId: newApiKey.userId,
+            status: newApiKey.status,
+            rewardAmount: newApiKey.rewardAmount,
+            credits: newApiKey.credits
+          },
+          timestamp: Date.now()
+        });
+        setTimeout(() => bc.close(), 200);
+      } catch (_) {}
+    }
 
     return {
       success: true,
       apiKey: newApiKey,
       reward: rewardAmount,
-      message: `API Key valid dan telah disetorkan ke Saldo Pasif! Menunggu verifikasi dari Admin untuk dicairkan ke Saldo Aktif.`
+      message: `API Key valid (80 cr) dan telah disetorkan! Sistem sedang melakukan validasi otomatis.`
     };
   }
 

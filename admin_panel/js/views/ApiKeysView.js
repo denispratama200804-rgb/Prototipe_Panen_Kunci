@@ -13,6 +13,7 @@ export class ApiKeysView {
     this.hasSynced = false;
     this.isSyncing = false;
     this.isSyncingKie = false;
+    this.isAutoValidating = false;
   }
 
   destroy() {
@@ -256,8 +257,20 @@ export class ApiKeysView {
               }
             </div>
 
-            <!-- Right: Status Database, Tombol Sinkronkan Supabase & Tombol Sinkron Kie.ai -->
+            <!-- Right: Tombol Validasi Otomatis Kie.ai, Tombol Sinkron Kie.ai & Supabase -->
             <div class="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                id="btn-auto-validate-all-keys"
+                title="Cek langsung ke Kie.ai: Validasi otomatis semua key pending yang aktif dan memiliki 80 kredit"
+                class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-500/10 ${
+                  this.isAutoValidating ? 'opacity-70 cursor-not-allowed' : ''
+                }"
+                ${this.isAutoValidating ? 'disabled' : ''}
+              >
+                <span class="material-symbols-outlined text-sm ${this.isAutoValidating ? 'animate-spin text-amber-400' : 'text-amber-400'}">bolt</span>
+                <span>${this.isAutoValidating ? 'Memvalidasi...' : '⚡ Validasi Otomatis (80 cr)'}</span>
+              </button>
               <button
                 type="button"
                 id="btn-sync-all-kie-credits"
@@ -504,6 +517,16 @@ export class ApiKeysView {
                               ? `
                             <button
                               type="button"
+                              data-action="auto-validate-key"
+                              data-id="${k.id}"
+                              title="Validasi Otomatis: Cek Kie.ai aktif & kredit 80"
+                              class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 active:scale-95 text-amber-300 border border-amber-500/40 flex items-center gap-1 transition-all shadow-sm cursor-pointer shrink-0"
+                            >
+                              <span class="material-symbols-outlined text-xs">bolt</span>
+                              <span>Auto Validasi</span>
+                            </button>
+                            <button
+                              type="button"
                               data-action="approve-key"
                               data-id="${k.id}"
                               title="Setujui API Key & Cairkan ke Saldo Aktif"
@@ -580,6 +603,27 @@ export class ApiKeysView {
     if (!this.hasSynced) {
       this.hasSynced = true;
       this.dataService.fetchApiKeysFromSupabase().then(() => {
+        refreshCallback();
+      });
+    }
+
+    // Tombol Validasi Otomatis Semua API Key Pending ke Kie.ai
+    const autoValidateAllBtn = container.querySelector('#btn-auto-validate-all-keys');
+    if (autoValidateAllBtn) {
+      autoValidateAllBtn.addEventListener('click', async () => {
+        this.isAutoValidating = true;
+        refreshCallback();
+        const res = await this.dataService.autoValidateAllPendingKeys();
+        this.isAutoValidating = false;
+        if (res.success) {
+          if (res.total === 0) {
+            this.toast.info('Tidak ada kunci pending yang perlu divalidasi.', 'Info');
+          } else {
+            this.toast.success(res.message, 'Validasi Otomatis');
+          }
+        } else {
+          this.toast.error(res.message || 'Gagal menjalankan validasi otomatis', 'Gagal Validasi');
+        }
         refreshCallback();
       });
     }
@@ -715,6 +759,22 @@ export class ApiKeysView {
           this.toast.warning(`API Key telah dihapus dari database.`, 'Dihapus');
           refreshCallback();
         }
+      });
+    });
+
+    // Auto-Validate Key (Cek ke Kie.ai: Aktif & Kredit 80)
+    container.querySelectorAll('[data-action="auto-validate-key"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">progress_activity</span><span>Cek Kie...</span>';
+        const res = await this.dataService.autoValidateApiKey(id);
+        if (res.success && res.validated) {
+          this.toast.success(res.message, 'Kie.ai Valid (80 cr)');
+        } else {
+          this.toast.warning(res.message || 'Key ditolak otomatis: Kie.ai tidak aktif atau kredit bukan 80.', 'Hasil Validasi');
+        }
+        refreshCallback();
       });
     });
 

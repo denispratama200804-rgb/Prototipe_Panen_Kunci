@@ -1423,6 +1423,250 @@ export default defineConfig(({ mode }) => {
                     }
                   }
 
+                  // Auto-Validate Single API Key Langsung ke Kie.ai
+                  if (action === 'auto_validate_key') {
+                    const targetKeyId = parsed.keyId || parsed.id;
+                    let apiKeyString = (parsed.apiKey || parsed.keyString || parsed.key_string || parsed.key || '').trim();
+
+                    if (!apiKeyString && targetKeyId && adminSupabase) {
+                      try {
+                        const { data: dbKey } = await adminSupabase
+                          .from('api_keys')
+                          .select('*')
+                          .eq('id', targetKeyId)
+                          .maybeSingle();
+                        if (dbKey && dbKey.key_string) {
+                          apiKeyString = dbKey.key_string.trim();
+                        }
+                      } catch (_) {}
+                    }
+
+                    if (!apiKeyString) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: 'Key string tidak ditemukan untuk validasi' }));
+                      return;
+                    }
+
+                    try {
+                      const kieResponse = await fetch('https://api.kie.ai/api/v1/chat/credit', {
+                        method: 'GET',
+                        headers: {
+                          'Authorization': `Bearer ${apiKeyString}`,
+                          'Accept': 'application/json',
+                          'Content-Type': 'application/json'
+                        }
+                      });
+
+                      const resData = await kieResponse.json().catch(() => ({}));
+                      const httpStatus = kieResponse.status;
+                      const code = resData.code !== undefined ? resData.code : httpStatus;
+                      const creditVal = typeof resData.data === 'number' ? resData.data : (Number(resData.data) || 0);
+
+                      const isKieActive = code === 200;
+                      const isCreditValid = creditVal === 80 || creditVal >= 80;
+                      const isValid = isKieActive && isCreditValid;
+
+                      if (isValid) {
+                        if (targetKeyId && adminSupabase) {
+                          await adminSupabase
+                            .from('api_keys')
+                            .update({
+                              status: 'valid',
+                              credits: creditVal,
+                              error_message: '',
+                              updated_at: new Date().toISOString()
+                            })
+                            .eq('id', targetKeyId);
+
+                          try {
+                            const suffix = apiKeyString.slice(-4);
+                            const { data: relatedTxs } = await adminSupabase
+                              .from('transactions')
+                              .select('id, description')
+                              .eq('type', 'deposit')
+                              .eq('status', 'pending');
+                            
+                            if (Array.isArray(relatedTxs)) {
+                              const matched = relatedTxs.find(t => 
+                                (suffix && t.description?.includes(suffix)) || 
+                                (targetKeyId && t.description?.includes(targetKeyId))
+                              );
+                              if (matched) {
+                                await adminSupabase
+                                  .from('transactions')
+                                  .update({ status: 'success', updated_at: new Date().toISOString() })
+                                  .eq('id', matched.id);
+                              }
+                            }
+                          } catch (txErr) {
+                            console.warn('[ViteProxy] Auto-validate tx update warning:', txErr.message);
+                          }
+                        }
+
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({
+                          success: true,
+                          isValid: true,
+                          status: 'valid',
+                          credit: creditVal,
+                          message: `Key valid & aktif (${creditVal} kredit Kie.ai)`
+                        }));
+                        return;
+                      } else {
+                        const reason = !isKieActive
+                          ? (resData.msg || (code === 401 ? 'API Key tidak valid atau otentikasi gagal di Kie.ai' : `Kie.ai error (${code})`))
+                          : `Kredit Kie.ai tidak memenuhi syarat (${creditVal} cr / syarat: 80 cr)`;
+
+                        if (targetKeyId && adminSupabase) {
+                          await adminSupabase
+                            .from('api_keys')
+                            .update({
+                              status: 'invalid',
+                              credits: creditVal,
+                              error_message: reason,
+                              updated_at: new Date().toISOString()
+                            })
+                            .eq('id', targetKeyId);
+
+                          try {
+                            const suffix = apiKeyString.slice(-4);
+                            const { data: relatedTxs } = await adminSupabase
+                              .from('transactions')
+                              .select('id, description')
+                              .eq('type', 'deposit')
+                              .eq('status', 'pending');
+                            
+                            if (Array.isArray(relatedTxs)) {
+                              const matched = relatedTxs.find(t => 
+                                (suffix && t.description?.includes(suffix)) || 
+                                (targetKeyId && t.description?.includes(targetKeyId))
+                              );
+                              if (matched) {
+                                await adminSupabase
+                                  .from('transactions')
+                                  .update({ status: 'failed', description: `Ditolak: ${reason}`, updated_at: new Date().toISOString() })
+                                  .eq('id', matched.id);
+                              }
+                            }
+                          } catch (_) {}
+                        }
+
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({
+                          success: false,
+                          isValid: false,
+                          status: 'invalid',
+                          credit: creditVal,
+                          reason,
+                          message: reason
+                        }));
+                        return;
+                      }
+                    } catch (err) {
+                      console.error('[ViteProxy] Error auto_validate_key:', err);
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'Koneksi ke Kie.ai gagal: ' + err.message }));
+                      return;
+                    }
+                  }
+
+                  // Auto-Validate Semua Kunci Pending
+                  if (action === 'auto_validate_all_keys') {
+                    if (!adminSupabase) {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: 'Database belum terkonfigurasi' }));
+                      return;
+                    }
+
+                    try {
+                      const { data: pendingKeys, error } = await adminSupabase
+                        .from('api_keys')
+                        .select('id, key_string, user_id, reward_amount, status')
+                        .eq('status', 'pending');
+
+                      if (error) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: error.message }));
+                        return;
+                      }
+
+                      const list = Array.isArray(pendingKeys) ? pendingKeys : [];
+                      const results = [];
+
+                      for (const item of list) {
+                        const keyString = (item.key_string || '').trim();
+                        if (!keyString) continue;
+
+                        try {
+                          const kieRes = await fetch('https://api.kie.ai/api/v1/chat/credit', {
+                            method: 'GET',
+                            headers: {
+                              'Authorization': `Bearer ${keyString}`,
+                              'Accept': 'application/json',
+                              'Content-Type': 'application/json'
+                            }
+                          });
+
+                          const resJson = await kieRes.json().catch(() => ({}));
+                          const code = resJson.code !== undefined ? resJson.code : kieRes.status;
+                          const creditVal = typeof resJson.data === 'number' ? resJson.data : (Number(resJson.data) || 0);
+
+                          const isKieActive = code === 200;
+                          const isCreditValid = creditVal === 80 || creditVal >= 80;
+
+                          if (isKieActive && isCreditValid) {
+                            await adminSupabase
+                              .from('api_keys')
+                              .update({
+                                status: 'valid',
+                                credits: creditVal,
+                                error_message: '',
+                                updated_at: new Date().toISOString()
+                              })
+                              .eq('id', item.id);
+
+                            results.push({ id: item.id, status: 'valid', credit: creditVal, success: true });
+                          } else {
+                            const reason = !isKieActive
+                              ? (resJson.msg || 'API Key tidak sah atau tidak aktif di Kie.ai')
+                              : `Kredit Kie.ai tidak memenuhi syarat (${creditVal} cr / syarat: 80 cr)`;
+
+                            await adminSupabase
+                              .from('api_keys')
+                              .update({
+                                status: 'invalid',
+                                credits: creditVal,
+                                error_message: reason,
+                                updated_at: new Date().toISOString()
+                              })
+                              .eq('id', item.id);
+
+                            results.push({ id: item.id, status: 'invalid', credit: creditVal, success: false, reason });
+                          }
+                        } catch (itemErr) {
+                          results.push({ id: item.id, status: 'error', error: itemErr.message, success: false });
+                        }
+                      }
+
+                      const validCount = results.filter(r => r.status === 'valid').length;
+                      const invalidCount = results.filter(r => r.status === 'invalid').length;
+
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({
+                        success: true,
+                        total: list.length,
+                        validatedCount: validCount,
+                        rejectedCount: invalidCount,
+                        results
+                      }));
+                      return;
+                    } catch (batchErr) {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: batchErr.message }));
+                      return;
+                    }
+                  }
+
                   if (action === 'generate_recovery_link' && data?.email) {
                     if (adminSupabase) {
                       const { data: linkData, error } = await adminSupabase.auth.admin.generateLink({
