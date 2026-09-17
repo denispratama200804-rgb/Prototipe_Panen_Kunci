@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
     : null;
 
   const CHAT_STORE_ID = '00000000-0000-0000-0000-000000000002';
+  const REFERRAL_STORE_ID = '00000000-0000-0000-0000-000000000003';
 
   async function getLiveChatsFromSupabase(targetUserId = null) {
     if (!adminSupabase) return [];
@@ -777,6 +778,7 @@ export default defineConfig(({ mode }) => {
                   if (action === 'bind_referral') {
                     if (adminSupabase) {
                       const targetUserId = parsed.userId || parsed.user_id || data?.userId || data?.user_id;
+                      const userEmail = (parsed.userEmail || parsed.email || data?.userEmail || data?.email || '').trim().toLowerCase();
                       const code = (parsed.referralCode || parsed.referral_code || data?.referralCode || data?.referral_code || '').trim().toUpperCase();
 
                       if (!targetUserId || !code) {
@@ -785,6 +787,38 @@ export default defineConfig(({ mode }) => {
                         return;
                       }
 
+                      // 1. Simpan ke central referral bindings store (REFERRAL_STORE_ID) di tabel users
+                      try {
+                        const { data: storeRow } = await adminSupabase
+                          .from('users')
+                          .select('avatar')
+                          .eq('id', REFERRAL_STORE_ID)
+                          .maybeSingle();
+
+                        let refMap = {};
+                        if (storeRow && storeRow.avatar) {
+                          try {
+                            refMap = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+                          } catch (_) {}
+                        }
+                        if (typeof refMap !== 'object' || !refMap) refMap = {};
+                        refMap[targetUserId] = code;
+                        if (userEmail) refMap[userEmail] = code;
+
+                        await adminSupabase.from('users').upsert({
+                          id: REFERRAL_STORE_ID,
+                          name: 'Referral Bindings Store',
+                          email: 'referral_store@panenkunci.internal',
+                          role: 'system_config',
+                          avatar: JSON.stringify(refMap),
+                          is_verified: true,
+                          updated_at: new Date().toISOString()
+                        });
+                      } catch (storeErr) {
+                        console.warn('[vite proxy] bind_referral store warning:', storeErr.message);
+                      }
+
+                      // 2. Coba update kolom jika tabel memiliki referred_by
                       try {
                         await adminSupabase
                           .from('users')
@@ -792,6 +826,7 @@ export default defineConfig(({ mode }) => {
                           .eq('id', targetUserId);
                       } catch (_) {}
 
+                      // 3. Simpan ke Auth user_metadata jika ada di auth.users
                       try {
                         await adminSupabase.auth.admin.updateUserById(targetUserId, {
                           user_metadata: { referred_by: code }
@@ -807,6 +842,40 @@ export default defineConfig(({ mode }) => {
                       res.end(JSON.stringify({ success: false, error: 'SUPABASE_SECRET_KEY belum diatur di .env' }));
                     }
                     return;
+                  }
+
+                  if (action === 'get_user_referral') {
+                    if (adminSupabase) {
+                      const targetId = parsed.userId || parsed.id;
+                      const targetEmail = (parsed.userEmail || parsed.email || '').trim().toLowerCase();
+
+                      try {
+                        const { data: storeRow } = await adminSupabase
+                          .from('users')
+                          .select('avatar')
+                          .eq('id', REFERRAL_STORE_ID)
+                          .maybeSingle();
+
+                        let refMap = {};
+                        if (storeRow && storeRow.avatar) {
+                          try {
+                            refMap = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+                          } catch (_) {}
+                        }
+                        const bound = (targetId && refMap[targetId]) || (targetEmail && refMap[targetEmail]) || '';
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({ success: true, referralCode: bound }));
+                        return;
+                      } catch (err) {
+                        res.statusCode = 200;
+                        res.end(JSON.stringify({ success: false, referralCode: '' }));
+                        return;
+                      }
+                    } else {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: false, referralCode: '' }));
+                      return;
+                    }
                   }
 
                   if (action === 'insert' && table === 'users') {

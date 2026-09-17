@@ -145,7 +145,14 @@ export class TarikSaldoView extends IComponent {
     ];
 
     const currentFee = getFee(resolved.method);
-    const userReferredBy = (user?.referredBy || '').trim().toUpperCase();
+    let userReferredBy = (user?.referredBy || '').trim().toUpperCase();
+    if (!userReferredBy && user && typeof localStorage !== 'undefined') {
+      try {
+        const bound = localStorage.getItem('pk_bound_ref_' + user.id) ||
+                      localStorage.getItem('pk_bound_ref_' + (user.email || '').toLowerCase());
+        if (bound) userReferredBy = bound.trim().toUpperCase();
+      } catch (_) {}
+    }
     const refPercent = this._walletService.referralCutPercent;
     const initialReferralCut = (userReferredBy && refPercent > 0) ? Math.round(minWithdrawal * (refPercent / 100)) : 0;
     const currentReceive = Math.max(0, minWithdrawal - currentFee - initialReferralCut);

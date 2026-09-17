@@ -169,6 +169,17 @@ export class AuthService {
       }
       this._currentUser = new User(saved);
 
+      // Sinkronkan cadangan pk_bound_ref_ jika properti referredBy kosong
+      if (!this._currentUser.referredBy && typeof localStorage !== 'undefined') {
+        try {
+          const bound = localStorage.getItem('pk_bound_ref_' + this._currentUser.id) ||
+                        localStorage.getItem('pk_bound_ref_' + (this._currentUser.email || '').toLowerCase());
+          if (bound) {
+            this._currentUser.referredBy = bound.trim().toUpperCase();
+          }
+        } catch (_) {}
+      }
+
       // Pastikan role bersih, tegas, dan konsisten (mencegah perpindahan sesi ke admin secara otomatis)
       const isExplicitAdmin = (this._currentUser.role === 'admin') ||
                               (this._currentUser.email === 'admin@panenkunci.id') ||
@@ -226,6 +237,17 @@ export class AuthService {
                   const metaRef = authData?.user?.user_metadata?.referred_by || authData?.user?.user_metadata?.referredBy;
                   if (metaRef) {
                     remote.referredBy = String(metaRef).trim().toUpperCase();
+                  }
+                } catch (_) {}
+              }
+
+              // Jika masih belum ada, cek cadangan localStorage
+              if (!remote.referredBy && typeof localStorage !== 'undefined') {
+                try {
+                  const bound = localStorage.getItem('pk_bound_ref_' + remote.id) ||
+                                localStorage.getItem('pk_bound_ref_' + (remote.email || '').toLowerCase());
+                  if (bound) {
+                    remote.referredBy = bound.trim().toUpperCase();
                   }
                 } catch (_) {}
               }
@@ -310,6 +332,15 @@ export class AuthService {
    * @returns {User|null}
    */
   getCurrentUser() {
+    if (this._currentUser && !this._currentUser.referredBy && typeof localStorage !== 'undefined') {
+      try {
+        const bound = localStorage.getItem('pk_bound_ref_' + this._currentUser.id) ||
+                      localStorage.getItem('pk_bound_ref_' + (this._currentUser.email || '').toLowerCase());
+        if (bound) {
+          this._currentUser.referredBy = bound.trim().toUpperCase();
+        }
+      } catch (_) {}
+    }
     return this._currentUser;
   }
 
@@ -728,12 +759,22 @@ export class AuthService {
     }
 
     // Simpan penautan ke akun saat ini:
-    // A. Update local domain, session, dan repository
+    // A. Amankan ke localStorage segera agar tahan refresh & reload kapan pun
+    if (typeof localStorage !== 'undefined') {
+      try {
+        if (this._currentUser.id) localStorage.setItem('pk_bound_ref_' + this._currentUser.id, cleanCode);
+        if (this._currentUser.email) localStorage.setItem('pk_bound_ref_' + (this._currentUser.email).toLowerCase(), cleanCode);
+      } catch (_) {}
+    }
+
+    // B. Update local domain, session, dan repository
+    this._currentUser.referredBy = cleanCode;
+    this._saveSession(this._currentUser, this._currentUser.role || 'user');
     await this.updateProfile({ referredBy: cleanCode });
     this._currentUser.referredBy = cleanCode;
     this._saveSession(this._currentUser, this._currentUser.role || 'user');
 
-    // B. Simpan ke Supabase auth user_metadata di client jika ada session
+    // C. Simpan ke Supabase auth user_metadata di client jika ada session
     if (isSupabaseConfigured()) {
       try {
         await supabase.auth.updateUser({
@@ -742,7 +783,7 @@ export class AuthService {
       } catch (_) {}
     }
 
-    // C. Simpan ke Supabase database & Auth user_metadata via Server Proxy (admin bypass RLS)
+    // D. Simpan ke Supabase database & Auth user_metadata via Server Proxy (admin bypass RLS)
     if (this._currentUser.id) {
       try {
         await fetch('/api/supabase-proxy', {
@@ -751,6 +792,7 @@ export class AuthService {
           body: JSON.stringify({
             action: 'bind_referral',
             userId: this._currentUser.id,
+            userEmail: this._currentUser.email,
             referralCode: cleanCode
           })
         });
@@ -1165,7 +1207,10 @@ export class AuthService {
       const metaReferredBy = (authUser.user_metadata?.referred_by || authUser.user_metadata?.referredBy || '').trim().toUpperCase();
       let storedLocalRef = '';
       try {
-        storedLocalRef = (localStorage.getItem('pk_referral_code') || sessionStorage.getItem('pk_referral_code') || '').trim().toUpperCase();
+        storedLocalRef = (localStorage.getItem('pk_referral_code') ||
+                          sessionStorage.getItem('pk_referral_code') ||
+                          localStorage.getItem('pk_bound_ref_' + authUser.id) ||
+                          localStorage.getItem('pk_bound_ref_' + email) || '').trim().toUpperCase();
       } catch (_) {}
       const effectiveOAuthRef = metaReferredBy || storedLocalRef;
 
@@ -1195,9 +1240,13 @@ export class AuthService {
             userRecord = await this._userRepository.create(newUserData);
             console.log('[AuthService] Pengguna baru dari Google berhasil disimpan ke database:', userRecord);
           } else {
-            // Jika user sudah ada, perbarui referredBy jika sebelumnya kosong dan metadata punya
-            if (!userRecord.referredBy && effectiveOAuthRef) {
-              userRecord.referredBy = effectiveOAuthRef;
+            // Jika user sudah ada, perbarui referredBy jika sebelumnya kosong dan metadata/local punya
+            if (!userRecord.referredBy) {
+              if (effectiveOAuthRef) {
+                userRecord.referredBy = effectiveOAuthRef;
+              } else if (this._currentUser?.referredBy) {
+                userRecord.referredBy = this._currentUser.referredBy;
+              }
             }
             // C. Jika user sudah ada, perbarui foto profil jika sebelumnya kosong
             if ((!userRecord.avatar || userRecord.avatar === '/avatar.png') && avatarUrl) {
@@ -1227,7 +1276,9 @@ export class AuthService {
           accountNumber: '',
           accountHolder: fullName.toUpperCase(),
           isVerified: false,
-          avatar: avatarUrl
+          avatar: avatarUrl,
+          referralCode: User.generateReferralCode(authUser.id || email || fullName),
+          referredBy: effectiveOAuthRef || (this._currentUser?.referredBy || '')
         });
       }
 

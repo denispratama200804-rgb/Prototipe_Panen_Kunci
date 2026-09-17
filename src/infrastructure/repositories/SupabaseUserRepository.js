@@ -56,7 +56,7 @@ export class SupabaseUserRepository extends IUserRepository {
 
     if (!data) return null;
 
-    // Jika tabel DB belum memiliki kolom referred_by, sinkronkan dari user_metadata session auth
+    // Jika tabel DB belum memiliki kolom referred_by, sinkronkan dari user_metadata session auth atau localStorage
     try {
       const { data: authData } = await supabase.auth.getUser();
       if (authData?.user && (authData.user.id === data.id || authData.user.email?.toLowerCase() === data.email?.toLowerCase())) {
@@ -66,6 +66,16 @@ export class SupabaseUserRepository extends IUserRepository {
         }
       }
     } catch (_) {}
+
+    if (!data.referred_by && typeof localStorage !== 'undefined') {
+      try {
+        const localBound = localStorage.getItem('pk_bound_ref_' + data.id) ||
+                           localStorage.getItem('pk_bound_ref_' + (data.email || '').toLowerCase());
+        if (localBound) {
+          data.referred_by = localBound;
+        }
+      } catch (_) {}
+    }
 
     return this._toDomain(data);
   }
@@ -77,30 +87,59 @@ export class SupabaseUserRepository extends IUserRepository {
    */
   async getByEmail(email) {
     if (!isSupabaseConfigured() || !email) return null;
+    const cleanEmail = String(email).trim().toLowerCase();
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from(this.tableName)
       .select('*')
-      .ilike('email', email)
+      .ilike('email', cleanEmail)
       .maybeSingle();
 
+    // Jika terhalang RLS (42501) atau error policy, gunakan fallback Server Proxy
+    if (error && (error.code === '42501' || error.message?.toLowerCase().includes('row-level security'))) {
+      try {
+        const proxyRes = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'select', table: 'users', query: { email: cleanEmail } })
+        });
+        const proxyJson = await proxyRes.json();
+        if (proxyJson.success && Array.isArray(proxyJson.data) && proxyJson.data.length > 0) {
+          data = proxyJson.data[0];
+          error = null;
+        }
+      } catch (proxyErr) {
+        console.warn('[SupabaseUserRepository] Proxy getByEmail error:', proxyErr);
+      }
+    }
+
     if (error) {
-      console.error('[SupabaseUserRepository] getByEmail error:', error.message);
-      throw new Error(error.message);
+      console.warn('[SupabaseUserRepository] getByEmail warning:', error.message);
+      return null;
     }
 
     if (!data) return null;
 
-    // Jika tabel DB belum memiliki kolom referred_by, sinkronkan dari user_metadata session auth
+    // Sinkronkan referred_by jika kolom DB belum terisi
     try {
       const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user && (authData.user.id === data.id || authData.user.email?.toLowerCase() === data.email?.toLowerCase())) {
+      if (authData?.user && (authData.user.id === data.id || authData.user.email?.toLowerCase() === cleanEmail)) {
         const metaRef = authData.user.user_metadata?.referred_by || authData.user.user_metadata?.referredBy;
         if (metaRef && !data.referred_by) {
           data.referred_by = String(metaRef).trim().toUpperCase();
         }
       }
     } catch (_) {}
+
+    if (!data.referred_by && typeof localStorage !== 'undefined') {
+      try {
+        const localBound = localStorage.getItem('pk_bound_ref_' + data.id) ||
+                           localStorage.getItem('pk_bound_ref_' + cleanEmail);
+        if (localBound) {
+          data.referred_by = localBound;
+        }
+      } catch (_) {}
+    }
 
     return this._toDomain(data);
   }
@@ -222,7 +261,22 @@ export class SupabaseUserRepository extends IUserRepository {
     if (updates.isVerified !== undefined) payload.is_verified = updates.isVerified;
     if (updates.avatar !== undefined) payload.avatar = (updates.avatar && updates.avatar !== '/avatar.png') ? updates.avatar : '';
     if (updates.referralCode !== undefined) payload.referral_code = updates.referralCode;
-    if (updates.referredBy !== undefined) payload.referred_by = updates.referredBy;
+    if (updates.referredBy !== undefined) {
+      payload.referred_by = updates.referredBy;
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('pk_bound_ref_' + id, updates.referredBy);
+        } catch (_) {}
+      }
+    }
+    // Jika payload kosong (misal hanya referral yang dikelola via store terpisah)
+    if (Object.keys(payload).length === 0) {
+      const existing = await this.getById(id);
+      if (existing) {
+        if (updates.referredBy) existing.referredBy = updates.referredBy;
+        return existing;
+      }
+    }
 
     // 1. Coba update langsung via Supabase client
     let { data, error } = await supabase
@@ -236,6 +290,15 @@ export class SupabaseUserRepository extends IUserRepository {
     if (error && error.message && (error.message.includes('referral_code') || error.message.includes('referred_by'))) {
       if (error.message.includes('referral_code')) delete payload.referral_code;
       if (error.message.includes('referred_by')) delete payload.referred_by;
+
+      if (Object.keys(payload).length === 0) {
+        const existing = await this.getById(id);
+        if (existing) {
+          if (updates.referredBy) existing.referredBy = updates.referredBy;
+          return existing;
+        }
+      }
+
       const retry = await supabase
         .from(this.tableName)
         .update(payload)

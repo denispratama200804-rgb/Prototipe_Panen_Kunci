@@ -42,6 +42,17 @@ export class ProfileView extends IComponent {
       `;
     }
 
+    // Pastikan status referral sinkron dari cadangan lokal jika di objek user sempat kosong
+    if (!user.referredBy && typeof localStorage !== 'undefined') {
+      try {
+        const bound = localStorage.getItem('pk_bound_ref_' + user.id) ||
+                      localStorage.getItem('pk_bound_ref_' + (user.email || '').toLowerCase());
+        if (bound) {
+          user.referredBy = bound.trim().toUpperCase();
+        }
+      } catch (_) {}
+    }
+
     const lifetime = this._walletService.getLifetimeEarnings();
     const totalKeys = this._apiKeyService.getAllKeys().length;
     const nicknameStatus = typeof user.canChangeNickname === 'function'
@@ -711,6 +722,13 @@ export class ProfileView extends IComponent {
 
       const res = await this._authService.bindReferralCode(code);
       if (res.success) {
+        if (typeof localStorage !== 'undefined') {
+          try {
+            const cur = this._authService.getCurrentUser();
+            if (cur?.id) localStorage.setItem('pk_bound_ref_' + cur.id, code);
+            if (cur?.email) localStorage.setItem('pk_bound_ref_' + (cur.email).toLowerCase(), code);
+          } catch (_) {}
+        }
         this._notification.success(res.message);
 
         // Langsung transformasikan UI tanpa menunggu reload: form hilang & hanya menampilkan kode rujukan terkunci

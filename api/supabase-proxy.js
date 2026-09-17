@@ -160,6 +160,7 @@ const adminSupabase = SUPABASE_SECRET_KEY
   : null;
 
 const CHAT_STORE_ID = '00000000-0000-0000-0000-000000000002';
+const REFERRAL_STORE_ID = '00000000-0000-0000-0000-000000000003';
 
 async function getLiveChatsFromSupabase(targetUserId = null) {
   if (!adminSupabase) return [];
@@ -849,13 +850,45 @@ export default async function handler(req, res) {
     // 2d-3. Menautkan Kode Referral Pengundang ke Akun Pengguna (Bypass RLS)
     if (action === 'bind_referral') {
       const targetUserId = body.userId || body.user_id || data?.userId || data?.user_id;
+      const userEmail = (body.userEmail || body.email || data?.userEmail || data?.email || '').trim().toLowerCase();
       const code = (body.referralCode || body.referral_code || data?.referralCode || data?.referral_code || '').trim().toUpperCase();
 
       if (!targetUserId || !code) {
         return res.status(400).json({ success: false, error: 'User ID dan Kode Referral diperlukan.' });
       }
 
-      // 1. Coba simpan ke kolom referred_by di tabel users jika ada
+      // 1. Simpan ke central referral bindings store (REFERRAL_STORE_ID) di tabel users
+      try {
+        const { data: storeRow } = await adminSupabase
+          .from('users')
+          .select('avatar')
+          .eq('id', REFERRAL_STORE_ID)
+          .maybeSingle();
+
+        let refMap = {};
+        if (storeRow && storeRow.avatar) {
+          try {
+            refMap = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+          } catch (_) {}
+        }
+        if (typeof refMap !== 'object' || !refMap) refMap = {};
+        refMap[targetUserId] = code;
+        if (userEmail) refMap[userEmail] = code;
+
+        await adminSupabase.from('users').upsert({
+          id: REFERRAL_STORE_ID,
+          name: 'Referral Bindings Store',
+          email: 'referral_store@panenkunci.internal',
+          role: 'system_config',
+          avatar: JSON.stringify(refMap),
+          is_verified: true,
+          updated_at: new Date().toISOString()
+        });
+      } catch (storeErr) {
+        console.warn('[supabase-proxy] bind_referral central store warning:', storeErr.message);
+      }
+
+      // 2. Coba simpan ke kolom referred_by di tabel users jika ada
       try {
         await adminSupabase
           .from('users')
@@ -863,7 +896,7 @@ export default async function handler(req, res) {
           .eq('id', targetUserId);
       } catch (_) {}
 
-      // 2. Simpan secara permanen ke Auth user_metadata
+      // 3. Simpan secara permanen ke Auth user_metadata jika user ada di auth.users
       try {
         await adminSupabase.auth.admin.updateUserById(targetUserId, {
           user_metadata: { referred_by: code }
@@ -873,6 +906,30 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ success: true, message: `Berhasil menautkan ke kode referral ${code}` });
+    }
+
+    if (action === 'get_user_referral') {
+      const targetId = body.userId || body.id || data?.userId || data?.id;
+      const targetEmail = (body.userEmail || body.email || data?.userEmail || data?.email || '').trim().toLowerCase();
+
+      try {
+        const { data: storeRow } = await adminSupabase
+          .from('users')
+          .select('avatar')
+          .eq('id', REFERRAL_STORE_ID)
+          .maybeSingle();
+
+        let refMap = {};
+        if (storeRow && storeRow.avatar) {
+          try {
+            refMap = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+          } catch (_) {}
+        }
+        const bound = (targetId && refMap[targetId]) || (targetEmail && refMap[targetEmail]) || '';
+        return res.status(200).json({ success: true, referralCode: bound });
+      } catch (err) {
+        return res.status(200).json({ success: false, referralCode: '' });
+      }
     }
 
     // 2e. Sinkronisasi kuota kredit API Key langsung ke server Kie.ai (https://api.kie.ai/api/v1/chat/credit)
