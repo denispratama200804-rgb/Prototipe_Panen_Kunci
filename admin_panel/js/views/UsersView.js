@@ -1,3 +1,5 @@
+import { User } from '../../../src/domain/models/User.js';
+
 /**
  * UsersView
  * Manajemen Pengguna & KYC Panen Kunci:
@@ -154,6 +156,20 @@ export class UsersView {
                       const balance = Number(u.balance || 0);
                       const totalWD = Number(u.totalWithdrawn || 0);
 
+                      // Informasi kode referral yang DIGUNAKAN oleh pengguna saat ini (kode pengundang)
+                      const usedReferralCode = (u.referredBy || u.referred_by || '').trim().toUpperCase();
+                      let referrerName = '';
+                      if (usedReferralCode) {
+                        const referrerUser = users.find(other => 
+                          (other.referralCode || '').toUpperCase() === usedReferralCode ||
+                          (other.id && User.generateReferralCode(other.id) === usedReferralCode) ||
+                          (other.email && User.generateReferralCode(other.email) === usedReferralCode)
+                        );
+                        if (referrerUser) {
+                          referrerName = referrerUser.name || referrerUser.email;
+                        }
+                      }
+
                       return `
               <div class="admin-item-card rounded-2xl overflow-hidden transition-all duration-200 ${
                 u.isVerified
@@ -197,7 +213,7 @@ export class UsersView {
                       <div class="text-[11px] text-admin-muted truncate mt-0.5 max-w-[200px] sm:max-w-none">
                         ${u.email || '-'}${u.phone ? ` • ${u.phone}` : ''}
                       </div>
-                      <div class="mt-1">
+                      <div class="mt-1 flex items-center gap-1.5 flex-wrap">
                         <!-- Pill Tag Saldo & Kunci -->
                         <span class="pill-saldo inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono border border-indigo-500/30 bg-indigo-500/10 text-indigo-300">
                           <span class="material-symbols-outlined text-xs text-amber-400">payments</span>
@@ -205,6 +221,15 @@ export class UsersView {
                           <span class="opacity-60">•</span>
                           <span class="text-emerald-400">${u.totalKeys || 0} Kunci</span>
                         </span>
+
+                        ${
+                          usedReferralCode
+                            ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border border-amber-500/30 bg-amber-500/10 text-amber-300 font-semibold" title="Pengguna ini menggunakan kode referral pengundang: ${usedReferralCode}">
+                                <span class="material-symbols-outlined text-[11px] text-amber-400">link</span>
+                                <span>Menggunakan Ref: <strong class="text-amber-400 font-bold">${usedReferralCode}</strong></span>
+                              </span>`
+                            : ''
+                        }
                       </div>
                     </div>
                   </div>
@@ -260,6 +285,19 @@ export class UsersView {
                           <span class="material-symbols-outlined text-xs text-slate-400">fingerprint</span>
                           <span class="truncate">${u.id}</span>
                         </div>
+                        <!-- Kode Referral Pengundang yang Digunakan -->
+                        <div class="flex items-center gap-1.5 text-admin-body pt-1.5 mt-1 border-t border-slate-700/50">
+                          <span class="material-symbols-outlined text-xs ${usedReferralCode ? 'text-amber-400' : 'text-slate-500'}">link</span>
+                          <span class="text-[11px] text-admin-muted">Menggunakan Referral:</span>
+                          ${
+                            usedReferralCode
+                              ? `<span class="font-mono text-[11px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30 inline-flex items-center gap-1" title="Akun ini menautkan kode referral ${usedReferralCode}">
+                                  <span>${usedReferralCode}</span>
+                                  ${referrerName ? `<span class="text-[10px] text-amber-300/80 font-sans font-normal">(${referrerName})</span>` : ''}
+                                </span>`
+                              : `<span class="text-slate-500 text-[11px] italic">Tidak Menggunakan Referral</span>`
+                          }
+                        </div>
                       </div>
                     </div>
 
@@ -274,6 +312,43 @@ export class UsersView {
                         <div class="font-mono text-admin-body">${u.accountNumber || '-'}</div>
                         <div class="text-[11px] text-admin-muted">a.n. ${u.accountHolder || u.name || '-'}</div>
                       </div>
+                    </div>
+
+                    <!-- Banner Informasi Kode Referral Pengundang yang Digunakan -->
+                    <div class="sm:col-span-2 p-2.5 rounded-xl border ${
+                      usedReferralCode
+                        ? 'bg-amber-950/20 border-amber-500/30'
+                        : 'bg-slate-900/40 border-slate-800'
+                    } flex items-center justify-between gap-2 flex-wrap">
+                      <div class="flex items-center gap-2.5">
+                        <div class="w-7 h-7 rounded-lg ${
+                          usedReferralCode
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                            : 'bg-slate-800 text-slate-500 border border-slate-700'
+                        } flex items-center justify-center shrink-0">
+                          <span class="material-symbols-outlined text-sm">link</span>
+                        </div>
+                        <div>
+                          <span class="text-[9px] uppercase font-bold text-admin-muted block">Kode Referral yang Digunakan Pengguna Ini:</span>
+                          <div class="text-xs font-semibold flex items-center gap-1.5 flex-wrap">
+                            ${
+                              usedReferralCode
+                                ? `<span class="text-admin-heading">Menggunakan kode pengundang:</span>
+                                   <span class="font-mono text-xs font-black text-amber-400 bg-amber-500/25 px-2 py-0.5 rounded border border-amber-500/40 tracking-wider">${usedReferralCode}</span>
+                                   ${referrerName ? `<span class="text-amber-300/90 text-[11px] font-normal font-sans">(Milik: <strong class="font-bold text-amber-300">${referrerName}</strong>)</span>` : ''}`
+                                : `<span class="text-slate-400 font-normal italic">Pengguna ini mendaftar langsung (tidak menggunakan kode referral siapapun).</span>`
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      ${
+                        usedReferralCode
+                          ? `<span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center gap-1">
+                              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                              <span>Terikat Pengundang</span>
+                            </span>`
+                          : `<span class="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-700">Tanpa Pengundang</span>`
+                      }
                     </div>
 
                     <!-- Statistik Setoran & Finansial -->

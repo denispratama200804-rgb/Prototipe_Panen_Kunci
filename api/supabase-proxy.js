@@ -477,6 +477,22 @@ export default async function handler(req, res) {
       }
 
       const cleanUsers = (users || []).filter(u => u.role !== 'system_config' && !u.email?.includes('system_config') && !u.email?.includes('panenkunci.internal'));
+      try {
+        const { data: authData } = await adminSupabase.auth.admin.listUsers({ perPage: 1000 });
+        if (authData && Array.isArray(authData.users)) {
+          const refMap = {};
+          authData.users.forEach(au => {
+            if (au && au.id && au.user_metadata) {
+              const ref = au.user_metadata.referred_by || au.user_metadata.referredBy;
+              if (ref) refMap[au.id] = String(ref).trim().toUpperCase();
+            }
+          });
+          cleanUsers.forEach(u => {
+            if (!u.referred_by && refMap[u.id]) u.referred_by = refMap[u.id];
+            if (!u.referredBy && refMap[u.id]) u.referredBy = refMap[u.id];
+          });
+        }
+      } catch (_) {}
       return res.status(200).json({ success: true, data: cleanUsers });
     } catch (err) {
       return res.status(500).json({ success: false, error: err.message });
@@ -614,6 +630,22 @@ export default async function handler(req, res) {
       }
 
       const cleanUsers = (users || []).filter(u => u.role !== 'system_config' && !u.email?.includes('system_config'));
+      try {
+        const { data: authData } = await adminSupabase.auth.admin.listUsers({ perPage: 1000 });
+        if (authData && Array.isArray(authData.users)) {
+          const refMap = {};
+          authData.users.forEach(au => {
+            if (au && au.id && au.user_metadata) {
+              const ref = au.user_metadata.referred_by || au.user_metadata.referredBy;
+              if (ref) refMap[au.id] = String(ref).trim().toUpperCase();
+            }
+          });
+          cleanUsers.forEach(u => {
+            if (!u.referred_by && refMap[u.id]) u.referred_by = refMap[u.id];
+            if (!u.referredBy && refMap[u.id]) u.referredBy = refMap[u.id];
+          });
+        }
+      } catch (_) {}
       return res.status(200).json({ success: true, data: cleanUsers });
     }
 

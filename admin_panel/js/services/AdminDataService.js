@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../../../src/infrastructure/supabase/supabaseClient.js';
+import { User } from '../../../src/domain/models/User.js';
 
 /**
  * AdminDataService
@@ -1649,6 +1650,11 @@ export class AdminDataService {
           const lastActive = row.updated_at ? new Date(row.updated_at).getTime() : 0;
           const isOnline = Boolean(lastActive && (Date.now() - lastActive < 60000));
 
+          const localAccs = this._get('registered_accounts', []);
+          const matchedLocal = Array.isArray(localAccs) ? localAccs.find(a => a.id === row.id || (a.email && row.email && a.email.toLowerCase() === row.email.toLowerCase())) : null;
+          const localReferredBy = matchedLocal?.referredBy || (this._get('current_user', {})?.id === row.id ? this._get('current_user', {})?.referredBy : '') || '';
+          const generatedCode = User.generateReferralCode(row.id || row.email || row.name);
+
           return {
             id: row.id,
             name: row.name || 'Tanpa Nama',
@@ -1664,8 +1670,8 @@ export class AdminDataService {
             updatedAt: row.updated_at || null,
             avatar: (row.avatar && row.avatar !== '/avatar.png') ? row.avatar : '',
             nicknameUpdatedAt: row.nickname_updated_at || row.nicknameUpdatedAt || null,
-            referralCode: row.referral_code || row.referralCode || '',
-            referredBy: row.referred_by || row.referredBy || '',
+            referralCode: row.referral_code || row.referralCode || generatedCode,
+            referredBy: (row.referred_by || row.referredBy || localReferredBy || '').trim().toUpperCase(),
             customBalance: balanceMap[row.id] !== undefined ? balanceMap[row.id] : undefined,
             manualBalance: manualMap[row.id] !== undefined ? manualMap[row.id] : undefined
           };
@@ -1761,7 +1767,8 @@ export class AdminDataService {
       (u.name && u.name.toLowerCase().includes(q)) ||
       (u.email && u.email.toLowerCase().includes(q)) ||
       (u.phone && u.phone.toLowerCase().includes(q)) ||
-      (u.id && u.id.toLowerCase().includes(q))
+      (u.id && u.id.toLowerCase().includes(q)) ||
+      (u.referredBy && u.referredBy.toLowerCase().includes(q))
     );
   }
 
