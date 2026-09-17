@@ -65,6 +65,7 @@ import { AuthService } from './infrastructure/services/AuthService.js';
 import { WalletService } from './infrastructure/services/WalletService.js';
 import { ApiKeyService } from './infrastructure/services/ApiKeyService.js';
 import { ChatService } from './infrastructure/services/ChatService.js';
+import { StorageService } from './infrastructure/services/StorageService.js';
 
 // Presentation Components & Router
 import { ToastComponent } from './presentation/components/Toast.js';
@@ -172,6 +173,9 @@ function bootstrap() {
 
   const chatService = new ChatService('panenkunci:');
   container.registerSingleton('ChatService', chatService);
+
+  const storageService = new StorageService();
+  container.registerSingleton('StorageService', storageService);
 
   // 5. Mount Global UI Shell & Components
   const appRoot = document.getElementById('app');

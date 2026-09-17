@@ -103,6 +103,13 @@ export class SupabaseTransactionRepository extends ITransactionRepository {
       payload.created_at = tx.createdAt;
     }
 
+    if (tx.proofImage) {
+      payload.proof_image = tx.proofImage;
+    }
+    if (tx.proofNotes) {
+      payload.proof_notes = tx.proofNotes;
+    }
+
     // PostgreSQL column id bertipe UUID; hanya kirim id jika valid UUID
     const isUuidTxId = tx.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tx.id);
     if (isUuidTxId) {
@@ -216,7 +223,9 @@ export class SupabaseTransactionRepository extends ITransactionRepository {
       status: row.status,
       method: row.method || '',
       recipient: row.recipient || '',
-      createdAt: row.created_at || row.createdAt
+      createdAt: row.created_at || row.createdAt,
+      proofImage: row.proof_image || row.proofImage || '',
+      proofNotes: row.proof_notes || row.proofNotes || ''
     });
   }
 }

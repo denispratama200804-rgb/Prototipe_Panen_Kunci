@@ -105,9 +105,15 @@ CREATE TABLE IF NOT EXISTS public.transactions (
                                   CHECK (status IN ('pending', 'success', 'failed')),
   method          TEXT          DEFAULT '',
   recipient       TEXT          DEFAULT '',
+  proof_image     TEXT          DEFAULT '',
+  proof_notes     TEXT          DEFAULT '',
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
+
+-- Query migrasi jika tabel transactions sudah dibuat sebelumnya:
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS proof_image TEXT DEFAULT '';
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS proof_notes TEXT DEFAULT '';
 
 COMMENT ON TABLE  public.transactions              IS 'Riwayat mutasi saldo: setoran API Key & penarikan dana';
 COMMENT ON COLUMN public.transactions.type         IS 'deposit = setoran key, withdrawal = tarik saldo';
@@ -117,6 +123,9 @@ COMMENT ON COLUMN public.transactions.net_payout   IS 'Dihitung otomatis: amount
 COMMENT ON COLUMN public.transactions.status       IS 'pending = menunggu admin, success = cair, failed = gagal';
 COMMENT ON COLUMN public.transactions.method       IS 'Metode penarikan: bank | dana | gopay | ovo';
 COMMENT ON COLUMN public.transactions.recipient    IS 'Nomor rekening atau HP tujuan penarikan';
+COMMENT ON COLUMN public.transactions.proof_image  IS 'URL gambar bukti transfer Cloudflare R2 (https://media.panenkunci.com/proofs/...)';
+COMMENT ON COLUMN public.transactions.proof_notes  IS 'Catatan transfer dari admin saat memproses penarikan';
+
 
 
 -- ============================================================

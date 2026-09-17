@@ -18,6 +18,7 @@ export class ProfileView extends IComponent {
     this._notification = container.resolve('NotificationService');
     this._walletService = container.resolve('WalletService');
     this._apiKeyService = container.resolve('ApiKeyService');
+    this._storageService = container.has('StorageService') ? container.resolve('StorageService') : null;
   }
 
   render() {
@@ -554,8 +555,23 @@ export class ProfileView extends IComponent {
           removeAvatarBtn.classList.remove('hidden');
         }
 
-        await this._authService.updateProfile({ avatar: base64Image });
-        this._notification.success('Foto profil berhasil diunggah dan disimpan!');
+        // Unggah ke Cloudflare R2 Storage
+        let avatarUrl = base64Image;
+        try {
+          if (this._storageService) {
+            const user = this._authService.getCurrentUser();
+            avatarUrl = await this._storageService.uploadImage({
+              base64Data: base64Image,
+              folder: 'avatars',
+              fileName: `avatar_${user?.id || 'usr'}_${Date.now()}.webp`
+            });
+          }
+        } catch (uploadErr) {
+          console.warn('[ProfileView] Upload R2 fallback ke Base64:', uploadErr);
+        }
+
+        await this._authService.updateProfile({ avatar: avatarUrl });
+        this._notification.success('Foto profil berhasil diunggah ke Cloudflare R2 dan disimpan!');
       } catch (err) {
         console.error('Upload avatar error:', err);
         this._notification.error('Gagal memperbarui foto profil: ' + (err.message || 'Terjadi kesalahan'));

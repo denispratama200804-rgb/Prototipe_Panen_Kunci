@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 import dns from 'node:dns';
 import crypto from 'node:crypto';
+import { uploadBase64ToR2 } from './api/r2-uploader.js';
 
 // Fix local IPv6 ENETUNREACH issue
 dns.setDefaultResultOrder('ipv4first');
@@ -326,6 +327,30 @@ export default defineConfig(({ mode }) => {
                 try {
                   const parsed = JSON.parse(bodyStr || '{}');
                   const { action, table, data, id } = parsed;
+
+                  // 0. Cloudflare R2 Upload Handler
+                  if (action === 'upload_r2') {
+                    const { base64Data, folder, fileName } = parsed;
+                    if (!base64Data) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: 'Data gambar (base64Data) diperlukan' }));
+                      return;
+                    }
+                    try {
+                      const result = await uploadBase64ToR2({
+                        base64Data,
+                        folder: folder || 'uploads',
+                        fileName: fileName || null
+                      });
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ success: true, ...result }));
+                    } catch (uploadErr) {
+                      console.error('[vite-dev-proxy] R2 upload error:', uploadErr);
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: uploadErr.message || 'Gagal mengunggah file ke Cloudflare R2' }));
+                    }
+                    return;
+                  }
 
                   if (action === 'get_live_chats') {
                     const [chats, onlineUserIds] = await Promise.all([

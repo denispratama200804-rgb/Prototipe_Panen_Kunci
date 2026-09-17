@@ -1082,7 +1082,7 @@ export class WithdrawalsView {
       confirmBtn.disabled = true;
       confirmBtn.innerHTML = `
         <span class="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-        <span>Memproses...</span>
+        <span>Mengunggah bukti ke Cloudflare R2...</span>
       `;
 
       setTimeout(async () => {

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 import crypto from 'node:crypto';
+import { uploadBase64ToR2 } from './r2-uploader.js';
 
 // Kunci Supabase Role Service yang digunakan untuk operasi admin yang by-pass RLS (PENTING!)
 // Kunci ini TIDAK BOLEH dieskspos ke klien frontend!
@@ -463,6 +464,25 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     const { action, table, data, id } = body;
+
+    // 0. Cloudflare R2 Upload Handler (Foto profil & bukti pembayaran)
+    if (action === 'upload_r2') {
+      const { base64Data, folder, fileName } = body;
+      if (!base64Data) {
+        return res.status(400).json({ success: false, error: 'Data gambar (base64Data) diperlukan' });
+      }
+      try {
+        const result = await uploadBase64ToR2({
+          base64Data,
+          folder: folder || 'uploads',
+          fileName: fileName || null
+        });
+        return res.status(200).json({ success: true, ...result });
+      } catch (uploadErr) {
+        console.error('[supabase-proxy] R2 upload error:', uploadErr);
+        return res.status(500).json({ success: false, error: uploadErr.message || 'Gagal mengunggah file ke Cloudflare R2' });
+      }
+    }
 
     if (!adminSupabase) {
       return res.status(500).json({

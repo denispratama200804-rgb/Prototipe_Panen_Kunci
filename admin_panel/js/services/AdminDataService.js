@@ -1189,6 +1189,30 @@ export class AdminDataService {
    * @param {string} [options.notes] Catatan transfer dari admin
    */
   async approveWithdrawal(transactionId, { proofImage = '', notes = '' } = {}) {
+    // 0. Jika bukti transfer berupa base64 Data URL, unggah ke Cloudflare R2
+    if (proofImage && proofImage.startsWith('data:')) {
+      try {
+        const upRes = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'upload_r2',
+            base64Data: proofImage,
+            folder: 'proofs',
+            fileName: `proof_${transactionId}_${Date.now()}.png`
+          })
+        });
+        if (upRes.ok) {
+          const upJson = await upRes.json();
+          if (upJson.success && upJson.url) {
+            proofImage = upJson.url;
+          }
+        }
+      } catch (r2Err) {
+        console.warn('[AdminDataService] R2 upload fallback:', r2Err);
+      }
+    }
+
     const txs = this.getTransactions();
     const idx = txs.findIndex(t => t.id === transactionId);
     if (idx !== -1) {
@@ -1252,6 +1276,8 @@ export class AdminDataService {
             id: transactionId,
             data: {
               status: 'success',
+              proof_image: proofImage || '',
+              proof_notes: notes || '',
               updated_at: new Date().toISOString()
             }
           })
