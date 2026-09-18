@@ -195,21 +195,6 @@ export class SetorApiKeyView extends IComponent {
               </p>
             </div>
 
-            <!-- Quick Key Generators for Testing/Demo -->
-            ${isVerified ? `
-              <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="text-[10px] text-outline font-semibold uppercase">Coba Contoh:</span>
-                <button type="button" class="btn-mock-key px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-[11px] font-mono text-primary border border-surface-container transition-colors" data-key="sk-kie-8f92a1bc3d4e5f6g7h8i">
-                  Key Valid
-                </button>
-                <button type="button" class="btn-mock-key px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-[11px] font-mono text-primary border border-surface-container transition-colors" data-key="sk-kie-duplicate_test_12345">
-                  Key Duplikat
-                </button>
-                <button type="button" class="btn-mock-key px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-[11px] font-mono text-primary border border-surface-container transition-colors" data-key="sk-kie-invalid_quota_00000">
-                  Key Invalid
-                </button>
-              </div>
-            ` : ''}
 
             <!-- Submit Button & Feedback -->
             <button
@@ -352,7 +337,6 @@ export class SetorApiKeyView extends IComponent {
     const input = container.querySelector('#inputApiKey');
     const pasteBtn = container.querySelector('#btnPasteKey');
     const submitBtn = container.querySelector('#btnSubmitKey');
-    const mockKeyBtns = container.querySelectorAll('.btn-mock-key');
 
     // Paste button
     pasteBtn?.addEventListener('click', async () => {
@@ -369,21 +353,6 @@ export class SetorApiKeyView extends IComponent {
       } catch (err) {
         this._notification.info('Gunakan Ctrl+V untuk menempel API Key.');
       }
-    });
-
-    // Mock key shortcuts
-    mockKeyBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const key = btn.getAttribute('data-key');
-        if (key) {
-          // Generate unique suffix for valid demo
-          if (key.includes('8f92a1')) {
-            input.value = `sk-kie-${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
-          } else {
-            input.value = key;
-          }
-        }
-      });
     });
 
     // Tombol Verifikasi Akun dari Banner Terkunci
