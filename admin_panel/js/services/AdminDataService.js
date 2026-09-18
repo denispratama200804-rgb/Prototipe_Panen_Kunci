@@ -1195,8 +1195,16 @@ export class AdminDataService {
       const isKieActive = syncRes.isValidKey === true;
       const isCredit80 = (liveCredit === 80 || liveCredit >= 80);
 
-      // Hitung masa pemantauan 3 hari (72 jam)
-      const holdTime = new Date(key.holdUntil || (new Date(key.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000)).getTime();
+      // Hitung masa pemantauan (2 hari jika ada referral, 3 hari standar)
+      let holdDays = key.holdDurationDays || 3;
+      if (!key.holdDurationDays && key.userId) {
+        const users = this.getUsers();
+        const u = users.find(user => user.id === key.userId || (key.userEmail && user.email === key.userEmail));
+        if (u && (u.referredBy || u.referred_by)) {
+          holdDays = 2;
+        }
+      }
+      const holdTime = new Date(key.holdUntil || (new Date(key.createdAt).getTime() + holdDays * 24 * 60 * 60 * 1000)).getTime();
       const isHoldExpired = Date.now() >= holdTime;
       const diffMs = holdTime - Date.now();
       const daysRemaining = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));

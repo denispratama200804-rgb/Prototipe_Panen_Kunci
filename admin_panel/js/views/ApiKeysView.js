@@ -440,7 +440,15 @@ export class ApiKeysView {
                           if (k.status === 'valid') {
                             statusBadge = '<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 whitespace-nowrap">Valid</span>';
                           } else if (k.status === 'pending') {
-                            const holdTime = new Date(k.holdUntil || (new Date(k.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000)).getTime();
+                            let holdDays = k.holdDurationDays || 3;
+                            if (!k.holdDurationDays && k.userId) {
+                              const allUsers = this.dataService?.getUsers ? this.dataService.getUsers() : [];
+                              const userObj = allUsers.find(u => u.id === k.userId || (k.userEmail && u.email === k.userEmail));
+                              if (userObj && (userObj.referredBy || userObj.referred_by)) {
+                                holdDays = 2;
+                              }
+                            }
+                            const holdTime = new Date(k.holdUntil || (new Date(k.createdAt).getTime() + holdDays * 24 * 60 * 60 * 1000)).getTime();
                             const diffMs = holdTime - Date.now();
                             const isReady = diffMs <= 0;
                             let holdText = '';
@@ -449,10 +457,11 @@ export class ApiKeysView {
                             } else {
                               const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
                               const hours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
-                              holdText = days > 0 ? `⏳ Sisa ${days}h ${hours}j` : `⏳ Sisa ${hours}j`;
+                              const refTag = holdDays === 2 ? ' (Ref 2h)' : '';
+                              holdText = days > 0 ? `⏳ Sisa ${days}h ${hours}j${refTag}` : `⏳ Sisa ${hours}j${refTag}`;
                             }
                             statusBadge = `
-                              <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border ${isReady ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/15 text-amber-300 border-amber-500/40'} inline-flex items-center gap-1 whitespace-nowrap" title="Dipantau otomatis setiap 00:00 WIB">
+                              <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border ${isReady ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/15 text-amber-300 border-amber-500/40'} inline-flex items-center gap-1 whitespace-nowrap" title="${holdDays === 2 ? 'Masa pantau 2 hari (Bonus Referral)' : 'Masa pantau 3 hari standar'} - Dipantau otomatis setiap 00:00 WIB">
                                 <span class="w-1.5 h-1.5 rounded-full ${isReady ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse"></span>
                                 <span>${holdText}</span>
                               </span>

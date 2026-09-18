@@ -23,6 +23,17 @@ export class SetorApiKeyView extends IComponent {
   render() {
     const user = this._authService.getCurrentUser();
     const isVerified = Boolean(user?.isVerified);
+    let userReferredBy = (user?.referredBy || '').trim().toUpperCase();
+    if (!userReferredBy && user && typeof localStorage !== 'undefined') {
+      try {
+        const bound = localStorage.getItem(`panenkunci:bound_referral_${user.id}`) ||
+                      localStorage.getItem(`pk_bound_ref_${user.id}`) ||
+                      (user.email ? localStorage.getItem(`pk_bound_ref_${user.email.toLowerCase()}`) : null) ||
+                      localStorage.getItem('panenkunci:bound_referral');
+        if (bound) userReferredBy = bound.trim().toUpperCase();
+      } catch (_) {}
+    }
+    const isReferredUser = Boolean(userReferredBy);
     const keys = this._apiKeyService.getAllKeys().slice(0, 5);
 
     return `
@@ -61,6 +72,31 @@ export class SetorApiKeyView extends IComponent {
               </button>
             </div>
           ` : ''}
+
+          <!-- Referral Benefit Card: 2 Hari vs 3 Hari -->
+          <div class="rounded-2xl p-3.5 border ${isReferredUser ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-surface-card border-surface-container text-text-body'} flex items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl ${isReferredUser ? 'bg-primary text-white' : 'bg-surface-container text-amber-500'} flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[18px]">${isReferredUser ? 'bolt' : 'schedule'}</span>
+              </div>
+              <div class="flex flex-col">
+                <div class="text-xs font-bold ${isReferredUser ? 'text-primary' : 'text-text-heading'} flex items-center gap-1.5">
+                  <span>Pencairan Saldo: ${isReferredUser ? 'Hanya 2 Hari (48 Jam)' : '3 Hari (72 Jam)'}</span>
+                  ${isReferredUser ? '<span class="text-[9px] px-1.5 py-0.5 bg-primary text-white font-extrabold rounded-md">Referral Aktif</span>' : ''}
+                </div>
+                <span class="text-[11px] ${isReferredUser ? 'text-primary/80' : 'text-text-body'}">
+                  ${isReferredUser 
+                    ? `Akun terhubung ke kode <strong>${userReferredBy}</strong>. Saldo pasif cair 1 hari lebih cepat!` 
+                    : 'Tautkan kode referral teman di Profil untuk mempercepat pencairan menjadi 2 hari.'}
+                </span>
+              </div>
+            </div>
+            ${!isReferredUser ? `
+              <a href="#/profil" class="text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0 text-decoration-none">
+                Tautkan
+              </a>
+            ` : ''}
+          </div>
 
           <!-- Mini Tutorial Steps Dropdown -->
           <section class="flex flex-col">
@@ -231,7 +267,8 @@ export class SetorApiKeyView extends IComponent {
       if (typeof k.getHoldRemaining === 'function') {
         holdInfo = k.getHoldRemaining();
       } else {
-        const holdTime = new Date(k.holdUntil || (new Date(k.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000)).getTime();
+        const itemHoldDays = k.holdDurationDays || 3;
+        const holdTime = new Date(k.holdUntil || (new Date(k.createdAt).getTime() + itemHoldDays * 24 * 60 * 60 * 1000)).getTime();
         const diffMs = holdTime - Date.now();
         if (diffMs <= 0) {
           holdInfo = { isReady: true, text: 'Siap validasi' };
@@ -376,10 +413,17 @@ export class SetorApiKeyView extends IComponent {
         // Segera perbarui daftar riwayat di bawah formulir secara reaktif seketika
         this._updateKeysHistoryUI(container);
 
+        // Tentukan durasi masa pemantauan (2 hari jika ada referral, 3 hari standar)
+        const holdDays = res.holdDays || 3;
+        const holdHours = holdDays * 24;
+        const refBonusBadge = res.isReferred
+          ? '<br><span class="inline-flex items-center gap-1 mt-1 text-[11px] text-primary font-bold">⚡ Bonus Referral: Masa tunggu dipercepat menjadi hanya 2 hari!</span>'
+          : '';
+
         // Tampilkan Popup Setor Berhasil Masuk ke Saldo Pasif & Masa Pemantauan
         this._notification.showModal({
           title: 'Setoran Masuk ke Saldo Pasif!',
-          message: `API Key berhasil disetorkan! Reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.<br><br><div class="bg-surface-container-low p-2.5 rounded-xl text-xs text-text-body border border-surface-container">⏳ <strong>Masa Pemantauan:</strong> Key akan dipantau selama <strong>3 hari (72 jam)</strong> setiap jam 12 malam WIB dengan syarat kredit tetap 80 sebelum dicairkan ke Saldo Aktif.</div>`,
+          message: `API Key berhasil disetorkan! Reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.<br><br><div class="bg-surface-container-low p-2.5 rounded-xl text-xs text-text-body border border-surface-container">⏳ <strong>Masa Pemantauan:</strong> Key akan dipantau selama <strong>${holdDays} hari (${holdHours} jam)</strong> setiap jam 12 malam WIB dengan syarat kredit tetap 80 sebelum dicairkan ke Saldo Aktif.${refBonusBadge}</div>`,
           type: 'success',
           confirmText: 'Kembali ke Dashboard',
           onConfirm: () => {
@@ -428,20 +472,28 @@ export class SetorApiKeyView extends IComponent {
       const hide3DayNotice = localStorage.getItem('panenkunci:hide_3day_notice') === 'true';
 
       if (!hide3DayNotice) {
-        // Tampilkan pop up pemberitahuan bahwa key tervalidasi setiap 3 hari sekali dengan checklist
+        const userRef = (user?.referredBy || '').trim().toUpperCase() ||
+                        localStorage.getItem(`panenkunci:bound_referral_${user?.id}`) ||
+                        localStorage.getItem(`pk_bound_ref_${user?.id}`) ||
+                        localStorage.getItem('panenkunci:bound_referral');
+        const isRef = Boolean(userRef);
+        const noticeDays = isRef ? 2 : 3;
+        const noticeHours = noticeDays * 24;
+
+        // Tampilkan pop up pemberitahuan bahwa key tervalidasi dengan durasi adaptif (2 hari vs 3 hari)
         this._notification.showModal({
           title: 'Ketentuan Validasi API Key',
           message: `
             <div class="flex flex-col gap-2.5 text-left text-xs text-text-body">
-              <p>Setiap API Key yang disetorkan akan melalui <strong>masa pemantauan selama 3 hari (72 jam)</strong> sebelum tervalidasi secara penuh.</p>
+              <p>Setiap API Key yang disetorkan akan melalui <strong>masa pemantauan selama ${noticeDays} hari (${noticeHours} jam)</strong> ${isRef ? '<span class="text-primary font-bold">(Keuntungan Referral Aktif ⚡)</span>' : ''} sebelum tervalidasi secara penuh.</p>
               <div class="bg-surface-container-low p-3 rounded-xl border border-surface-container flex flex-col gap-1 text-[11px]">
                 <div class="flex items-center gap-1.5 font-bold text-text-heading">
                   <span class="material-symbols-outlined text-amber-500 text-[16px]">schedule</span>
                   <span>Pemeriksaan Rutin Jam 12 Malam WIB</span>
                 </div>
-                <p>Sistem otomatis mengecek seluruh key aktif dengan saldo <strong>80 kredit</strong> setiap jam 12 malam WIB. Jika kredit berkurang atau tidak aktif sebelum 3 hari, key dinyatakan invalid.</p>
+                <p>Sistem otomatis mengecek seluruh key aktif dengan saldo <strong>80 kredit</strong> setiap jam 12 malam WIB. Jika kredit berkurang atau tidak aktif sebelum ${noticeDays} hari, key dinyatakan invalid.</p>
               </div>
-              <p class="text-[11px] text-outline">Reward sebesar Rp 3.000 sementara tersimpan di <strong>Saldo Pasif</strong> dan otomatis cair ke Saldo Aktif setelah 3 hari jika syarat terpenuhi.</p>
+              <p class="text-[11px] text-outline">Reward sebesar Rp 3.000 sementara tersimpan di <strong>Saldo Pasif</strong> dan otomatis cair ke Saldo Aktif setelah ${noticeDays} hari jika syarat terpenuhi.</p>
             </div>
           `,
           type: 'info',

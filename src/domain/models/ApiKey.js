@@ -14,6 +14,7 @@ export class ApiKey {
    * @param {number} [params.credits]
    * @param {string} [params.createdAt]
    * @param {string} [params.holdUntil]
+   * @param {number} [params.holdDurationDays]
    * @param {string} [params.errorMessage]
    */
   constructor({
@@ -25,6 +26,7 @@ export class ApiKey {
     credits = 80,
     createdAt = new Date().toISOString(),
     holdUntil = null,
+    holdDurationDays = null,
     errorMessage = ''
   }) {
     this.id = id;
@@ -34,8 +36,10 @@ export class ApiKey {
     this.rewardAmount = rewardAmount;
     this.credits = credits;
     this.createdAt = createdAt;
-    // Masa pemantauan 3 hari (72 jam) sejak dibuat
-    this.holdUntil = holdUntil || new Date(new Date(this.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    // Masa pemantauan: 2 hari (48 jam) jika user menautkan kode referral, default 3 hari (72 jam)
+    const duration = holdDurationDays || 3;
+    this.holdDurationDays = duration;
+    this.holdUntil = holdUntil || new Date(new Date(this.createdAt).getTime() + duration * 24 * 60 * 60 * 1000).toISOString();
     this.errorMessage = errorMessage;
   }
 
@@ -53,11 +57,12 @@ export class ApiKey {
   }
 
   /**
-   * Memeriksa apakah masa pemantauan 3 hari telah berakhir
+   * Memeriksa apakah masa pemantauan telah berakhir
    * @returns {boolean}
    */
   isHoldPeriodExpired() {
-    const holdTime = new Date(this.holdUntil || new Date(this.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000).getTime();
+    const defaultDays = this.holdDurationDays || 3;
+    const holdTime = new Date(this.holdUntil || new Date(this.createdAt).getTime() + defaultDays * 24 * 60 * 60 * 1000).getTime();
     return Date.now() >= holdTime;
   }
 
@@ -66,7 +71,8 @@ export class ApiKey {
    * @returns {{ days: number, hours: number, isReady: boolean, text: string }}
    */
   getHoldRemaining() {
-    const holdTime = new Date(this.holdUntil || new Date(this.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000).getTime();
+    const defaultDays = this.holdDurationDays || 3;
+    const holdTime = new Date(this.holdUntil || new Date(this.createdAt).getTime() + defaultDays * 24 * 60 * 60 * 1000).getTime();
     const diffMs = holdTime - Date.now();
     if (diffMs <= 0) {
       return { days: 0, hours: 0, isReady: true, text: 'Siap divalidasi' };
@@ -92,6 +98,7 @@ export class ApiKey {
       rewardAmount: this.rewardAmount,
       credits: this.credits,
       createdAt: this.createdAt,
+      holdDurationDays: this.holdDurationDays,
       holdUntil: this.holdUntil,
       errorMessage: this.errorMessage
     };

@@ -1611,12 +1611,14 @@ export default defineConfig(({ mode }) => {
                         try {
                           const { data: dbKeyData } = await adminSupabase
                             .from('api_keys')
-                            .select('created_at')
+                            .select('created_at, user_id, users:user_id(id, referred_by)')
                             .eq('id', targetKeyId)
                             .maybeSingle();
                           if (dbKeyData && dbKeyData.created_at) {
                             const createdAtMs = new Date(dbKeyData.created_at).getTime();
-                            const holdUntilMs = createdAtMs + 3 * 24 * 60 * 60 * 1000;
+                            const isReferred = Boolean(dbKeyData.users?.referred_by);
+                            const holdDays = isReferred ? 2 : 3;
+                            const holdUntilMs = createdAtMs + holdDays * 24 * 60 * 60 * 1000;
                             const diffMs = holdUntilMs - Date.now();
                             isHoldExpired = diffMs <= 0;
                             daysRemaining = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
@@ -1772,7 +1774,7 @@ export default defineConfig(({ mode }) => {
                     try {
                       const { data: pendingKeys, error } = await adminSupabase
                         .from('api_keys')
-                        .select('id, key_string, user_id, reward_amount, status, created_at')
+                        .select('id, key_string, user_id, reward_amount, status, created_at, users:user_id(id, referred_by)')
                         .eq('status', 'pending');
 
                       if (error) {
@@ -1805,8 +1807,10 @@ export default defineConfig(({ mode }) => {
                           const isKieActive = code === 200;
                           const isCreditValid = creditVal === 80 || creditVal >= 80;
 
+                          const isReferred = Boolean(item.users?.referred_by);
+                          const holdDays = isReferred ? 2 : 3;
                           const createdAtMs = item.created_at ? new Date(item.created_at).getTime() : Date.now();
-                          const holdUntilMs = createdAtMs + 3 * 24 * 60 * 60 * 1000;
+                          const holdUntilMs = item.hold_until ? new Date(item.hold_until).getTime() : (createdAtMs + holdDays * 24 * 60 * 60 * 1000);
                           const isHoldExpired = Date.now() >= holdUntilMs;
 
                           if (isKieActive && isCreditValid) {

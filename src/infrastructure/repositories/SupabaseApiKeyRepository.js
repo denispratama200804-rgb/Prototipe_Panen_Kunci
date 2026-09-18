@@ -40,6 +40,10 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
                 domainStatus = 'pending';
                 errorMessage = errorMessage.replace('__PENDING__', '');
               }
+              const isReferred = Boolean(item.users?.referred_by || item.users?.referredBy || item.referredBy || item.referred_by);
+              const holdDurationDays = Number(item.holdDurationDays || item.hold_duration_days) || (isReferred ? 2 : 3);
+              const createdAtVal = item.createdAt || item.created_at;
+              const holdUntil = item.holdUntil || item.hold_until || (createdAtVal ? new Date(new Date(createdAtVal).getTime() + holdDurationDays * 24 * 60 * 60 * 1000).toISOString() : null);
               const k = new ApiKey({
                 id: item.id,
                 userId: item.userId || item.user_id,
@@ -48,7 +52,9 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
                 rewardAmount: Number(item.rewardAmount ?? item.reward_amount ?? 3000),
                 credits: Number(item.credits ?? 80),
                 errorMessage: errorMessage,
-                createdAt: item.createdAt || item.created_at
+                createdAt: createdAtVal,
+                holdUntil,
+                holdDurationDays
               });
               k.userName = item.userName || 'Pengguna';
               k.userEmail = item.userEmail || '-';
@@ -321,6 +327,10 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
       errorMessage = errorMessage.replace('__PENDING__', '');
     }
 
+    const isReferred = Boolean(row.users?.referred_by || row.users?.referredBy);
+    const holdDurationDays = Number(row.hold_duration_days) || (isReferred ? 2 : 3);
+    const holdUntil = row.hold_until || (row.created_at ? new Date(new Date(row.created_at).getTime() + holdDurationDays * 24 * 60 * 60 * 1000).toISOString() : null);
+
     const apiKey = new ApiKey({
       id: row.id,
       userId: row.user_id,
@@ -329,7 +339,9 @@ export class SupabaseApiKeyRepository extends IApiKeyRepository {
       rewardAmount: Number(row.reward_amount),
       credits: Number(row.credits),
       errorMessage: errorMessage,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      holdUntil,
+      holdDurationDays
     });
 
     // Tempelkan informasi pengguna jika query relasi tersedia

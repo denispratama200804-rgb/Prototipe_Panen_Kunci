@@ -386,7 +386,28 @@ export class ApiKeyService {
       ? Number(config.rewardPerKey)
       : 3000;
 
-    const holdUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    // Cek apakah user telah menautkan kode referral (Diskon masa pemantauan: 2 hari vs standar 3 hari)
+    const activeUser = currentUser || this._storage.get('current_user') || {};
+    let isReferred = Boolean(activeUser.referredBy);
+    if (!isReferred && userId) {
+      if (typeof localStorage !== 'undefined') {
+        const bound = localStorage.getItem('pk_bound_ref_' + userId) ||
+                      localStorage.getItem('panenkunci:bound_referral_' + userId) ||
+                      (activeUser.email ? localStorage.getItem('pk_bound_ref_' + (activeUser.email).toLowerCase()) : null) ||
+                      localStorage.getItem('panenkunci:bound_referral');
+        if (bound) isReferred = true;
+      }
+    }
+    if (!isReferred && userId) {
+      const allUsers = this._storage.get('all_users') || [];
+      const matched = allUsers.find(u => u.id === userId || (activeUser.email && u.email === activeUser.email));
+      if (matched && (matched.referredBy || matched.referred_by)) {
+        isReferred = true;
+      }
+    }
+
+    const holdDurationDays = isReferred ? 2 : 3;
+    const holdUntil = new Date(Date.now() + holdDurationDays * 24 * 60 * 60 * 1000).toISOString();
     const newApiKey = new ApiKey({
       id: 'key_' + Math.random().toString(36).substring(2, 9),
       keyString: trimmed,
@@ -395,7 +416,8 @@ export class ApiKeyService {
       rewardAmount,
       credits: liveCredit,
       createdAt: new Date().toISOString(),
-      holdUntil
+      holdUntil,
+      holdDurationDays
     });
 
     // Simpan ke database Supabase terlebih dahulu sebelum kredit saldo
@@ -429,7 +451,7 @@ export class ApiKeyService {
     this._walletService.addPassiveDeposit(rewardAmount, newApiKey);
 
     // 6. Emit event lokal dan BroadcastChannel agar Admin Panel seketika memantau key
-    this._eventBus.emit(AppEvents.API_KEY_SUBMITTED, { apiKey: newApiKey, reward: rewardAmount });
+    this._eventBus.emit(AppEvents.API_KEY_SUBMITTED, { apiKey: newApiKey, reward: rewardAmount, holdDays: holdDurationDays, isReferred });
 
     if (typeof BroadcastChannel !== 'undefined') {
       try {
@@ -445,11 +467,12 @@ export class ApiKeyService {
             rewardAmount: newApiKey.rewardAmount,
             credits: newApiKey.credits,
             createdAt: newApiKey.createdAt,
-            holdUntil: newApiKey.holdUntil
+            holdUntil: newApiKey.holdUntil,
+            holdDurationDays: newApiKey.holdDurationDays
           },
           timestamp: Date.now()
         });
-        setTimeout(() => bc.close(), 200);
+        setTimeout(() => bc.close(), 1000);
       } catch (_) {}
     }
 
@@ -457,7 +480,9 @@ export class ApiKeyService {
       success: true,
       apiKey: newApiKey,
       reward: rewardAmount,
-      message: `API Key valid (80 cr) dan telah disetorkan! Masuk masa pemantauan 3 hari.`
+      holdDays: holdDurationDays,
+      isReferred,
+      message: `API Key valid (80 cr) dan telah disetorkan! Masuk masa pemantauan ${holdDurationDays} hari.`
     };
   }
 
