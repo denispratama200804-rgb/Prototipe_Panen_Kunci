@@ -281,7 +281,7 @@ export class ApiKeysView {
                 }"
                 ${this.isAutoValidating ? 'disabled' : ''}
               >
-                <span class="material-symbols-outlined text-sm ${this.isAutoValidating ? 'animate-spin text-amber-400' : 'text-amber-400'}">bolt</span>
+                <span class="material-symbols-outlined text-sm ${this.isAutoValidating ? 'animate-spin text-amber-400' : 'text-amber-400'}">star</span>
                 <span>${this.isAutoValidating ? 'Memvalidasi...' : 'Auto Validasi (80 cr)'}</span>
               </button>
               <button
@@ -548,7 +548,7 @@ export class ApiKeysView {
                               title="Validasi Otomatis: Cek Kie.ai aktif & kredit 80"
                               class="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 active:scale-95 text-amber-300 border border-amber-500/40 flex items-center gap-0.5 transition-all shadow-sm cursor-pointer shrink-0"
                             >
-                              <span class="material-symbols-outlined text-xs">bolt</span>
+                              <span class="material-symbols-outlined text-xs">star</span>
                               <span>Auto</span>
                             </button>
                             <button
