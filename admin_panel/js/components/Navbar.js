@@ -128,144 +128,16 @@ export class Navbar {
             </span>
           </button>
 
-          <!-- Admin User Profile Dropdown (Purple Circle + Admin User + Chevron) -->
-          <div class="relative" id="admin-user-menu-container">
-            <button
-              type="button"
-              id="btn-admin-user-dropdown"
-              class="admin-nav-btn flex items-center gap-1.5 sm:gap-2 py-1 px-1.5 sm:px-2.5 rounded-xl transition-all cursor-pointer"
-            >
-              <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-600 shadow-md shadow-purple-600/30 flex items-center justify-center text-white font-bold text-xs">
-                <span class="material-symbols-outlined text-base">person</span>
-              </div>
-              <span class="hidden sm:inline text-xs font-semibold admin-user-label">Admin User</span>
-              <span class="material-symbols-outlined text-sm opacity-70">expand_more</span>
-            </button>
-
-            <!-- Dropdown Menu -->
-            <div
-              id="admin-user-dropdown-menu"
-              class="hidden absolute right-0 mt-2 w-60 admin-dropdown-menu rounded-2xl shadow-2xl py-2 z-50 backdrop-blur-md"
-            >
-              <div class="px-4 py-2.5 border-b border-slate-800">
-                <div class="text-xs font-bold text-white">Administrator</div>
-                <div class="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>Super Admin Sesi Aktif</span>
-                </div>
-              </div>
-
-              <!-- Quick Navigation Inside Dropdown -->
-              <div class="py-1">
-                <button
-                  type="button"
-                  data-dropdown-nav="dashboard"
-                  class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center gap-2.5"
-                >
-                  <span class="material-symbols-outlined text-sm text-indigo-400">grid_view</span>
-                  <span>Dashboard Utama</span>
-                </button>
-                <button
-                  type="button"
-                  data-dropdown-nav="apikeys"
-                  class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center gap-2.5"
-                >
-                  <span class="material-symbols-outlined text-sm text-blue-400">vpn_key</span>
-                  <span>Gudang API Key</span>
-                </button>
-                <button
-                  type="button"
-                  data-dropdown-nav="withdrawals"
-                  class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center gap-2.5"
-                >
-                  <span class="material-symbols-outlined text-sm text-amber-400">payments</span>
-                  <span>Persetujuan Penarikan</span>
-                </button>
-                <button
-                  type="button"
-                  data-dropdown-nav="users"
-                  class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center gap-2.5"
-                >
-                  <span class="material-symbols-outlined text-sm text-purple-400">group</span>
-                  <span>Kelola Pengguna</span>
-                </button>
-                <button
-                  type="button"
-                  data-dropdown-nav="settings"
-                  class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center gap-2.5"
-                >
-                  <span class="material-symbols-outlined text-sm text-emerald-400">tune</span>
-                  <span>Pengaturan Tarif</span>
-                </button>
-                <button
-                  type="button"
-                  data-dropdown-nav="chat"
-                  class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center justify-between"
-                >
-                  <div class="flex items-center gap-2.5">
-                    <span class="material-symbols-outlined text-sm text-emerald-400">forum</span>
-                    <span>Live Chat Pengguna</span>
-                  </div>
-                  ${unreadChatCount > 0 ? `
-                    <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white">
-                      ${unreadChatCount} baru
-                    </span>
-                  ` : ''}
-                </button>
-              </div>
-
-              <div class="border-t border-slate-800 my-1"></div>
-
-              <!-- Theme Toggle in Dropdown -->
-              <div class="py-1">
-                <button
-                  type="button"
-                  id="dropdown-btn-toggle-theme"
-                  class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center justify-between cursor-pointer"
-                >
-                  <div class="flex items-center gap-2.5">
-                    <span class="material-symbols-outlined text-sm text-indigo-400">brightness_medium</span>
-                    <span>Tema Tampilan</span>
-                  </div>
-                  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${isDark ? 'bg-slate-700 text-indigo-300' : 'bg-amber-500/15 text-amber-600'} flex items-center gap-1" id="dropdown-theme-badge">
-                    <span class="material-symbols-outlined text-[12px]">${isDark ? 'dark_mode' : 'light_mode'}</span>
-                    <span>${isDark ? 'Malam' : 'Siang'}</span>
-                  </span>
-                </button>
-              </div>
-
-              <div class="border-t border-slate-800 my-1"></div>
-
-              <div class="py-1">
-                <a
-                  href="/"
-                  target="_blank"
-                  class="w-full text-left px-4 py-2 text-xs text-cyan-300 hover:text-cyan-200 hover:bg-cyan-500/10 flex items-center gap-2.5 text-decoration-none"
-                >
-                  <span class="material-symbols-outlined text-sm">open_in_new</span>
-                  <span>Buka App User</span>
-                </a>
-
-                <button
-                  type="button"
-                  id="dropdown-btn-seed-data"
-                  class="w-full text-left px-4 py-2 text-xs text-indigo-300 hover:text-indigo-200 hover:bg-indigo-500/10 flex items-center gap-2.5 cursor-pointer"
-                >
-                  <span class="material-symbols-outlined text-sm">database</span>
-                  <span>Isi / Reset Data Demo</span>
-                </button>
-
-                <button
-                  type="button"
-                  id="dropdown-btn-logout"
-                  class="w-full text-left px-4 py-2 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 flex items-center gap-2.5 cursor-pointer"
-                >
-                  <span class="material-symbols-outlined text-sm">logout</span>
-                  <span>Keluar Admin</span>
-                </button>
-              </div>
-            </div>
-          </div>
+          <!-- Logout Button (Langsung di Navbar) -->
+          <button
+            type="button"
+            id="navbar-logout-btn"
+            title="Keluar dari sesi Administrator"
+            class="admin-nav-btn px-2.5 sm:px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors group"
+          >
+            <span class="material-symbols-outlined text-base text-rose-400 group-hover:scale-110 transition-transform">logout</span>
+            <span class="hidden sm:inline font-medium">Keluar</span>
+          </button>
         </div>
       </header>
     `;
@@ -294,46 +166,10 @@ export class Navbar {
       });
     });
 
-    // Dropdown Toggle
-    const dropdownBtn = container.querySelector('#btn-admin-user-dropdown');
-    const dropdownMenu = container.querySelector('#admin-user-dropdown-menu');
-    if (dropdownBtn && dropdownMenu) {
-      dropdownBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdownMenu.classList.toggle('hidden');
-      });
-
-      const handleOutsideClick = (e) => {
-        if (!container.contains(e.target)) {
-          dropdownMenu.classList.add('hidden');
-        }
-      };
-      document.addEventListener('click', handleOutsideClick);
-    }
-
-    // Dropdown Nav Items
-    container.querySelectorAll('[data-dropdown-nav]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const target = btn.getAttribute('data-dropdown-nav');
-        dropdownMenu?.classList.add('hidden');
-        this.onNavigate(target);
-      });
-    });
-
-    // Seed Demo in Dropdown
-    const seedBtn = container.querySelector('#dropdown-btn-seed-data');
-    if (seedBtn) {
-      seedBtn.addEventListener('click', () => {
-        dropdownMenu?.classList.add('hidden');
-        this.onSeed();
-      });
-    }
-
-    // Logout in Dropdown
-    const logoutBtn = container.querySelector('#dropdown-btn-logout');
+    // Logout Button
+    const logoutBtn = container.querySelector('#navbar-logout-btn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
-        dropdownMenu?.classList.add('hidden');
         this.onLogout();
       });
     }
@@ -353,18 +189,6 @@ export class Navbar {
       navbarThemeBtn.onclick = handleToggleTheme;
     }
 
-    const dropdownThemeBtn = container.querySelector('#dropdown-btn-toggle-theme');
-    if (dropdownThemeBtn) {
-      dropdownThemeBtn.onclick = (e) => {
-        if (e) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        dropdownMenu?.classList.add('hidden');
-        handleToggleTheme();
-      };
-    }
-
     // Pastikan hanya satu pendengar aktif (hindari memory leak / duplicate calls)
     if (this._themeUnsubscribe) {
       this._themeUnsubscribe();
@@ -378,7 +202,6 @@ export class Navbar {
     const isDark = theme === 'dark';
     const icon = container.querySelector('#navbar-theme-icon');
     const label = container.querySelector('#navbar-theme-label');
-    const badge = container.querySelector('#dropdown-theme-badge');
     const themeBtn = container.querySelector('#navbar-theme-toggle-btn');
 
     if (icon) {
@@ -387,13 +210,6 @@ export class Navbar {
     }
     if (label) {
       label.textContent = isDark ? 'Malam' : 'Siang';
-    }
-    if (badge) {
-      badge.innerHTML = `
-        <span class="material-symbols-outlined text-[12px]">${isDark ? 'dark_mode' : 'light_mode'}</span>
-        <span>${isDark ? 'Malam' : 'Siang'}</span>
-      `;
-      badge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold ${isDark ? 'bg-slate-700 text-indigo-300' : 'bg-amber-500/15 text-amber-700'} flex items-center gap-1`;
     }
     if (themeBtn) {
       themeBtn.setAttribute('title', isDark ? 'Ganti ke Tema Siang' : 'Ganti ke Tema Malam');

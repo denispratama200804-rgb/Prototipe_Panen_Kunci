@@ -803,12 +803,6 @@ input[type="number"] {
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06) !important;
 }
 
-/* Dropdown Menu in Light Mode */
-[data-theme="light"] #admin-user-dropdown-menu {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 20px 30px -8px rgba(0, 0, 0, 0.12), 0 8px 12px -4px rgba(0, 0, 0, 0.06) !important;
-}
 
 /* Ensure Text Inside Colored Solid Action Buttons Remains White (Excluding low-opacity buttons) */
 [data-theme="light"] button[class*="bg-blue-"]:not([class*="/"]),
