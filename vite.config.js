@@ -2063,14 +2063,6 @@ export default defineConfig(({ mode }) => {
                                     <a href="${safeAppActionLink}" style="background-color: #4F46E5; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 9999px; font-weight: 700; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">Atur Ulang Kata Sandi</a>
                                   </div>
 
-                                  ${emailOtp ? `
-                                  <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; margin: 24px 0; text-align: center;">
-                                    <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Atau Masukkan Kode Pemulihan (OTP)</div>
-                                    <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #1F2937; font-family: monospace;">${emailOtp}</div>
-                                    <div style="font-size: 11px; color: #9CA3AF; margin-top: 6px;">Kode berlaku selama 1 jam</div>
-                                  </div>
-                                  ` : ''}
-
                                   <p style="color: #6B7280; font-size: 12px; line-height: 1.5; margin-top: 20px;">Jika tombol di atas tidak dapat diklik, salin tautan berikut ke browser Anda:<br>
                                     <a href="${safeAppActionLink}" style="color: #4F46E5; word-break: break-all;">${safeAppActionLink}</a>
                                   </p>

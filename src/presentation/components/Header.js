@@ -68,7 +68,8 @@ export class HeaderComponent {
 
     const isLogin = path === '/login' || path === 'login' || currentHash === '/login' || currentHash === 'login';
     const isRegister = path === '/register' || path === 'register' || currentHash === '/register' || currentHash === 'register';
-    const isAuthPage = isLogin || isRegister;
+    const isResetPassword = path === '/reset-password' || path === 'reset-password' || currentHash === '/reset-password' || currentHash.startsWith('/reset-password') || path.startsWith('/reset-password');
+    const isAuthPage = isLogin || isRegister || isResetPassword;
     const isProfilePage = path === '/profil' || path === 'profil' || currentHash === '/profil' || currentHash === 'profil' || path.startsWith('/profil') || currentHash.startsWith('/profil');
 
     const isAuth = this._authService.isAuthenticated();
@@ -83,7 +84,8 @@ export class HeaderComponent {
       '/riwayat': 'Riwayat Transaksi',
       '/profil': 'Profil Pengguna',
       '/login': 'Masuk Akun',
-      '/register': 'Daftar Akun'
+      '/register': 'Daftar Akun',
+      '/reset-password': 'Panen Kunci'
     };
 
     const title = pageTitles[path] || (isLogin ? 'Masuk Akun' : (isRegister ? 'Daftar Akun' : 'Panen Kunci'));
@@ -106,10 +108,10 @@ export class HeaderComponent {
     }
 
     // Jika berjalan sebagai PWA standalone dan di halaman utama (login/dashboard),
-    // sembunyikan tombol back karena tidak ada halaman sebelumnya untuk kembali.
+    // atau di halaman reset kata sandi, sembunyikan tombol back.
     const isPwa = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
     const isDashboard = path === '/dashboard' || path === 'dashboard' || currentHash === '/dashboard';
-    const hideBackBtn = isPwa && (isLogin || isDashboard);
+    const hideBackBtn = (isPwa && (isLogin || isDashboard)) || isResetPassword;
 
     this._element.innerHTML = `
       <div class="h-16 max-w-md mx-auto px-4 flex items-center justify-between">
