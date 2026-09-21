@@ -1809,12 +1809,35 @@ export default async function handler(req, res) {
     }
 
     if (action === 'update' && table === 'transactions' && id) {
-      const { data: updated, error } = await adminSupabase
+      let updatePayload = { ...data };
+      let { data: updated, error } = await adminSupabase
         .from('transactions')
-        .update(data)
+        .update(updatePayload)
         .eq('id', id)
         .select()
         .single();
+
+      let retries = 0;
+      while (error && retries < 5) {
+        retries++;
+        const missingMatch = error.message && (
+          error.message.match(/Could not find the '([^']+)' column/i) ||
+          error.message.match(/column [^\s.]*\.?([a-zA-Z0-9_]+) does not exist/i)
+        );
+        if (missingMatch && missingMatch[1] && (missingMatch[1] in updatePayload)) {
+          delete updatePayload[missingMatch[1]];
+          const retry = await adminSupabase
+            .from('transactions')
+            .update(updatePayload)
+            .eq('id', id)
+            .select()
+            .single();
+          updated = retry.data;
+          error = retry.error;
+        } else {
+          break;
+        }
+      }
 
       if (error) {
         return res.status(400).json({ success: false, error: error.message });

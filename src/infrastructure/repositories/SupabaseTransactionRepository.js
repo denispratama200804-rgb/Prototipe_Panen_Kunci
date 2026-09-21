@@ -139,11 +139,32 @@ export class SupabaseTransactionRepository extends ITransactionRepository {
       throw new Error('Supabase belum dikonfigurasikan di .env');
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from(this.tableName)
       .insert(payload)
       .select()
       .single();
+
+    let retries = 0;
+    while (error && retries < 5) {
+      retries++;
+      const missingMatch = error.message && (
+        error.message.match(/Could not find the '([^']+)' column/i) ||
+        error.message.match(/column [^\s.]*\.?([a-zA-Z0-9_]+) does not exist/i)
+      );
+      if (missingMatch && missingMatch[1] && (missingMatch[1] in payload)) {
+        delete payload[missingMatch[1]];
+        const retry = await supabase
+          .from(this.tableName)
+          .insert(payload)
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      } else {
+        break;
+      }
+    }
 
     if (error) {
       console.error('[SupabaseTransactionRepository] create error:', error.message);

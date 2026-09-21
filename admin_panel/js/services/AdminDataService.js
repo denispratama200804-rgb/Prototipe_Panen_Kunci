@@ -1623,6 +1623,14 @@ export class AdminDataService {
           const adminCfg = this.getAdminConfig?.() || {};
           const refCutPercent = adminCfg.referralPercent || adminCfg.referralCutPercent || 5;
 
+          const existingTxs = this.getTransactions();
+          const localTxMap = {};
+          if (Array.isArray(existingTxs)) {
+            existingTxs.forEach(item => {
+              if (item && item.id) localTxMap[item.id] = item;
+            });
+          }
+
           const normalized = json.data.map(t => {
             const amount = Number(t.amount || 0);
             const fee = Number(t.fee || 0);
@@ -1649,6 +1657,11 @@ export class AdminDataService {
               netPayout = Math.max(0, amount - fee - referralDeduction);
             }
 
+            const localTx = localTxMap[t.id] || {};
+            const proofImage = t.proof_image || t.proofImage || localTx.proofImage || '';
+            const proofNotes = t.proof_notes || t.proofNotes || localTx.proofNotes || '';
+            const processedAt = t.processed_at || t.processedAt || localTx.processedAt || null;
+
             return {
               ...t,
               id: t.id,
@@ -1674,6 +1687,12 @@ export class AdminDataService {
               status: t.status || 'pending',
               method: t.method || '',
               recipient: t.recipient || '',
+              proofImage,
+              proof_image: proofImage,
+              proofNotes,
+              proof_notes: proofNotes,
+              processedAt,
+              processed_at: processedAt,
               createdAt: t.createdAt || t.created_at || new Date().toISOString(),
               created_at: t.created_at || t.createdAt || new Date().toISOString()
             };
@@ -1779,7 +1798,7 @@ export class AdminDataService {
 
       // Sinkronkan update status transaksi ke database Supabase
       try {
-        await fetch('/api/supabase-proxy', {
+        const syncRes = await fetch('/api/supabase-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1794,8 +1813,20 @@ export class AdminDataService {
             }
           })
         });
+        if (syncRes.ok) {
+          const syncJson = await syncRes.json();
+          if (!syncJson.success) {
+            console.error('[AdminDataService] Supabase approve sync failed:', syncJson.error);
+            return { success: false, message: `Gagal memperbarui database: ${syncJson.error}` };
+          }
+        } else {
+          const errText = await syncRes.text();
+          console.error('[AdminDataService] Supabase proxy returned error status:', syncRes.status, errText);
+          return { success: false, message: `Gagal menghubungi database (HTTP ${syncRes.status})` };
+        }
       } catch (err) {
         console.warn('[AdminDataService] Supabase approve withdrawal sync warning:', err.message);
+        return { success: false, message: `Gagal sinkronisasi ke server: ${err.message}` };
       }
 
       // Siarkan ke user tab via BroadcastChannel
