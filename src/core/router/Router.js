@@ -79,6 +79,9 @@ export class Router {
     const isRecovery = rawHash.includes('type=recovery') ||
                        window.location.search.includes('type=recovery') ||
                        rawHash.startsWith('/reset-password') ||
+                       rawHash.includes('token_hash=') ||
+                       rawHash.includes('otp_expired') ||
+                       rawHash.includes('Email+link') ||
                        rawHash === '/reset-password';
 
     // Jika URL memuat token callback OAuth biasa (Google dsb), biarkan Supabase SDK memprosesnya

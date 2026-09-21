@@ -1006,12 +1006,14 @@ export class AuthService {
   _initSupabaseOAuthListener() {
     if (!isSupabaseConfigured()) return;
 
-    // 0. Deteksi jika tautan membawa token pemulihan kata sandi (baik format standar Supabase maupun double-hash)
+    // 0. Deteksi jika tautan membawa token pemulihan kata sandi (baik format standar Supabase maupun token_hash / OTP)
     const rawHash = window.location.hash || '';
     const rawSearch = window.location.search || '';
 
     const isRecoveryToken = rawHash.includes('type=recovery') ||
                             rawSearch.includes('type=recovery') ||
+                            rawHash.includes('token_hash=') ||
+                            rawSearch.includes('token_hash=') ||
                             (rawHash.includes('access_token=') && rawHash.includes('/reset-password'));
 
     if (isRecoveryToken) {
@@ -1033,16 +1035,34 @@ export class AuthService {
         }
       }
 
-      window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      // Jika URL memiliki token_hash atau search parameter pemulihan, pertahankan query agar dapat dibaca view
+      if (!rawHash.includes('token_hash=') && !rawSearch.includes('token_hash=')) {
+        window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      }
     }
 
-    // 1. Tangani jika callback URL membawa parameter error dari Google OAuth
+    // 1. Tangani jika callback URL membawa parameter error
     const hash = window.location.hash || '';
     const search = window.location.search || '';
     if (hash.includes('error=') || hash.includes('error_description=') || search.includes('error=')) {
       const params = new URLSearchParams(hash.includes('error=') ? hash.replace(/^#/, '') : search.replace(/^\?/, ''));
-      const errorDesc = params.get('error_description') || params.get('error') || 'Autentikasi Google gagal atau dibatalkan.';
+      const errorCode = params.get('error_code') || '';
+      const errorDesc = params.get('error_description') || params.get('error') || 'Autentikasi gagal atau dibatalkan.';
+
+      const isRecoveryError = errorCode === 'otp_expired' ||
+                             hash.includes('reset-password') ||
+                             errorDesc.toLowerCase().includes('email link') ||
+                             errorDesc.toLowerCase().includes('otp');
+
+      if (isRecoveryError) {
+        this._isPasswordRecovery = true;
+        // Jangan tendang ke /login! Arahkan ke /reset-password dengan parameter error=otp_expired
+        // agar ResetPasswordView dapat menampilkan panduan ramah pengguna dan form input kode OTP
+        window.history.replaceState(null, '', window.location.pathname + '#/reset-password?error=otp_expired');
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+        return;
+      }
 
       window.history.replaceState(null, '', window.location.pathname + '#/login');
       window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -1072,11 +1092,15 @@ export class AuthService {
 
       const isRecovery = window.location.hash.includes('type=recovery') ||
                          window.location.search.includes('type=recovery') ||
+                         window.location.hash.includes('token_hash=') ||
+                         window.location.search.includes('token_hash=') ||
                          window.location.hash.startsWith('#/reset-password');
       if (isRecovery) {
         this._isPasswordRecovery = true;
-        window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
-        window.dispatchEvent(new HashChangeEvent('hashchange'));
+        if (!window.location.hash.includes('token_hash=')) {
+          window.history.replaceState(null, '', window.location.pathname + '#/reset-password');
+          window.dispatchEvent(new HashChangeEvent('hashchange'));
+        }
         return;
       }
 
@@ -1640,7 +1664,13 @@ export class AuthService {
         }
 
         // Sinkronkan juga perubahan kata sandi ke tabel public.users
-        const updatedEmail = data?.user?.email || this._currentUser?.email;
+        let updatedEmail = data?.user?.email || this._currentUser?.email;
+        if (!updatedEmail) {
+          try {
+            const { data: userData } = await supabase.auth.getUser();
+            updatedEmail = userData?.user?.email;
+          } catch (_) {}
+        }
         if (updatedEmail && this._userRepository) {
           try {
             const dbUser = await this._userRepository.getByEmail(updatedEmail);

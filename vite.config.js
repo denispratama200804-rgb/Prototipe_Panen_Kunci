@@ -2016,41 +2016,76 @@ export default defineConfig(({ mode }) => {
 
                   if (action === 'generate_recovery_link' && data?.email) {
                     if (adminSupabase) {
+                      const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:5173';
+                      const proto = req.headers['x-forwarded-proto'] || (req.connection?.encrypted ? 'https' : 'http');
+                      const dynamicOrigin = `${proto}://${host}`;
+                      const targetRedirect = data.redirectTo || `${dynamicOrigin}/#/reset-password`;
+
                       const { data: linkData, error } = await adminSupabase.auth.admin.generateLink({
                         type: 'recovery',
                         email: data.email,
                         options: {
-                          redirectTo: data.redirectTo || 'http://localhost:5173/#/reset-password'
+                          redirectTo: targetRedirect
                         }
                       });
                       if (error) {
                         res.statusCode = 400;
                         res.end(JSON.stringify({ success: false, error: error.message }));
                       } else {
-                        const actionLink = linkData?.properties?.action_link;
+                        const hashedToken = linkData?.properties?.hashed_token || '';
+                        const emailOtp = linkData?.properties?.email_otp || '';
                         const currentEnv = loadEnv(server.config.mode, process.cwd(), '');
 
-                        if (actionLink) {
+                        const appBaseUrl = dynamicOrigin.replace(/\/+$/, '');
+                        const safeAppActionLink = `${appBaseUrl}/#/reset-password?token_hash=${encodeURIComponent(hashedToken)}&type=recovery&email=${encodeURIComponent(data.email)}`;
+
+                        if (safeAppActionLink) {
                           try {
                             await sendEmailVite({
                               currentEnv,
                               to: data.email,
                               subject: 'Pemulihan Kata Sandi Akun Panen Kunci',
-                              html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px;">
-                                <h2 style="color: #4F46E5;">Atur Ulang Kata Sandi</h2>
-                                <p>Halo,</p>
-                                <p>Ini adalah email pemulihan akun Panen Kunci Anda. Klik tombol di bawah ini untuk membuat kata sandi baru Anda:</p>
-                                <div style="text-align: center; margin: 30px 0;">
-                                  <a href="${actionLink}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Atur Ulang Kata Sandi</a>
+                              html: `
+                                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 16px; background-color: #ffffff; color: #1F2937;">
+                                  <div style="text-align: center; margin-bottom: 24px;">
+                                    <div style="display: inline-flex; width: 56px; height: 56px; background-color: #EEF2FF; border-radius: 14px; align-items: center; justify-content: center; margin-bottom: 12px; font-size: 28px; line-height: 56px;">
+                                      🔐
+                                    </div>
+                                    <h2 style="color: #1E1B4B; margin: 0 0 6px 0; font-size: 22px; font-weight: 700;">Atur Ulang Kata Sandi</h2>
+                                    <p style="color: #6B7280; font-size: 14px; margin: 0;">Akun Panen Kunci</p>
+                                  </div>
+
+                                  <p style="font-size: 14px; line-height: 1.6; color: #374151;">Halo,</p>
+                                  <p style="font-size: 14px; line-height: 1.6; color: #374151;">Kami menerima permintaan untuk mengatur ulang kata sandi akun Panen Kunci yang terdaftar dengan email <strong>${data.email}</strong>.</p>
+                                  <p style="font-size: 14px; line-height: 1.6; color: #374151;">Klik tombol resmi di bawah ini untuk membuat kata sandi baru Anda:</p>
+
+                                  <div style="text-align: center; margin: 28px 0;">
+                                    <a href="${safeAppActionLink}" style="background-color: #4F46E5; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 9999px; font-weight: 700; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">Atur Ulang Kata Sandi</a>
+                                  </div>
+
+                                  ${emailOtp ? `
+                                  <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; margin: 24px 0; text-align: center;">
+                                    <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Atau Masukkan Kode Pemulihan (OTP)</div>
+                                    <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #1F2937; font-family: monospace;">${emailOtp}</div>
+                                    <div style="font-size: 11px; color: #9CA3AF; margin-top: 6px;">Kode berlaku selama 1 jam</div>
+                                  </div>
+                                  ` : ''}
+
+                                  <p style="color: #6B7280; font-size: 12px; line-height: 1.5; margin-top: 20px;">Jika tombol di atas tidak dapat diklik, salin tautan berikut ke browser Anda:<br>
+                                    <a href="${safeAppActionLink}" style="color: #4F46E5; word-break: break-all;">${safeAppActionLink}</a>
+                                  </p>
+
+                                  <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
+                                  <p style="color: #9CA3AF; font-size: 11px; margin: 0; line-height: 1.4;">Jika Anda tidak meminta pengaturan ulang kata sandi, abaikan email ini. Akun Anda tetap aman.<br>© Panen Kunci. Hak cipta dilindungi undang-undang.</p>
                                 </div>
-                                <p style="color: #666; font-size: 12px;">Atau salin dan tempel tautan berikut ke browser Anda:<br><a href="${actionLink}">${actionLink}</a></p>
-                              </div>`
+                              `
                             });
 
                             res.statusCode = 200;
                             res.end(JSON.stringify({
                               success: true,
                               emailSent: true,
+                              action_link: safeAppActionLink,
                               message: 'Email pemulihan kata sandi berhasil dikirimkan.'
                             }));
                             return;
