@@ -320,8 +320,8 @@ export class DashboardView extends IComponent {
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm hover:bg-surface-container-low transition-colors">
           <div class="flex items-center gap-3 min-w-0">
             ${(!isDeposit && !isReferralCommission) ? `
-              <div class="w-10 h-10 rounded-xl overflow-hidden shadow-xs flex items-center justify-center shrink-0">
-                ${renderPaymentMethodSvg((tx.method || '') + ' ' + (tx.title || '') + ' ' + (tx.description || ''), 'w-10 h-10')}
+              <div class="w-10 h-10 rounded-2xl overflow-hidden shadow-xs flex items-center justify-center shrink-0 bg-surface-container">
+                ${renderPaymentMethodSvg((tx.method || '') + ' ' + (tx.title || '') + ' ' + (tx.description || '') + ' ' + (user?.bankName || ''), 'w-full h-full')}
               </div>
             ` : `
               <div class="w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0">

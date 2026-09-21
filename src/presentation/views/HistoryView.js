@@ -86,7 +86,7 @@ export class HistoryView extends IComponent {
 
           <!-- Tab Content: Penarikan Dana -->
           <div id="tabContentPenarikan" class="flex flex-col gap-2.5 ${this._activeTab === 'penarikan' ? '' : 'hidden'}">
-            ${this._renderPenarikanTabHtml(withdrawals)}
+            ${this._renderPenarikanTabHtml(withdrawals, currentUser)}
           </div>
 
           <!-- Tab Content: Riwayat Potongan Kode Referral -->
@@ -166,7 +166,7 @@ export class HistoryView extends IComponent {
     }).join('');
   }
 
-  _renderPenarikanTabHtml(withdrawals) {
+  _renderPenarikanTabHtml(withdrawals, currentUser = null) {
     if (!withdrawals || withdrawals.length === 0) {
       return `
         <div class="bg-surface-card rounded-3xl p-10 text-center flex flex-col items-center border border-surface-container">
@@ -210,8 +210,8 @@ export class HistoryView extends IComponent {
           <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}"></div>
 
           <div class="flex items-center gap-3 pl-2">
-            <div class="w-9 h-9 shrink-0 rounded-xl overflow-hidden shadow-2xs flex items-center justify-center">
-              ${renderPaymentMethodIcon(w.title + ' ' + (w.description || ''), 'w-9 h-9')}
+            <div class="w-9 h-9 shrink-0 rounded-xl overflow-hidden shadow-2xs flex items-center justify-center bg-surface-container">
+              ${renderPaymentMethodIcon(w.title + ' ' + (w.description || '') + ' ' + (w.method || '') + ' ' + (currentUser?.bankName || ''), 'w-9 h-9')}
             </div>
             <div class="flex flex-col gap-1">
               <div class="flex items-center gap-2">

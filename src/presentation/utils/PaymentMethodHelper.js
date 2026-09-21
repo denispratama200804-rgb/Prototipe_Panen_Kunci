@@ -291,18 +291,21 @@ export function getPaymentMethodSvg(meta, sizeClass = 'w-full h-full') {
 }
 
 /**
- * Menghasilkan HTML Icon resmi yang responsif
+ * Menghasilkan HTML Icon gambar resmi (e-wallet / bank PNG)
  * @param {string|Object} rawInput - Nama bank / e-wallet
  * @param {string} [customSizeClass='w-10 h-10'] - Ukuran kotak icon
  * @returns {string} HTML string
  */
 export function renderPaymentMethodIcon(rawInput = '', customSizeClass = 'w-10 h-10') {
   const meta = typeof rawInput === 'object' && rawInput?.id ? rawInput : getPaymentMethodMetadata(rawInput);
-  return getPaymentMethodSvg(meta, customSizeClass);
+  const iconSrc = meta.type === 'ewallet' ? '/images/icon-ewallet.png' : '/images/icon-bank.png';
+  return `
+    <img src="${iconSrc}" alt="${meta.name}" class="${customSizeClass} object-cover" title="${meta.name}" />
+  `;
 }
 
 /**
- * Helper alias untuk merender SVG metode pembayaran
+ * Helper alias untuk merender icon metode pembayaran
  * @param {string|Object} rawInput
  * @param {string} [customSizeClass='w-10 h-10']
  * @returns {string}
@@ -312,7 +315,7 @@ export function renderPaymentMethodSvg(rawInput = '', customSizeClass = 'w-10 h-
 }
 
 /**
- * Menghasilkan pill / chip badge dengan logo resmi
+ * Menghasilkan pill / chip badge dengan gambar resmi e-wallet / bank
  * @param {string|Object} rawInput - Nama bank / e-wallet
  * @param {string} [label] - Label teks alternatif jika ingin meng-override
  * @returns {string} HTML string
@@ -320,10 +323,11 @@ export function renderPaymentMethodSvg(rawInput = '', customSizeClass = 'w-10 h-
 export function renderPaymentMethodPill(rawInput = '', label = null) {
   const meta = typeof rawInput === 'object' && rawInput?.id ? rawInput : getPaymentMethodMetadata(rawInput);
   const displayLabel = label || meta.name;
+  const iconSrc = meta.type === 'ewallet' ? '/images/icon-ewallet.png' : '/images/icon-bank.png';
   return `
     <div class="inline-flex items-center gap-2 bg-surface-card border border-surface-container px-3 py-1.5 rounded-full shadow-xs text-xs font-bold text-text-heading">
       <div class="w-5 h-5 shrink-0 rounded-md overflow-hidden flex items-center justify-center">
-        ${getPaymentMethodSvg(meta, 'w-5 h-5')}
+        <img src="${iconSrc}" alt="${displayLabel}" class="w-full h-full object-cover" />
       </div>
       <span>${displayLabel}</span>
     </div>

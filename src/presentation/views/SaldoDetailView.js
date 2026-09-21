@@ -15,6 +15,7 @@ export class SaldoDetailView extends IComponent {
     super();
     this._container = container;
     this._walletService = container.resolve('WalletService');
+    this._authService = container.has('AuthService') ? container.resolve('AuthService') : null;
     this._eventBus = container.resolve('EventBus');
   }
 
@@ -171,24 +172,35 @@ export class SaldoDetailView extends IComponent {
 
       const rejectionReason = w.rejectionReason || (w.description && typeof w.description === 'string' ? (w.description.match(/\(Ditolak:\s*([^)]+)\)/)?.[1] || '') : '');
 
-      // Identifikasi jenis e-wallet / bank dari data transaksi
+      // Ambil data rekening/metode yang dipilih user saat verifikasi akun (profil)
+      const currentUser = this._authService?.getCurrentUser();
+      const verifiedBank = (currentUser?.bankName || '').trim();
+
+      // Cek apakah metode penarikan bertipe e-wallet atau bank
+      // Prioritas 1: Dari data transaksi penarikan itu sendiri (w.method, w.bankName, w.title, w.description)
+      // Prioritas 2: Dari rekening yang dipilih user saat verifikasi akun (verifiedBank)
       const methodQuery = [
         w.method,
         w.bankName,
         w.title,
         w.description,
-        w.recipient
+        w.recipient,
+        verifiedBank
       ].filter(Boolean).join(' ');
+
       const methodMeta = getPaymentMethodMetadata(methodQuery);
-      const displayTitle = w.title || `Penarikan (${methodMeta.name})`;
+      const isEwallet = methodMeta.type === 'ewallet' || ['dana', 'gopay', 'ovo', 'shopeepay', 'wallet', 'ewallet', 'e-wallet'].some(x => methodQuery.toLowerCase().includes(x));
+      const iconSrc = isEwallet ? '/images/icon-ewallet.png' : '/images/icon-bank.png';
+      const iconAlt = isEwallet ? 'E-Wallet' : 'Bank Transfer';
+      const displayTitle = w.title || `Penarikan (${isEwallet ? 'E-Wallet' : 'Bank'})`;
 
       return `
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
           <div class="flex items-center gap-3 min-w-0">
-            <!-- Icon Pembayaran Dinamis Berdasarkan Jenis E-Wallet atau Bank -->
-            <div class="w-10 h-10 rounded-xl relative shrink-0 overflow-visible">
-              <div class="w-10 h-10 rounded-xl overflow-hidden shadow-xs flex items-center justify-center">
-                ${renderPaymentMethodSvg(methodQuery, 'w-10 h-10')}
+            <!-- Icon Pembayaran Biasa (Gambar E-Wallet / Bank Sesuai Pilihan Verifikasi Akun) -->
+            <div class="w-10 h-10 rounded-2xl relative shrink-0 overflow-visible">
+              <div class="w-10 h-10 rounded-2xl overflow-hidden shadow-xs flex items-center justify-center bg-surface-container">
+                <img src="${iconSrc}" alt="${iconAlt}" class="w-full h-full object-cover" />
               </div>
               <div class="absolute -bottom-1 -right-1 w-4 h-4 ${iconBg} rounded-full flex items-center justify-center text-white border-2 border-surface-card z-10 shadow-2xs">
                 <span class="material-symbols-outlined text-[10px] font-bold">${statusIcon}</span>
