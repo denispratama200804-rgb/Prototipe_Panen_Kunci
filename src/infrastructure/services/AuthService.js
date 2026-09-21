@@ -560,6 +560,23 @@ export class AuthService {
           role
         });
 
+        // Sinkronkan tautan kode referral ke store proxy & auth user_metadata jika ada
+        if (newUserData.referredBy && (savedUser?.id || authUserId)) {
+          const targetId = savedUser?.id || authUserId;
+          try {
+            fetch('/api/supabase-proxy', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'bind_referral',
+                userId: targetId,
+                userEmail: email,
+                referralCode: newUserData.referredBy
+              })
+            }).catch(() => {});
+          } catch (_) {}
+        }
+
         return {
           success: true,
           role: 'user',

@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS public.users (
   role            TEXT          NOT NULL DEFAULT 'user'
                                   CHECK (role IN ('user', 'admin')),
   is_verified     BOOLEAN       NOT NULL DEFAULT FALSE,
+  avatar          TEXT          DEFAULT '',
+  nickname_updated_at TIMESTAMPTZ,
+  referral_code   TEXT,
+  referred_by     TEXT,
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
@@ -45,6 +49,7 @@ ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL D
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT '';
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS nickname_updated_at TIMESTAMPTZ;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS referral_code TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS referred_by TEXT;
 
 COMMENT ON TABLE  public.users                  IS 'Profil pengguna aplikasi Panen Kunci';
 COMMENT ON COLUMN public.users.id               IS 'Primary key — UUID otomatis, harus sama dengan auth.users.id';

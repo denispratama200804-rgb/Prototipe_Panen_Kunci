@@ -180,23 +180,40 @@ export class SupabaseUserRepository extends IUserRepository {
       .select()
       .single();
 
-    // Jika kolom referral_code atau referred_by belum ada di database Supabase, fallback tanpa kolom tersebut
-    if (error && error.message && (error.message.includes('referral_code') || error.message.includes('referred_by'))) {
-      if (error.message.includes('referral_code')) delete payload.referral_code;
-      if (error.message.includes('referred_by')) delete payload.referred_by;
-      const retry = await supabase
-        .from(this.tableName)
-        .insert(payload)
-        .select()
-        .single();
-      data = retry.data;
-      error = retry.error;
+    // Fallback otomatis jika kolom belum ada di database Supabase (misal: referral_code, referred_by, dll)
+    let createRetries = 0;
+    while (error && createRetries < 5) {
+      createRetries++;
+      const missingMatch = error.message && (
+        error.message.match(/Could not find the '([^']+)' column/i) ||
+        error.message.match(/column [^\s.]*\.?([a-zA-Z0-9_]+) does not exist/i)
+      );
+      if (missingMatch && missingMatch[1] && (missingMatch[1] in payload)) {
+        delete payload[missingMatch[1]];
+        const retry = await supabase
+          .from(this.tableName)
+          .insert(payload)
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      } else {
+        break;
+      }
     }
 
     if (!error && data) {
       const domainUser = this._toDomain(data);
       if (!domainUser.referredBy && userData.referredBy) {
         domainUser.referredBy = userData.referredBy;
+      }
+      if (userData.referredBy) {
+        try {
+          if (typeof localStorage !== 'undefined') {
+            if (domainUser.id) localStorage.setItem('pk_bound_ref_' + domainUser.id, userData.referredBy);
+            if (domainUser.email) localStorage.setItem('pk_bound_ref_' + domainUser.email.toLowerCase(), userData.referredBy);
+          }
+        } catch (_) {}
       }
       return domainUser;
     }
@@ -286,27 +303,36 @@ export class SupabaseUserRepository extends IUserRepository {
       .select()
       .single();
 
-    // Fallback jika kolom referral_code atau referred_by belum ada di tabel users
-    if (error && error.message && (error.message.includes('referral_code') || error.message.includes('referred_by'))) {
-      if (error.message.includes('referral_code')) delete payload.referral_code;
-      if (error.message.includes('referred_by')) delete payload.referred_by;
+    // Fallback otomatis jika ada kolom yang belum ada di schema database Supabase (misal: referral_code, referred_by)
+    let updateRetries = 0;
+    while (error && updateRetries < 5) {
+      updateRetries++;
+      const missingMatch = error.message && (
+        error.message.match(/Could not find the '([^']+)' column/i) ||
+        error.message.match(/column [^\s.]*\.?([a-zA-Z0-9_]+) does not exist/i)
+      );
+      if (missingMatch && missingMatch[1] && (missingMatch[1] in payload)) {
+        delete payload[missingMatch[1]];
 
-      if (Object.keys(payload).length === 0) {
-        const existing = await this.getById(id);
-        if (existing) {
-          if (updates.referredBy) existing.referredBy = updates.referredBy;
-          return existing;
+        if (Object.keys(payload).length === 0) {
+          const existing = await this.getById(id);
+          if (existing) {
+            if (updates.referredBy) existing.referredBy = updates.referredBy;
+            return existing;
+          }
         }
-      }
 
-      const retry = await supabase
-        .from(this.tableName)
-        .update(payload)
-        .eq('id', id)
-        .select()
-        .single();
-      data = retry.data;
-      error = retry.error;
+        const retry = await supabase
+          .from(this.tableName)
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      } else {
+        break;
+      }
     }
 
     if (!error && data) {

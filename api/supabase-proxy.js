@@ -1572,11 +1572,33 @@ export default async function handler(req, res) {
 
     // 4. Insert record pengguna / API Key / Transaksi (bypass RLS)
     if (action === 'insert' && table === 'users' && data) {
-      const { data: inserted, error } = await adminSupabase
+      let insertPayload = { ...data };
+      let { data: inserted, error } = await adminSupabase
         .from('users')
-        .insert(data)
+        .insert(insertPayload)
         .select()
         .single();
+
+      let retries = 0;
+      while (error && retries < 5) {
+        retries++;
+        const missingMatch = error.message && (
+          error.message.match(/Could not find the '([^']+)' column/i) ||
+          error.message.match(/column [^\s.]*\.?([a-zA-Z0-9_]+) does not exist/i)
+        );
+        if (missingMatch && missingMatch[1] && (missingMatch[1] in insertPayload)) {
+          delete insertPayload[missingMatch[1]];
+          const retry = await adminSupabase
+            .from('users')
+            .insert(insertPayload)
+            .select()
+            .single();
+          inserted = retry.data;
+          error = retry.error;
+        } else {
+          break;
+        }
+      }
 
       if (error) {
         return res.status(400).json({ success: false, error: error.message });
@@ -1731,12 +1753,35 @@ export default async function handler(req, res) {
 
     // 5. Update record pengguna / API Key / Transaksi (bypass RLS)
     if (action === 'update' && table === 'users' && id) {
-      const { data: updated, error } = await adminSupabase
+      let updatePayload = { ...data };
+      let { data: updated, error } = await adminSupabase
         .from('users')
-        .update(data)
+        .update(updatePayload)
         .eq('id', id)
         .select()
         .single();
+
+      let retries = 0;
+      while (error && retries < 5) {
+        retries++;
+        const missingMatch = error.message && (
+          error.message.match(/Could not find the '([^']+)' column/i) ||
+          error.message.match(/column [^\s.]*\.?([a-zA-Z0-9_]+) does not exist/i)
+        );
+        if (missingMatch && missingMatch[1] && (missingMatch[1] in updatePayload)) {
+          delete updatePayload[missingMatch[1]];
+          const retry = await adminSupabase
+            .from('users')
+            .update(updatePayload)
+            .eq('id', id)
+            .select()
+            .single();
+          updated = retry.data;
+          error = retry.error;
+        } else {
+          break;
+        }
+      }
 
       if (error) {
         return res.status(400).json({ success: false, error: error.message });
@@ -1929,11 +1974,21 @@ export default async function handler(req, res) {
         let daysRemaining = 3;
         if (targetKeyId && adminSupabase) {
           try {
-            const { data: dbKeyData } = await adminSupabase
+            let { data: dbKeyData, error: dbKeyErr } = await adminSupabase
               .from('api_keys')
               .select('created_at, user_id, users:user_id(id, referred_by)')
               .eq('id', targetKeyId)
               .maybeSingle();
+
+            if (dbKeyErr && (dbKeyErr.code === '42703' || (dbKeyErr.message && dbKeyErr.message.includes('referred_by')))) {
+              const retryKey = await adminSupabase
+                .from('api_keys')
+                .select('created_at, user_id, users:user_id(id)')
+                .eq('id', targetKeyId)
+                .maybeSingle();
+              dbKeyData = retryKey.data;
+            }
+
             if (dbKeyData && dbKeyData.created_at) {
               const createdAtMs = new Date(dbKeyData.created_at).getTime();
               const isReferred = Boolean(dbKeyData.users?.referred_by);
@@ -2026,10 +2081,19 @@ export default async function handler(req, res) {
       }
 
       try {
-        const { data: pendingKeys, error } = await adminSupabase
+        let { data: pendingKeys, error } = await adminSupabase
           .from('api_keys')
           .select('id, key_string, user_id, reward_amount, status, created_at, users:user_id(id, referred_by)')
           .eq('status', 'pending');
+
+        if (error && (error.code === '42703' || (error.message && error.message.includes('referred_by')))) {
+          const retryPending = await adminSupabase
+            .from('api_keys')
+            .select('id, key_string, user_id, reward_amount, status, created_at, users:user_id(id)')
+            .eq('status', 'pending');
+          pendingKeys = retryPending.data;
+          error = retryPending.error;
+        }
 
         if (error) {
           return res.status(400).json({ success: false, error: error.message });
