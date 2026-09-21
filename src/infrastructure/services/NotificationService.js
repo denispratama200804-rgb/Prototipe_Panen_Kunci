@@ -26,7 +26,7 @@ export class NotificationService {
     // Real-time Payout Notifications (Diterima / Ditolak)
     this._eventBus.on('PAYOUT_PROCESSED', (payload) => {
       if (!payload) return;
-      const isSuccess = payload.type === 'success' || payload.status === 'success';
+      const isSuccess = payload.type === 'success' || ['success', 'valid', 'approved', 'completed', 'berhasil'].includes(payload.status);
       const title = payload.title || (isSuccess ? 'Penarikan Saldo Diterima!' : 'Permintaan Penarikan Ditolak');
 
       this.addNotification({
@@ -240,7 +240,7 @@ export class NotificationService {
     // Filter transaksi penarikan milik user yang statusnya sudah selesai (success atau failed)
     const processedWithdrawals = transactions.filter(t =>
       t.type === 'withdrawal' &&
-      (t.status === 'success' || t.status === 'failed') &&
+      ['success', 'valid', 'approved', 'completed', 'berhasil', 'failed', 'rejected', 'ditolak'].includes(t.status) &&
       (!t.userId || t.userId === userId)
     );
 
@@ -250,7 +250,7 @@ export class NotificationService {
         n.id === `notif_wd_${tx.id}`
       );
 
-      const isSuccess = tx.status === 'success';
+      const isSuccess = ['success', 'valid', 'approved', 'completed', 'berhasil'].includes(tx.status);
       const amt = Number(tx.amount || 0);
       const fee = Number(tx.fee !== undefined ? tx.fee : 1000);
       const netPayout = Number(tx.net_payout || tx.netPayout || (amt - fee));

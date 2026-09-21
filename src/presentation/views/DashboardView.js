@@ -1,5 +1,6 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { AppEvents } from '../../core/events/EventBus.js';
+import { renderPaymentMethodSvg } from '../utils/PaymentMethodHelper.js';
 
 /**
  * DashboardView
@@ -223,14 +224,15 @@ export class DashboardView extends IComponent {
     });
 
     const withdrawalActivities = withdrawals.map(w => {
-      const isPending = w.status === 'pending';
-      const isFailed = w.status === 'failed';
-      const isSuccess = !isPending && !isFailed;
+      const rawStatus = String(w.status || '').trim().toLowerCase();
+      const isSuccess = rawStatus === 'success' || rawStatus === 'valid' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'berhasil';
+      const isFailed = rawStatus === 'failed' || rawStatus === 'rejected' || rawStatus === 'ditolak' || rawStatus === 'invalid';
+      const isPending = !isSuccess && !isFailed;
 
       return {
         id: w.id,
         type: 'withdrawal',
-        status: isPending ? 'pending' : (isFailed ? 'failed' : 'success'),
+        status: isSuccess ? 'success' : (isFailed ? 'failed' : 'pending'),
         title: w.title || 'Penarikan Saldo',
         maskedKey: w.description || '',
         amount: Number(w.amount) || 0,
@@ -259,10 +261,11 @@ export class DashboardView extends IComponent {
 
     return recentActivities.map(tx => {
       const isDeposit = tx.type === 'deposit';
-      const isPending = tx.status === 'pending';
-      const isInvalid = tx.status === 'invalid';
-      const isFailed = tx.status === 'failed';
-      const isValidOrSuccess = tx.status === 'valid' || tx.status === 'success';
+      const rawStatus = String(tx.status || '').trim().toLowerCase();
+      const isValidOrSuccess = rawStatus === 'valid' || rawStatus === 'success' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'berhasil';
+      const isInvalid = rawStatus === 'invalid';
+      const isFailed = rawStatus === 'failed' || rawStatus === 'rejected' || rawStatus === 'ditolak';
+      const isPending = rawStatus === 'pending' || (!isValidOrSuccess && !isInvalid && !isFailed);
 
       const dateStr = new Date(tx.createdAt).toLocaleDateString('id-ID', {
         day: 'numeric',
@@ -284,6 +287,8 @@ export class DashboardView extends IComponent {
         statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 rounded font-bold border border-emerald-500/20 inline-flex items-center gap-0.5">Komisi Ref</span>';
       } else if (isValidOrSuccess && isDeposit) {
         statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded font-bold inline-flex items-center gap-0.5">Valid</span>';
+      } else if (isValidOrSuccess && !isDeposit) {
+        statusBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded font-bold inline-flex items-center gap-0.5">Ditransfer</span>';
       }
 
       const iconBg = isReferralCommission
@@ -314,11 +319,17 @@ export class DashboardView extends IComponent {
       return `
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm hover:bg-surface-container-low transition-colors">
           <div class="flex items-center gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">
-                ${iconName}
-              </span>
-            </div>
+            ${(!isDeposit && !isReferralCommission) ? `
+              <div class="w-10 h-10 rounded-xl overflow-hidden shadow-xs flex items-center justify-center shrink-0">
+                ${renderPaymentMethodSvg((tx.method || '') + ' ' + (tx.title || '') + ' ' + (tx.description || ''), 'w-10 h-10')}
+              </div>
+            ` : `
+              <div class="w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">
+                  ${iconName}
+                </span>
+              </div>
+            `}
             <div class="flex flex-col min-w-0">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="font-label-md text-xs font-bold text-text-heading truncate">${tx.title}</span>
@@ -389,9 +400,20 @@ export class DashboardView extends IComponent {
       this._updateDashboardUI(container);
     });
 
+    this._unsubTxLoaded = this._eventBus.on(AppEvents.TRANSACTIONS_LOADED, () => {
+      this._updateDashboardUI(container);
+    });
+
     this._unsubKeySubmitted = this._eventBus.on(AppEvents.API_KEY_SUBMITTED, () => {
       this._updateDashboardUI(container);
     });
+
+    // Pemicu sinkronisasi data remote dari database saat dashboard dibuka
+    if (this._walletService && typeof this._walletService.syncFromRemote === 'function') {
+      this._walletService.syncFromRemote().then(() => {
+        this._updateDashboardUI(container);
+      }).catch(() => {});
+    }
 
     // Cek apakah ada notifikasi payout (diterima / ditolak) yang belum dibaca
     this._checkUnreadPayoutNotifications();
@@ -865,5 +887,28 @@ export class DashboardView extends IComponent {
         });
       }
     });
+  }
+
+  destroy() {
+    if (this._unsubBalance) {
+      this._unsubBalance();
+      this._unsubBalance = null;
+    }
+    if (this._unsubTxLoaded) {
+      this._unsubTxLoaded();
+      this._unsubTxLoaded = null;
+    }
+    if (this._unsubKeySubmitted) {
+      this._unsubKeySubmitted();
+      this._unsubKeySubmitted = null;
+    }
+    if (this._unsubNotifsUpdated) {
+      this._unsubNotifsUpdated();
+      this._unsubNotifsUpdated = null;
+    }
+    if (this._onAppInstalled) {
+      window.removeEventListener('appinstalled', this._onAppInstalled);
+      this._onAppInstalled = null;
+    }
   }
 }

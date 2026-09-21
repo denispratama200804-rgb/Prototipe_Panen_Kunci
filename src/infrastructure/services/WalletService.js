@@ -33,6 +33,7 @@ export class WalletService {
     this._realtimeChannel = null;
 
     this._loadWallet();
+    this._syncFromRemote().catch(() => {});
 
     // Listen auth state changed: saat user login/register/logout, reset dan muat ulang dompet milik user tersebut
     this._eventBus.on(AppEvents.AUTH_STATE_CHANGED, () => {
@@ -88,12 +89,28 @@ export class WalletService {
                   });
                 }
               } else if (data.type === 'WITHDRAWAL_APPROVED') {
+                if (Array.isArray(this._transactions)) {
+                  const matchTx = this._transactions.find(t => 
+                    t.id === data.transactionId || 
+                    (t.type === 'withdrawal' && String(t.status || '').toLowerCase() === 'pending' && Number(t.amount) === Number(data.amount))
+                  );
+                  if (matchTx) {
+                    matchTx.id = data.transactionId || matchTx.id;
+                    matchTx.status = 'success';
+                    if (data.proofImage) matchTx.proofImage = data.proofImage;
+                    if (data.proofNotes) matchTx.proofNotes = data.proofNotes;
+                    this._persist();
+                  }
+                }
                 this._loadWallet();
                 await this._syncFromRemote();
                 this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
                   balance: this._balance,
                   passiveBalance: this._passiveBalance,
                   lifetime: this._lifetimeEarnings
+                });
+                this._eventBus.emit(AppEvents.TRANSACTIONS_LOADED, {
+                  transactions: this._transactions
                 });
                 const amountStr = data.amount ? `Rp ${Number(data.amount).toLocaleString('id-ID')}` : '';
                 this._eventBus.emit('PAYOUT_PROCESSED', {
@@ -482,9 +499,14 @@ export class WalletService {
       .filter(t => (t.method === 'referral_commission' || t.title?.includes('Referral') || t.description?.includes('Referral')) && t.status === 'success')
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-    // Hitung total penarikan aktif
+    // Hitung total penarikan aktif (termasuk status valid, success, approved, completed, pending)
+    const isWdStatusActive = (s) => {
+      const raw = String(s || '').trim().toLowerCase();
+      return raw === 'success' || raw === 'valid' || raw === 'approved' || raw === 'completed' || raw === 'pending';
+    };
+
     const totalWithdrawals = loadedTxs
-      .filter(t => t.type === 'withdrawal' && (t.status === 'success' || t.status === 'pending'))
+      .filter(t => t.type === 'withdrawal' && isWdStatusActive(t.status))
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
     if (combinedKeys.length === 0 && loadedTxs.length === 0) {
@@ -736,7 +758,8 @@ export class WalletService {
               calculatedLifetime += amt;
             }
           } else if (tx.type === 'withdrawal') {
-            if (tx.status === 'success' || tx.status === 'pending') {
+            const rawStatus = String(tx.status || '').trim().toLowerCase();
+            if (rawStatus === 'success' || rawStatus === 'valid' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'pending') {
               calculatedBalance -= amt;
             }
           }
@@ -753,7 +776,11 @@ export class WalletService {
       } else {
         // Jika remoteTxs belum ada/kosong di database, gunakan perhitungan authoritative dari daftar key user + komisi referral!
         const totalWithdrawals = this._transactions
-          .filter(t => t.type === 'withdrawal' && (t.status === 'success' || t.status === 'pending'))
+          .filter(t => {
+            if (t.type !== 'withdrawal') return false;
+            const rawStatus = String(t.status || '').trim().toLowerCase();
+            return rawStatus === 'success' || rawStatus === 'valid' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'pending';
+          })
           .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
         const totalCommissions = this._transactions
@@ -851,6 +878,14 @@ export class WalletService {
    */
   getTransactions() {
     return [...this._transactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  /**
+   * Pemicu sinkronisasi data transaksi dan saldo dari remote Supabase secara publik
+   * @returns {Promise<void>}
+   */
+  async syncFromRemote() {
+    return this._syncFromRemote();
   }
 
   /**

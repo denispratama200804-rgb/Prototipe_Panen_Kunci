@@ -207,7 +207,7 @@ export class AdminDataService {
 
     const withdrawals = transactions.filter(t => t.type === 'withdrawal');
     const pendingWithdrawals = withdrawals.filter(t => t.status === 'pending');
-    const completedWithdrawals = withdrawals.filter(t => t.status === 'success');
+    const completedWithdrawals = withdrawals.filter(t => ['success', 'valid', 'approved', 'completed', 'berhasil'].includes(t.status));
 
     const totalPaidOut = completedWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const pendingPayoutAmount = pendingWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -258,7 +258,7 @@ export class AdminDataService {
       keyDepositsPerDay.push(keysCount);
 
       const wdSum = transactions
-        .filter(t => t.type === 'withdrawal' && t.createdAt && t.createdAt.startsWith(dateStr) && t.status === 'success')
+        .filter(t => t.type === 'withdrawal' && t.createdAt && t.createdAt.startsWith(dateStr) && ['success', 'valid', 'approved', 'completed', 'berhasil'].includes(t.status))
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
       withdrawalVolumePerDay.push(wdSum);
     }
@@ -1590,7 +1590,10 @@ export class AdminDataService {
 
     return enriched.filter(t => {
       const matchType = type === 'all' || t.type === type;
-      const matchStatus = status === 'all' || t.status === status;
+      const matchStatus = status === 'all' ||
+        t.status === status ||
+        (status === 'success' && ['valid', 'approved', 'completed', 'berhasil'].includes(t.status)) ||
+        (status === 'failed' && ['rejected', 'ditolak'].includes(t.status));
       const q = search.toLowerCase();
       const matchSearch = !search ||
         (t.id && t.id.toLowerCase().includes(q)) ||
@@ -1759,7 +1762,10 @@ export class AdminDataService {
       const userTxKey = `transactions_${targetUserId}`;
       const userTxs = this._get(userTxKey, []);
       if (Array.isArray(userTxs)) {
-        const uIdx = userTxs.findIndex(t => t.id === transactionId);
+        let uIdx = userTxs.findIndex(t => t.id === transactionId);
+        if (uIdx === -1) {
+          uIdx = userTxs.findIndex(t => t.type === 'withdrawal' && (t.status === 'pending' || t.status === 'valid') && Number(t.amount) === Number(tx.amount));
+        }
         if (uIdx !== -1) {
           userTxs[uIdx].status = 'success';
           userTxs[uIdx].processedAt = tx.processedAt;
@@ -2356,7 +2362,7 @@ export class AdminDataService {
 
     const enriched = users.map(u => {
       const userKeys = apiKeys.filter(k => k.userId === u.id || (u.email && k.userEmail === u.email));
-      const userWithdrawals = transactions.filter(t => (t.userId === u.id || (u.email && t.userEmail === u.email)) && t.type === 'withdrawal' && t.status === 'success');
+      const userWithdrawals = transactions.filter(t => (t.userId === u.id || (u.email && t.userEmail === u.email)) && t.type === 'withdrawal' && ['success', 'valid', 'approved', 'completed', 'berhasil'].includes(t.status));
       const totalWithdrawn = userWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
       
       const validUserKeys = userKeys.filter(k => k.status === 'valid');

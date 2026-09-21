@@ -1,5 +1,6 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { AppEvents } from '../../core/events/EventBus.js';
+import { renderPaymentMethodSvg, getPaymentMethodMetadata } from '../utils/PaymentMethodHelper.js';
 
 /**
  * SaldoDetailView
@@ -143,9 +144,10 @@ export class SaldoDetailView extends IComponent {
         year: 'numeric'
       });
 
-      const isPending = w.status === 'pending';
-      const isFailed = w.status === 'failed';
-      const isSuccess = !isPending && !isFailed;
+      const rawStatus = String(w.status || '').trim().toLowerCase();
+      const isSuccess = rawStatus === 'success' || rawStatus === 'valid' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'berhasil';
+      const isFailed = rawStatus === 'failed' || rawStatus === 'rejected' || rawStatus === 'ditolak' || rawStatus === 'invalid';
+      const isPending = !isSuccess && !isFailed;
 
       let statusIcon = 'check';
       let iconBg = 'bg-secondary';
@@ -169,17 +171,31 @@ export class SaldoDetailView extends IComponent {
 
       const rejectionReason = w.rejectionReason || (w.description && typeof w.description === 'string' ? (w.description.match(/\(Ditolak:\s*([^)]+)\)/)?.[1] || '') : '');
 
+      // Identifikasi jenis e-wallet / bank dari data transaksi
+      const methodQuery = [
+        w.method,
+        w.bankName,
+        w.title,
+        w.description,
+        w.recipient
+      ].filter(Boolean).join(' ');
+      const methodMeta = getPaymentMethodMetadata(methodQuery);
+      const displayTitle = w.title || `Penarikan (${methodMeta.name})`;
+
       return `
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
           <div class="flex items-center gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-primary relative shrink-0">
-              <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">account_balance</span>
-              <div class="absolute -bottom-1 -right-1 w-4 h-4 ${iconBg} rounded-full flex items-center justify-center text-white border-2 border-surface-card">
+            <!-- Icon Pembayaran Dinamis Berdasarkan Jenis E-Wallet atau Bank -->
+            <div class="w-10 h-10 rounded-xl relative shrink-0 overflow-visible">
+              <div class="w-10 h-10 rounded-xl overflow-hidden shadow-xs flex items-center justify-center">
+                ${renderPaymentMethodSvg(methodQuery, 'w-10 h-10')}
+              </div>
+              <div class="absolute -bottom-1 -right-1 w-4 h-4 ${iconBg} rounded-full flex items-center justify-center text-white border-2 border-surface-card z-10 shadow-2xs">
                 <span class="material-symbols-outlined text-[10px] font-bold">${statusIcon}</span>
               </div>
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="font-label-md text-xs font-bold text-text-heading truncate">${w.title}</span>
+              <span class="font-label-md text-xs font-bold text-text-heading truncate">${displayTitle}</span>
               <span class="text-[11px] text-text-body">${dateStr}</span>
               ${isFailed && rejectionReason ? `<span class="text-[10px] text-error-ruby truncate mt-0.5" title="${rejectionReason}">Alasan: ${rejectionReason}</span>` : ''}
             </div>
@@ -242,16 +258,29 @@ export class SaldoDetailView extends IComponent {
     this._unsubBalance = this._eventBus.on(AppEvents.BALANCE_UPDATED, () => {
       this._updateUI(container);
     });
+    this._unsubTxLoaded = this._eventBus.on(AppEvents.TRANSACTIONS_LOADED, () => {
+      this._updateUI(container);
+    });
     this._onConfigUpdated = () => {
       this._updateUI(container);
     };
     window.addEventListener('panenkunci:config_updated', this._onConfigUpdated);
+
+    if (this._walletService && typeof this._walletService.syncFromRemote === 'function') {
+      this._walletService.syncFromRemote().then(() => {
+        this._updateUI(container);
+      }).catch(() => {});
+    }
   }
 
   destroy() {
     if (this._unsubBalance) {
       this._unsubBalance();
       this._unsubBalance = null;
+    }
+    if (this._unsubTxLoaded) {
+      this._unsubTxLoaded();
+      this._unsubTxLoaded = null;
     }
     if (this._onConfigUpdated) {
       window.removeEventListener('panenkunci:config_updated', this._onConfigUpdated);

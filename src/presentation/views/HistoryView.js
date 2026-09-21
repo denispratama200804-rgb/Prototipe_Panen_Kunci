@@ -189,9 +189,10 @@ export class HistoryView extends IComponent {
         minute: '2-digit'
       });
 
-      const isPending = w.status === 'pending';
-      const isSuccess = w.status === 'success';
-      const isFailed = w.status === 'failed';
+      const rawStatus = String(w.status || '').trim().toLowerCase();
+      const isSuccess = rawStatus === 'success' || rawStatus === 'valid' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'berhasil';
+      const isFailed = rawStatus === 'failed' || rawStatus === 'rejected' || rawStatus === 'ditolak' || rawStatus === 'invalid';
+      const isPending = !isSuccess && !isFailed;
 
       let stripeColor = 'bg-warning-amber';
       let badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-amber/15 text-warning-amber border border-warning-amber/30 animate-pulse">Menunggu Persetujuan Admin</span>';
@@ -315,9 +316,10 @@ export class HistoryView extends IComponent {
         minute: '2-digit'
       });
 
-      const isSuccess = ref.status === 'success';
-      const isPending = ref.status === 'pending';
-      const isFailed = ref.status === 'failed';
+      const rawStatus = String(ref.status || '').trim().toLowerCase();
+      const isSuccess = rawStatus === 'success' || rawStatus === 'valid' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'berhasil';
+      const isFailed = rawStatus === 'failed' || rawStatus === 'rejected' || rawStatus === 'ditolak' || rawStatus === 'invalid';
+      const isPending = !isSuccess && !isFailed;
 
       let stripeColor = 'bg-primary';
       let statusBadge = `
@@ -471,8 +473,20 @@ export class HistoryView extends IComponent {
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-text-body">Status</span>
-                  <span class="font-bold ${item.status === 'success' ? 'text-secondary' : item.status === 'pending' ? 'text-warning-amber' : 'text-error-ruby'}">
-                    ${item.status === 'success' ? 'Tercairkan & Selesai' : item.status === 'pending' ? 'Dalam Antrean Verifikasi' : 'Dibatalkan'}
+                  <span class="font-bold ${
+                    (String(item.status || '').toLowerCase() === 'success' || String(item.status || '').toLowerCase() === 'valid' || String(item.status || '').toLowerCase() === 'approved') 
+                      ? 'text-secondary' 
+                      : (String(item.status || '').toLowerCase() === 'pending' || !item.status) 
+                      ? 'text-warning-amber' 
+                      : 'text-error-ruby'
+                  }">
+                    ${
+                      (String(item.status || '').toLowerCase() === 'success' || String(item.status || '').toLowerCase() === 'valid' || String(item.status || '').toLowerCase() === 'approved') 
+                        ? 'Tercairkan & Selesai' 
+                        : (String(item.status || '').toLowerCase() === 'pending' || !item.status) 
+                        ? 'Dalam Antrean Verifikasi' 
+                        : 'Dibatalkan'
+                    }
                   </span>
                 </div>
               </div>
@@ -554,6 +568,10 @@ export class HistoryView extends IComponent {
       this._updateContentUI(container);
     });
 
+    this._unsubTxLoaded = this._eventBus.on(AppEvents.TRANSACTIONS_LOADED, () => {
+      this._updateContentUI(container);
+    });
+
     this._unsubKey = this._eventBus.on(AppEvents.API_KEY_SUBMITTED, () => {
       this._updateContentUI(container);
     });
@@ -561,6 +579,13 @@ export class HistoryView extends IComponent {
     this._unsubPayout = this._eventBus.on('PAYOUT_PROCESSED', () => {
       this._updateContentUI(container);
     });
+
+    // Pemicu sinkronisasi data dari Supabase saat halaman riwayat dibuka
+    if (this._walletService && typeof this._walletService.syncFromRemote === 'function') {
+      this._walletService.syncFromRemote().then(() => {
+        this._updateContentUI(container);
+      }).catch(() => {});
+    }
 
     this._storageHandler = (e) => {
       if (e.key && (e.key.includes('transactions') || e.key.includes('wallet_balance') || e.key.includes('referral_transactions'))) {
@@ -574,6 +599,10 @@ export class HistoryView extends IComponent {
     if (this._unsubBalance) {
       this._unsubBalance();
       this._unsubBalance = null;
+    }
+    if (this._unsubTxLoaded) {
+      this._unsubTxLoaded();
+      this._unsubTxLoaded = null;
     }
     if (this._unsubKey) {
       this._unsubKey();

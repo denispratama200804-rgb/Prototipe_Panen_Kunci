@@ -38,8 +38,8 @@ export class WithdrawalsView {
   render() {
     const allWds = this.dataService.getTransactions({ type: 'withdrawal' });
     const pendingCount = allWds.filter(t => t.status === 'pending').length;
-    const successCount = allWds.filter(t => t.status === 'success').length;
-    const failedCount = allWds.filter(t => t.status === 'failed').length;
+    const successCount = allWds.filter(t => ['success', 'valid', 'approved', 'completed', 'berhasil'].includes(t.status)).length;
+    const failedCount = allWds.filter(t => ['failed', 'rejected', 'ditolak'].includes(t.status)).length;
 
     const filtered = this.dataService.getTransactions({
       type: 'withdrawal',
@@ -308,7 +308,7 @@ export class WithdrawalsView {
                       }
 
                       const isPending = tx.status === 'pending';
-                      const isSuccess = tx.status === 'success';
+                      const isSuccess = ['success', 'valid', 'approved', 'completed', 'berhasil'].includes(tx.status);
                       const isExpanded = this.expandedTxIds.has(tx.id);
 
                       // Inisial avatar huruf diambil dari Nama Pengguna
@@ -1413,13 +1413,13 @@ export class WithdrawalsView {
 
             <!-- Status Stamp -->
             <div class="p-2 rounded-xl ${
-              tx.status === 'success'
+              ['success', 'valid', 'approved', 'completed', 'berhasil'].includes(tx.status)
                 ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
                 : tx.status === 'pending'
                 ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
                 : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
             } text-center font-bold text-xs uppercase tracking-wider">
-              STATUS: ${tx.status === 'success' ? 'DITRANSFER / SELESAI' : tx.status === 'pending' ? 'MENUNGGU TRANSFER' : 'DITOLAK / DANA REFUND'}
+              STATUS: ${['success', 'valid', 'approved', 'completed', 'berhasil'].includes(tx.status) ? 'DITRANSFER / SELESAI' : tx.status === 'pending' ? 'MENUNGGU TRANSFER' : 'DITOLAK / DANA REFUND'}
             </div>
           </div>
 
