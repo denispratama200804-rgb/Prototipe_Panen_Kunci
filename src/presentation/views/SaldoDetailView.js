@@ -242,27 +242,48 @@ export class SaldoDetailView extends IComponent {
     const tarikBtnEl = container.querySelector('#saldo-tarik-btn');
     const recentWdEl = container.querySelector('#saldo-recent-withdrawals');
 
-    if (activeEl) activeEl.textContent = `Rp ${balance.toLocaleString('id-ID')}`;
-    if (passiveEl) passiveEl.textContent = `Rp ${passiveBalance.toLocaleString('id-ID')}`;
-    if (lifetimeEl) lifetimeEl.textContent = `Rp ${lifetime.toLocaleString('id-ID')}`;
-    if (minWdTargetEl) minWdTargetEl.textContent = `Batas Minimum: Rp ${minWithdrawal.toLocaleString('id-ID')}`;
-    if (progressPctEl) progressPctEl.textContent = `${progress.percentage}%`;
-    if (progressBarEl) progressBarEl.style.width = `${progress.percentage}%`;
+    const newActive = `Rp ${balance.toLocaleString('id-ID')}`;
+    if (activeEl && activeEl.textContent !== newActive) activeEl.textContent = newActive;
+
+    const newPassive = `Rp ${passiveBalance.toLocaleString('id-ID')}`;
+    if (passiveEl && passiveEl.textContent !== newPassive) passiveEl.textContent = newPassive;
+
+    const newLifetime = `Rp ${lifetime.toLocaleString('id-ID')}`;
+    if (lifetimeEl && lifetimeEl.textContent !== newLifetime) lifetimeEl.textContent = newLifetime;
+
+    const newMinTarget = `Batas Minimum: Rp ${minWithdrawal.toLocaleString('id-ID')}`;
+    if (minWdTargetEl && minWdTargetEl.textContent !== newMinTarget) minWdTargetEl.textContent = newMinTarget;
+
+    const newProgressPct = `${progress.percentage}%`;
+    if (progressPctEl && progressPctEl.textContent !== newProgressPct) progressPctEl.textContent = newProgressPct;
+
+    if (progressBarEl && progressBarEl.style.width !== newProgressPct) progressBarEl.style.width = newProgressPct;
+
     if (progressTextEl) {
-      progressTextEl.textContent = progress.isEligible 
+      const newProgressText = progress.isEligible 
         ? '🎉 Saldo Anda telah memenuhi batas minimal untuk ditarik!' 
         : `Rp ${progress.remaining.toLocaleString('id-ID')} lagi untuk dapat melakukan penarikan.`;
+      if (progressTextEl.textContent !== newProgressText) {
+        progressTextEl.textContent = newProgressText;
+      }
     }
     if (tarikBtnEl) {
-      tarikBtnEl.textContent = progress.isEligible ? 'Tarik Saldo Sekarang' : 'Buka Menu Penarikan';
-      if (progress.isEligible) {
-        tarikBtnEl.className = 'w-full mt-2 py-3.5 rounded-2xl font-label-md text-sm font-bold uppercase tracking-wider text-center transition-all bg-secondary text-white shadow-lg shadow-secondary/25 hover:opacity-95 active:scale-[0.98]';
-      } else {
-        tarikBtnEl.className = 'w-full mt-2 py-3.5 rounded-2xl font-label-md text-sm font-bold uppercase tracking-wider text-center transition-all bg-primary text-white shadow-md shadow-primary/20 hover:bg-primary-container';
+      const newBtnText = progress.isEligible ? 'Tarik Saldo Sekarang' : 'Buka Menu Penarikan';
+      if (tarikBtnEl.textContent !== newBtnText) {
+        tarikBtnEl.textContent = newBtnText;
+      }
+      const newBtnClass = progress.isEligible 
+        ? 'w-full mt-2 py-3.5 rounded-2xl font-label-md text-sm font-bold uppercase tracking-wider text-center transition-all bg-secondary text-white shadow-lg shadow-secondary/25 hover:opacity-95 active:scale-[0.98]'
+        : 'w-full mt-2 py-3.5 rounded-2xl font-label-md text-sm font-bold uppercase tracking-wider text-center transition-all bg-primary text-white shadow-md shadow-primary/20 hover:bg-primary-container';
+      if (tarikBtnEl.className !== newBtnClass) {
+        tarikBtnEl.className = newBtnClass;
       }
     }
     if (recentWdEl) {
-      recentWdEl.innerHTML = this._renderRecentWithdrawalsHtml(withdrawals);
+      const newHtml = this._renderRecentWithdrawalsHtml(withdrawals);
+      if (recentWdEl.innerHTML !== newHtml) {
+        recentWdEl.innerHTML = newHtml;
+      }
     }
   }
 

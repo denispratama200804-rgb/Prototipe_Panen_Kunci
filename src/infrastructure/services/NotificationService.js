@@ -14,10 +14,12 @@ export class NotificationService {
     this._eventBus = eventBus;
     this._storage = storage;
 
-    // Cross-tab synchronization via storage event
+    // Cross-tab synchronization via storage event (dengan filter ketat userId)
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', (e) => {
-        if (e.key && (e.key.includes('notifications') || e.key.includes('transactions'))) {
+        if (!e.key) return;
+        const userId = this._getUserId();
+        if (e.key === `notifications_${userId}` || e.key === `transactions_${userId}`) {
           this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
         }
       });

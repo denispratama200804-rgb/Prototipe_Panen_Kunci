@@ -572,6 +572,10 @@ export class TarikSaldoView extends IComponent {
   }
 
   mount(container) {
+    this.destroy();
+    this._containerRef = container;
+    this._lastLockedState = this._walletService.getBalance() < this._walletService.minWithdrawal;
+
     const form = container.querySelector('#withdrawalForm');
     const amountInput = container.querySelector('#withdrawAmount');
     const accountInput = container.querySelector('#accountIdentifier');
@@ -1006,6 +1010,7 @@ export class TarikSaldoView extends IComponent {
     const handleUserUpdate = () => {
       const viewRoot = document.getElementById('app-view-root');
       if (viewRoot && window.location.hash.includes('/tarik-saldo')) {
+        this.destroy();
         viewRoot.innerHTML = this.render();
         this.mount(viewRoot);
       }
@@ -1015,13 +1020,34 @@ export class TarikSaldoView extends IComponent {
       this._eventBus.on(AppEvents.USER_UPDATED, handleUserUpdate);
     }
 
-    // Reaktif re-render saat saldo bertambah/berkurang (misal deposit diverifikasi admin)
+    // Reaktif update saldo: lakukan pembaruan DOM in-place tanpa menghapus elemen formulir
     const handleBalanceUpdate = () => {
-      const viewRoot = document.getElementById('app-view-root');
-      if (viewRoot && window.location.hash.includes('/tarik-saldo')) {
-        viewRoot.innerHTML = this.render();
-        this.mount(viewRoot);
+      const currentBalance = this._walletService.getBalance();
+      const currentMin = this._walletService.minWithdrawal;
+      const isLockedNow = currentBalance < currentMin;
+
+      // Hanya re-render jika status lock berubah (misal dari terkunci ke terbuka)
+      if (this._lastLockedState !== undefined && this._lastLockedState !== isLockedNow) {
+        this._lastLockedState = isLockedNow;
+        const viewRoot = document.getElementById('app-view-root');
+        if (viewRoot && window.location.hash.includes('/tarik-saldo')) {
+          this.destroy();
+          viewRoot.innerHTML = this.render();
+          this.mount(viewRoot);
+          return;
+        }
       }
+      this._lastLockedState = isLockedNow;
+
+      // Pembaruan teks saldo in-place
+      const displayBalance = container.querySelector('#displayBalance');
+      const formattedBal = `Rp ${currentBalance.toLocaleString('id-ID')}`;
+      if (displayBalance && displayBalance.textContent.trim() !== formattedBal) {
+        displayBalance.textContent = formattedBal;
+      }
+
+      // Pembaruan live summary breakdown
+      updateBreakdown();
     };
     this._handleBalanceUpdate = handleBalanceUpdate;
     if (this._eventBus) {
@@ -1034,12 +1060,15 @@ export class TarikSaldoView extends IComponent {
       const currentBalance = this._walletService.getBalance();
       const isLockedNow = currentBalance < currentMin;
 
-      // Jika status lock berubah atau config berubah, re-render tampilan agar lock state sinkron
-      const viewRoot = document.getElementById('app-view-root');
-      if (viewRoot && window.location.hash.includes('/tarik-saldo')) {
-        viewRoot.innerHTML = this.render();
-        this.mount(viewRoot);
-        return;
+      if (this._lastLockedState !== undefined && this._lastLockedState !== isLockedNow) {
+        this._lastLockedState = isLockedNow;
+        const viewRoot = document.getElementById('app-view-root');
+        if (viewRoot && window.location.hash.includes('/tarik-saldo')) {
+          this.destroy();
+          viewRoot.innerHTML = this.render();
+          this.mount(viewRoot);
+          return;
+        }
       }
 
       if (amountInput && !isLockedNow) {
@@ -1053,9 +1082,10 @@ export class TarikSaldoView extends IComponent {
     };
 
     this._handleConfigSync = handleConfigSync;
-    window.addEventListener('storage', (e) => {
+    this._storageConfigHandler = (e) => {
       if (e.key && e.key.includes('admin_config')) handleConfigSync();
-    });
+    };
+    window.addEventListener('storage', this._storageConfigHandler);
     window.addEventListener('panenkunci:config_updated', handleConfigSync);
   }
 
@@ -1063,6 +1093,10 @@ export class TarikSaldoView extends IComponent {
     if (this._handleConfigSync) {
       window.removeEventListener('panenkunci:config_updated', this._handleConfigSync);
       this._handleConfigSync = null;
+    }
+    if (this._storageConfigHandler) {
+      window.removeEventListener('storage', this._storageConfigHandler);
+      this._storageConfigHandler = null;
     }
     if (this._handleUserUpdate && this._eventBus) {
       this._eventBus.off(AppEvents.USER_UPDATED, this._handleUserUpdate);

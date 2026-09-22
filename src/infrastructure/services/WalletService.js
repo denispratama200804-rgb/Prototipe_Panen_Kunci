@@ -57,92 +57,106 @@ export class WalletService {
           this._broadcastChannel = new BroadcastChannel('panenkunci_sync');
           this._broadcastChannel.onmessage = async (event) => {
             const data = event.data;
-            if (data) {
-              if (data.type === 'CONFIG_UPDATED' && data.config) {
-                this._applyNewConfig(data.config);
-              } else if (
-                data.type === 'KEY_APPROVED' ||
-                data.type === 'KEY_REJECTED' ||
-                data.type === 'KEY_STATUS_UPDATED' ||
-                data.type === 'KEY_DELETED' ||
-                data.type === 'BALANCE_UPDATED' ||
-                data.type === 'WITHDRAWAL_CREATED' ||
-                data.type === 'TRANSACTION_UPDATED' ||
-                data.type === 'REFERRAL_COMMISSION_CREDITED'
-              ) {
-                this._loadWallet();
-                await this._syncFromRemote();
-                this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
-                  balance: this._balance,
-                  passiveBalance: this._passiveBalance,
-                  lifetime: this._lifetimeEarnings
-                });
+            if (!data) return;
 
-                if (data.type === 'REFERRAL_COMMISSION_CREDITED' && (!data.referrerId || data.referrerId === this._getUserId())) {
-                  const commAmountStr = data.amount ? `Rp ${Number(data.amount).toLocaleString('id-ID')}` : '';
-                  this._eventBus.emit('PAYOUT_PROCESSED', {
-                    type: 'success',
-                    status: 'success',
-                    amount: data.amount,
-                    title: 'Komisi Referral Masuk!',
-                    message: `Selamat! Anda menerima komisi referral ${commAmountStr} dari penarikan downline Anda.`
-                  });
-                }
-              } else if (data.type === 'WITHDRAWAL_APPROVED') {
-                if (Array.isArray(this._transactions)) {
-                  const matchTx = this._transactions.find(t => 
-                    t.id === data.transactionId || 
-                    (t.type === 'withdrawal' && String(t.status || '').toLowerCase() === 'pending' && Number(t.amount) === Number(data.amount))
-                  );
-                  if (matchTx) {
-                    matchTx.id = data.transactionId || matchTx.id;
-                    matchTx.status = 'success';
-                    if (data.proofImage) matchTx.proofImage = data.proofImage;
-                    if (data.proofNotes) matchTx.proofNotes = data.proofNotes;
-                    this._persist();
-                  }
-                }
-                this._loadWallet();
-                await this._syncFromRemote();
-                this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
-                  balance: this._balance,
-                  passiveBalance: this._passiveBalance,
-                  lifetime: this._lifetimeEarnings
-                });
-                this._eventBus.emit(AppEvents.TRANSACTIONS_LOADED, {
-                  transactions: this._transactions
-                });
-                const amountStr = data.amount ? `Rp ${Number(data.amount).toLocaleString('id-ID')}` : '';
+            const currentUserId = this._getUserId();
+
+            if (data.type === 'CONFIG_UPDATED' && data.config) {
+              this._applyNewConfig(data.config);
+              return;
+            }
+
+            // ISOLASI USER: Jika event membawa target userId dan tidak cocok dengan user aktif di tab ini, abaikan!
+            if (data.userId && currentUserId && data.userId !== currentUserId) {
+              return;
+            }
+
+            if (
+              data.type === 'KEY_APPROVED' ||
+              data.type === 'KEY_REJECTED' ||
+              data.type === 'KEY_STATUS_UPDATED' ||
+              data.type === 'KEY_DELETED' ||
+              data.type === 'BALANCE_UPDATED' ||
+              data.type === 'WITHDRAWAL_CREATED' ||
+              data.type === 'TRANSACTION_UPDATED' ||
+              data.type === 'REFERRAL_COMMISSION_CREDITED'
+            ) {
+              this._loadWallet();
+              await this._syncFromRemote();
+              this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+                balance: this._balance,
+                passiveBalance: this._passiveBalance,
+                lifetime: this._lifetimeEarnings
+              });
+
+              if (data.type === 'REFERRAL_COMMISSION_CREDITED' && (!data.referrerId || data.referrerId === currentUserId)) {
+                const commAmountStr = data.amount ? `Rp ${Number(data.amount).toLocaleString('id-ID')}` : '';
                 this._eventBus.emit('PAYOUT_PROCESSED', {
                   type: 'success',
                   status: 'success',
-                  transactionId: data.transactionId,
-                  userId: data.userId,
                   amount: data.amount,
-                  proofImage: data.proofImage || '',
-                  proofNotes: data.proofNotes || '',
-                  title: 'Penarikan Saldo Diterima!',
-                  message: `Pencairan dana ${amountStr} telah berhasil disetujui & ditransfer oleh Admin.`
-                });
-              } else if (data.type === 'WITHDRAWAL_REJECTED') {
-                this._loadWallet();
-                await this._syncFromRemote();
-                this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
-                  balance: this._balance,
-                  passiveBalance: this._passiveBalance,
-                  lifetime: this._lifetimeEarnings
-                });
-                const refundStr = data.refundAmount ? `sebesar Rp ${Number(data.refundAmount).toLocaleString('id-ID')} ` : '';
-                this._eventBus.emit('PAYOUT_PROCESSED', {
-                  type: 'error',
-                  status: 'failed',
-                  transactionId: data.transactionId,
-                  userId: data.userId,
-                  refundAmount: data.refundAmount,
-                  title: 'Permintaan Penarikan Ditolak',
-                  message: `Penarikan ${refundStr}ditolak (${data.reason || 'Data tidak sesuai'}). Dana telah dikembalikan ke saldo aktif Anda.`
+                  title: 'Komisi Referral Masuk!',
+                  message: `Selamat! Anda menerima komisi referral ${commAmountStr} dari penarikan downline Anda.`
                 });
               }
+            } else if (data.type === 'WITHDRAWAL_APPROVED') {
+              if (data.userId && currentUserId && data.userId !== currentUserId) return;
+
+              if (Array.isArray(this._transactions)) {
+                const matchTx = this._transactions.find(t => 
+                  t.id === data.transactionId || 
+                  (t.type === 'withdrawal' && String(t.status || '').toLowerCase() === 'pending' && Number(t.amount) === Number(data.amount))
+                );
+                if (matchTx) {
+                  matchTx.id = data.transactionId || matchTx.id;
+                  matchTx.status = 'success';
+                  if (data.proofImage) matchTx.proofImage = data.proofImage;
+                  if (data.proofNotes) matchTx.proofNotes = data.proofNotes;
+                  this._persist();
+                }
+              }
+              this._loadWallet();
+              await this._syncFromRemote();
+              this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+                balance: this._balance,
+                passiveBalance: this._passiveBalance,
+                lifetime: this._lifetimeEarnings
+              });
+              this._eventBus.emit(AppEvents.TRANSACTIONS_LOADED, {
+                transactions: this._transactions
+              });
+              const amountStr = data.amount ? `Rp ${Number(data.amount).toLocaleString('id-ID')}` : '';
+              this._eventBus.emit('PAYOUT_PROCESSED', {
+                type: 'success',
+                status: 'success',
+                transactionId: data.transactionId,
+                userId: data.userId,
+                amount: data.amount,
+                proofImage: data.proofImage || '',
+                proofNotes: data.proofNotes || '',
+                title: 'Penarikan Saldo Diterima!',
+                message: `Pencairan dana ${amountStr} telah berhasil disetujui & ditransfer oleh Admin.`
+              });
+            } else if (data.type === 'WITHDRAWAL_REJECTED') {
+              if (data.userId && currentUserId && data.userId !== currentUserId) return;
+
+              this._loadWallet();
+              await this._syncFromRemote();
+              this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+                balance: this._balance,
+                passiveBalance: this._passiveBalance,
+                lifetime: this._lifetimeEarnings
+              });
+              const refundStr = data.refundAmount ? `sebesar Rp ${Number(data.refundAmount).toLocaleString('id-ID')} ` : '';
+              this._eventBus.emit('PAYOUT_PROCESSED', {
+                type: 'error',
+                status: 'failed',
+                transactionId: data.transactionId,
+                userId: data.userId,
+                refundAmount: data.refundAmount,
+                title: 'Permintaan Penarikan Ditolak',
+                message: `Penarikan ${refundStr}ditolak (${data.reason || 'Data tidak sesuai'}). Dana telah dikembalikan ke saldo aktif Anda.`
+              });
             }
           };
         } catch (e) {
@@ -150,7 +164,7 @@ export class WalletService {
         }
       }
 
-      // 2. Cross-tab synchronization via storage event
+      // 2. Cross-tab synchronization via storage event (dengan filter ketat userId)
       window.addEventListener('storage', (e) => {
         if (e.key && e.key.includes('admin_config')) {
           const cfg = this._storage.get('admin_config');
@@ -163,19 +177,26 @@ export class WalletService {
             lifetime: this._lifetimeEarnings
           });
           window.dispatchEvent(new CustomEvent('panenkunci:config_updated', { detail: cfg }));
-        } else if (
-          e.key &&
-          (e.key.includes('wallet_balance') ||
-           e.key.includes('wallet_passive_balance') ||
-           e.key.includes('transactions') ||
-           e.key.includes('api_keys'))
-        ) {
-          this._loadWallet();
-          this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
-            balance: this._balance,
-            passiveBalance: this._passiveBalance,
-            lifetime: this._lifetimeEarnings
-          });
+        } else if (e.key) {
+          const currentUserId = this._getUserId();
+          if (!currentUserId) return;
+
+          // HANYA bereaksi jika storage event merupakan key milik user yang sedang aktif
+          const isUserStorageKey =
+            e.key === `wallet_balance_${currentUserId}` ||
+            e.key === `wallet_passive_balance_${currentUserId}` ||
+            e.key === `lifetime_earnings_${currentUserId}` ||
+            e.key === `transactions_${currentUserId}` ||
+            e.key === `api_keys_${currentUserId}`;
+
+          if (isUserStorageKey) {
+            this._loadWallet();
+            this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+              balance: this._balance,
+              passiveBalance: this._passiveBalance,
+              lifetime: this._lifetimeEarnings
+            });
+          }
         }
       });
 
@@ -533,9 +554,6 @@ export class WalletService {
       // Pastikan jika ada key valid/pending yang belum ada di riwayat mutasi transaksi, tambahkan ke transaksi
       this._ensureDepositTransactions(combinedKeys);
     }
-
-    // Sync remote transactions dari Supabase
-    this._syncFromRemote();
   }
 
   /**
@@ -628,7 +646,16 @@ export class WalletService {
     const userId = this._getUserId();
     if (!this._transactionRepository || !userId) return;
 
+    // Concurrency lock: cegah request sinkronisasi ganda yang berjalan bersamaan
+    if (this._isSyncing) return;
+    this._isSyncing = true;
+
     try {
+      const prevBalance = this._balance;
+      const prevPassive = this._passiveBalance;
+      const prevLifetime = this._lifetimeEarnings;
+      const prevTxCount = Array.isArray(this._transactions) ? this._transactions.length : 0;
+
       // Filter transaksi HANYA untuk pengguna yang sedang aktif
       const remoteTxs = await this._transactionRepository.getAll(userId);
 
@@ -842,17 +869,30 @@ export class WalletService {
 
       this._persist();
 
-      this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
-        balance: this._balance,
-        passiveBalance: this._passiveBalance,
-        lifetime: this._lifetimeEarnings
-      });
+      // Change Detection: HANYA pancarkan event jika terjadi perubahan nilai riil
+      const balanceChanged =
+        prevBalance !== this._balance ||
+        prevPassive !== this._passiveBalance ||
+        prevLifetime !== this._lifetimeEarnings;
 
-      this._eventBus.emit(AppEvents.TRANSACTIONS_LOADED, {
-        transactions: this._transactions
-      });
+      if (balanceChanged) {
+        this._eventBus.emit(AppEvents.BALANCE_UPDATED, {
+          balance: this._balance,
+          passiveBalance: this._passiveBalance,
+          lifetime: this._lifetimeEarnings
+        });
+      }
+
+      const txsChanged = prevTxCount !== this._transactions.length || balanceChanged;
+      if (txsChanged) {
+        this._eventBus.emit(AppEvents.TRANSACTIONS_LOADED, {
+          transactions: this._transactions
+        });
+      }
     } catch (err) {
       console.warn('[WalletService] Remote tx sync fallback to local cache:', err.message);
+    } finally {
+      this._isSyncing = false;
     }
   }
 
@@ -864,10 +904,14 @@ export class WalletService {
       this._storage.set(`lifetime_earnings_${userId}`, this._lifetimeEarnings);
       this._storage.set(`transactions_${userId}`, this._transactions.map(t => t.toJSON()));
     }
-    this._storage.set('wallet_balance', this._balance);
-    this._storage.set('wallet_passive_balance', this._passiveBalance);
-    this._storage.set('lifetime_earnings', this._lifetimeEarnings);
-    this._storage.set('transactions', this._transactions.map(t => t.toJSON()));
+    // Hanya simpan ke storage global jika user yang sedang aktif di session adalah pemilik data ini
+    const currentUser = this._authService ? this._authService.getCurrentUser() : null;
+    if (!currentUser || !userId || currentUser.id === userId) {
+      this._storage.set('wallet_balance', this._balance);
+      this._storage.set('wallet_passive_balance', this._passiveBalance);
+      this._storage.set('lifetime_earnings', this._lifetimeEarnings);
+      this._storage.set('transactions', this._transactions.map(t => t.toJSON()));
+    }
   }
 
   /**

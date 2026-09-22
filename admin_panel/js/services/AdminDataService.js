@@ -475,6 +475,7 @@ export class AdminDataService {
       this._broadcastSync({
         type: 'KEY_STATUS_UPDATED',
         id,
+        userId: keys[idx].userId,
         newStatus
       });
 
@@ -1022,7 +1023,8 @@ export class AdminDataService {
 
     this._broadcastSync({
       type: 'KEY_DELETED',
-      id
+      id,
+      userId: deletedKey?.userId
     });
 
     // Sinkronkan penghapusan ke Supabase

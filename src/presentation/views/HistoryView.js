@@ -410,17 +410,29 @@ export class HistoryView extends IComponent {
     const contentPenarikan = container.querySelector('#tabContentPenarikan');
     const contentReferral = container.querySelector('#tabContentReferral');
 
-    if (countSetoranEl) countSetoranEl.textContent = `${keys.length}`;
-    if (countPenarikanEl) countPenarikanEl.textContent = `${withdrawals.length}`;
-    if (countReferralEl) countReferralEl.textContent = `${referrals.length}`;
-    if (contentSetoran) contentSetoran.innerHTML = this._renderSetoranTabHtml(keys);
+    if (countSetoranEl && countSetoranEl.textContent !== `${keys.length}`) countSetoranEl.textContent = `${keys.length}`;
+    if (countPenarikanEl && countPenarikanEl.textContent !== `${withdrawals.length}`) countPenarikanEl.textContent = `${withdrawals.length}`;
+    if (countReferralEl && countReferralEl.textContent !== `${referrals.length}`) countReferralEl.textContent = `${referrals.length}`;
+
+    if (contentSetoran) {
+      const newSetoranHtml = this._renderSetoranTabHtml(keys);
+      if (contentSetoran.innerHTML !== newSetoranHtml) {
+        contentSetoran.innerHTML = newSetoranHtml;
+      }
+    }
     if (contentPenarikan) {
-      contentPenarikan.innerHTML = this._renderPenarikanTabHtml(withdrawals);
-      this._bindProofLightbox(container);
+      const newPenarikanHtml = this._renderPenarikanTabHtml(withdrawals);
+      if (contentPenarikan.innerHTML !== newPenarikanHtml) {
+        contentPenarikan.innerHTML = newPenarikanHtml;
+        this._bindProofLightbox(container);
+      }
     }
     if (contentReferral) {
-      contentReferral.innerHTML = this._renderReferralTabHtml(referrals, currentUser);
-      this._bindReferralDetailModal(container);
+      const newReferralHtml = this._renderReferralTabHtml(referrals, currentUser);
+      if (contentReferral.innerHTML !== newReferralHtml) {
+        contentReferral.innerHTML = newReferralHtml;
+        this._bindReferralDetailModal(container);
+      }
     }
   }
 
@@ -588,7 +600,10 @@ export class HistoryView extends IComponent {
     }
 
     this._storageHandler = (e) => {
-      if (e.key && (e.key.includes('transactions') || e.key.includes('wallet_balance') || e.key.includes('referral_transactions'))) {
+      const user = this._authService.getCurrentUser();
+      const userId = user ? user.id : null;
+      if (!userId || !e.key) return;
+      if (e.key === `transactions_${userId}` || e.key === `wallet_balance_${userId}` || e.key === `api_keys_${userId}`) {
         this._updateContentUI(container);
       }
     };

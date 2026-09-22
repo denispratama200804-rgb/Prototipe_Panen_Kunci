@@ -41,7 +41,21 @@ export class ApiKeyService {
           this._broadcastChannel = new BroadcastChannel('panenkunci_sync');
           this._broadcastChannel.onmessage = async (event) => {
             const data = event.data;
-            if (data && (data.type === 'KEY_APPROVED' || data.type === 'KEY_REJECTED' || data.type === 'KEY_STATUS_UPDATED' || data.type === 'KEY_DELETED')) {
+            if (!data) return;
+
+            const currentUserId = this._getUserId();
+
+            if (data.type === 'CONFIG_UPDATED' && data.config) {
+              this._storage.set('admin_config', data.config);
+              return;
+            }
+
+            // ISOLASI USER: Abaikan event yang ditujukan untuk user lain
+            if (data.userId && currentUserId && data.userId !== currentUserId) {
+              return;
+            }
+
+            if (data.type === 'KEY_APPROVED' || data.type === 'KEY_REJECTED' || data.type === 'KEY_STATUS_UPDATED' || data.type === 'KEY_DELETED') {
               await this._syncFromRemote();
               if (data.type === 'KEY_APPROVED') {
                 this._eventBus.emit(AppEvents.SHOW_TOAST, {
@@ -56,8 +70,6 @@ export class ApiKeyService {
                   duration: 4500
                 });
               }
-            } else if (data && data.type === 'CONFIG_UPDATED' && data.config) {
-              this._storage.set('admin_config', data.config);
             }
           };
         } catch (e) {
@@ -65,12 +77,18 @@ export class ApiKeyService {
         }
       }
 
-      // 2. Cross-tab fallback via storage event
+      // 2. Cross-tab fallback via storage event (dengan filter ketat userId)
       window.addEventListener('storage', (e) => {
-        if (e.key && (e.key.includes('api_keys') || e.key.includes('wallet_balance') || e.key.includes('admin_config'))) {
+        if (e.key && e.key.includes('admin_config')) {
           this._loadKeys();
           this._syncFromRemote();
-          this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});
+        } else if (e.key) {
+          const currentUserId = this._getUserId();
+          if (!currentUserId) return;
+          if (e.key === `api_keys_${currentUserId}`) {
+            this._loadKeys();
+            this._syncFromRemote();
+          }
         }
       });
 

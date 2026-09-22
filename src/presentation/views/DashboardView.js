@@ -365,17 +365,29 @@ export class DashboardView extends IComponent {
     const recentTxContainer = container.querySelector('#dashboard-recent-tx');
 
     if (balanceEl) {
-      balanceEl.textContent = `Rp ${this._walletService.getBalance().toLocaleString('id-ID')}`;
+      const newBal = `Rp ${this._walletService.getBalance().toLocaleString('id-ID')}`;
+      if (balanceEl.textContent !== newBal) {
+        balanceEl.textContent = newBal;
+      }
     }
     if (passiveEl) {
-      passiveEl.textContent = `Rp ${this._walletService.getPassiveBalance().toLocaleString('id-ID')}`;
+      const newPass = `Rp ${this._walletService.getPassiveBalance().toLocaleString('id-ID')}`;
+      if (passiveEl.textContent !== newPass) {
+        passiveEl.textContent = newPass;
+      }
     }
     if (validCountEl) {
-      validCountEl.textContent = `${this._apiKeyService.getTodayValidCount()}`;
+      const newCount = `${this._apiKeyService.getTodayValidCount()}`;
+      if (validCountEl.textContent !== newCount) {
+        validCountEl.textContent = newCount;
+      }
     }
     if (recentTxContainer) {
       const recentActivities = this._getCombinedRecentActivities().slice(0, 5);
-      recentTxContainer.innerHTML = this._renderRecentTxHtml(recentActivities);
+      const newHtml = this._renderRecentTxHtml(recentActivities);
+      if (recentTxContainer.innerHTML !== newHtml) {
+        recentTxContainer.innerHTML = newHtml;
+      }
     }
   }
 
