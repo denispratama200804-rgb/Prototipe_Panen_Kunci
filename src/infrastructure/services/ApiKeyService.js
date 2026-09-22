@@ -406,7 +406,14 @@ export class ApiKeyService {
       }
     }
 
-    const holdDurationDays = isReferred ? 2 : 3;
+    const defaultNormal = (config && config.holdDaysNormal !== undefined && !isNaN(Number(config.holdDaysNormal)))
+      ? Number(config.holdDaysNormal)
+      : 3;
+    const defaultReferral = (config && config.holdDaysReferral !== undefined && !isNaN(Number(config.holdDaysReferral)))
+      ? Number(config.holdDaysReferral)
+      : 2;
+
+    const holdDurationDays = isReferred ? defaultReferral : defaultNormal;
     const holdUntil = new Date(Date.now() + holdDurationDays * 24 * 60 * 60 * 1000).toISOString();
     const newApiKey = new ApiKey({
       id: 'key_' + Math.random().toString(36).substring(2, 9),

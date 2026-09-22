@@ -1195,13 +1195,16 @@ export class AdminDataService {
       const isKieActive = syncRes.isValidKey === true;
       const isCredit80 = (liveCredit === 80 || liveCredit >= 80);
 
-      // Hitung masa pemantauan (2 hari jika ada referral, 3 hari standar)
-      let holdDays = key.holdDurationDays || 3;
+      // Hitung masa pemantauan (mengikuti konfigurasi sistem admin)
+      const config = this.getConfig();
+      const defaultNormal = config.holdDaysNormal ?? 3;
+      const defaultReferral = config.holdDaysReferral ?? 2;
+      let holdDays = key.holdDurationDays || defaultNormal;
       if (!key.holdDurationDays && key.userId) {
         const users = this.getUsers();
         const u = users.find(user => user.id === key.userId || (key.userEmail && user.email === key.userEmail));
         if (u && (u.referredBy || u.referred_by)) {
-          holdDays = 2;
+          holdDays = defaultReferral;
         }
       }
       const holdTime = new Date(key.holdUntil || (new Date(key.createdAt).getTime() + holdDays * 24 * 60 * 60 * 1000)).getTime();
@@ -2554,6 +2557,8 @@ export class AdminDataService {
       feeOvo: 1000,
       feeBank: 2500,
       referralPercent: 5,
+      holdDaysNormal: 3,
+      holdDaysReferral: 2,
       validationMode: 'simulation',
       autoApproveThreshold: 0
     });

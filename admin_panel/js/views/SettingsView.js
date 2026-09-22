@@ -164,6 +164,155 @@ export class SettingsView {
               </div>
             </div>
 
+            <!-- Pengaturan Masa Tunggu Konversi Saldo Pasif ke Aktif (Holding Period) -->
+            <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-indigo-500/10 via-slate-900/90 to-slate-900/60 border border-indigo-500/30 space-y-4 relative overflow-hidden shadow-lg">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/30 shadow-xs">
+                    <span class="material-symbols-outlined text-xl">hourglass_top</span>
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <label class="block text-xs font-bold text-indigo-300 uppercase tracking-wider">
+                        Masa Tunggu Konversi Saldo Pasif (Hari)
+                      </label>
+                      <span class="px-2 py-0.2 text-[10px] font-bold rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        Otomatis ke Saldo Aktif
+                      </span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                      Jangka waktu holding sebelum saldo pasif dari setoran API Key otomatis dikonversi menjadi saldo aktif yang siap dicairkan.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Grid 2 Kolom: Standar vs Dengan Referral -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <!-- Kolom 1: Masa Tunggu Standar (Tanpa Referral) -->
+                <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-sm text-slate-400">person</span>
+                      <span class="text-xs font-bold text-slate-200">Standar (Tanpa Referral)</span>
+                    </div>
+                    <div class="flex items-center gap-1 flex-wrap">
+                      <span class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mr-0.5">Preset:</span>
+                      <button type="button" class="btn-hold-normal-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="1">1h</button>
+                      <button type="button" class="btn-hold-normal-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="2">2h</button>
+                      <button type="button" class="btn-hold-normal-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="3">3h</button>
+                      <button type="button" class="btn-hold-normal-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="5">5h</button>
+                      <button type="button" class="btn-hold-normal-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="7">7h</button>
+                    </div>
+                  </div>
+
+                  <p class="text-[11px] text-slate-400 leading-tight">Waktu holding untuk user reguler yang mendaftar tanpa kode referral.</p>
+
+                  <!-- Stepper Normal -->
+                  <div class="flex items-center gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      id="btnDecHoldNormal"
+                      title="Kurangi 1 hari"
+                      class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-indigo-400 flex items-center justify-center font-bold text-lg border border-slate-700 active:scale-95 transition-all cursor-pointer select-none shrink-0"
+                    >
+                      <span class="material-symbols-outlined text-lg">remove</span>
+                    </button>
+
+                    <div class="relative flex-1">
+                      <input
+                        type="number"
+                        name="holdDaysNormal"
+                        id="inputHoldDaysNormal"
+                        value="${config.holdDaysNormal ?? 3}"
+                        step="1"
+                        min="1"
+                        max="30"
+                        class="w-full text-center pl-3 pr-10 py-2 bg-slate-900 border border-indigo-500/40 rounded-xl text-base sm:text-sm font-extrabold text-indigo-300 focus:outline-none focus:border-indigo-400 font-mono transition-colors"
+                      />
+                      <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-indigo-400 font-sans">Hari</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      id="btnIncHoldNormal"
+                      title="Tambah 1 hari"
+                      class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-indigo-400 flex items-center justify-center font-bold text-lg border border-slate-700 active:scale-95 transition-all cursor-pointer select-none shrink-0"
+                    >
+                      <span class="material-symbols-outlined text-lg">add</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Kolom 2: Masa Tunggu dengan Kode Referral (Diskon) -->
+                <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-sm text-emerald-400">group_add</span>
+                      <span class="text-xs font-bold text-emerald-300">Dengan Kode Referral</span>
+                      <span class="px-1.5 py-0.2 text-[9px] font-bold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Lebih Cepat</span>
+                    </div>
+                    <div class="flex items-center gap-1 flex-wrap">
+                      <span class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mr-0.5">Preset:</span>
+                      <button type="button" class="btn-hold-ref-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="1">1h</button>
+                      <button type="button" class="btn-hold-ref-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="2">2h</button>
+                      <button type="button" class="btn-hold-ref-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="3">3h</button>
+                      <button type="button" class="btn-hold-ref-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="4">4h</button>
+                      <button type="button" class="btn-hold-ref-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="5">5h</button>
+                    </div>
+                  </div>
+
+                  <p class="text-[11px] text-slate-400 leading-tight">Waktu holding lebih singkat untuk user yang mendaftar memakai kode referral.</p>
+
+                  <!-- Stepper Referral -->
+                  <div class="flex items-center gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      id="btnDecHoldReferral"
+                      title="Kurangi 1 hari"
+                      class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-emerald-400 flex items-center justify-center font-bold text-lg border border-slate-700 active:scale-95 transition-all cursor-pointer select-none shrink-0"
+                    >
+                      <span class="material-symbols-outlined text-lg">remove</span>
+                    </button>
+
+                    <div class="relative flex-1">
+                      <input
+                        type="number"
+                        name="holdDaysReferral"
+                        id="inputHoldDaysReferral"
+                        value="${config.holdDaysReferral ?? 2}"
+                        step="1"
+                        min="1"
+                        max="30"
+                        class="w-full text-center pl-3 pr-10 py-2 bg-slate-900 border border-emerald-500/40 rounded-xl text-base sm:text-sm font-extrabold text-emerald-300 focus:outline-none focus:border-emerald-400 font-mono transition-colors"
+                      />
+                      <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-400 font-sans">Hari</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      id="btnIncHoldReferral"
+                      title="Tambah 1 hari"
+                      class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-emerald-400 flex items-center justify-center font-bold text-lg border border-slate-700 active:scale-95 transition-all cursor-pointer select-none shrink-0"
+                    >
+                      <span class="material-symbols-outlined text-lg">add</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Live Simulation Preview Box -->
+              <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 px-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <span class="text-slate-400 font-sans text-[11px] flex items-center gap-1.5">
+                  <span class="material-symbols-outlined text-indigo-400 text-sm shrink-0">speed</span>
+                  <span>Simulasi Konversi Saldo Pasif:</span>
+                </span>
+                <span class="font-mono text-[11px] text-slate-200" id="holdSimulationPreview">
+                  Standar: <strong class="text-indigo-300">${config.holdDaysNormal ?? 3} Hari</strong> ➔ Referral: <strong class="text-emerald-400">${config.holdDaysReferral ?? 2} Hari</strong> (${Math.max(0, (config.holdDaysNormal ?? 3) - (config.holdDaysReferral ?? 2))} hari lebih cepat)
+                </span>
+              </div>
+            </div>
+
             <!-- Biaya Admin E-Wallet & Bank Grid -->
             <div>
               <div class="flex items-center justify-between mb-3">
@@ -362,6 +511,101 @@ export class SettingsView {
       });
     });
 
+    // ── Stepper & Presets: Masa Tunggu Konversi Saldo Pasif (Hari) ──
+    const inputHoldNormal = container.querySelector('#inputHoldDaysNormal');
+    const inputHoldRef = container.querySelector('#inputHoldDaysReferral');
+    const btnDecHoldNormal = container.querySelector('#btnDecHoldNormal');
+    const btnIncHoldNormal = container.querySelector('#btnIncHoldNormal');
+    const btnDecHoldRef = container.querySelector('#btnDecHoldReferral');
+    const btnIncHoldRef = container.querySelector('#btnIncHoldReferral');
+    const holdPreviewEl = container.querySelector('#holdSimulationPreview');
+    const presetNormalBtns = container.querySelectorAll('.btn-hold-normal-preset');
+    const presetRefBtns = container.querySelectorAll('.btn-hold-ref-preset');
+
+    const updateHoldPreview = (normalDays, refDays) => {
+      const norm = Math.max(1, Math.min(30, Math.round(Number(normalDays) || 3)));
+      const ref = Math.max(1, Math.min(30, Math.round(Number(refDays) || 2)));
+      if (holdPreviewEl) {
+        const diff = Math.max(0, norm - ref);
+        const diffText = diff > 0 ? `(${diff} hari lebih cepat)` : '(durasi sama)';
+        holdPreviewEl.innerHTML = `Standar: <strong class="text-indigo-300">${norm} Hari</strong> ➔ Referral: <strong class="text-emerald-400">${ref} Hari</strong> ${diffText}`;
+      }
+    };
+
+    if (inputHoldNormal) {
+      inputHoldNormal.addEventListener('input', () => updateHoldPreview(inputHoldNormal.value, inputHoldRef?.value));
+      inputHoldNormal.addEventListener('change', () => {
+        let val = Math.max(1, Math.min(30, Math.round(Number(inputHoldNormal.value) || 3)));
+        inputHoldNormal.value = val;
+        updateHoldPreview(val, inputHoldRef?.value);
+      });
+    }
+
+    if (inputHoldRef) {
+      inputHoldRef.addEventListener('input', () => updateHoldPreview(inputHoldNormal?.value, inputHoldRef.value));
+      inputHoldRef.addEventListener('change', () => {
+        let val = Math.max(1, Math.min(30, Math.round(Number(inputHoldRef.value) || 2)));
+        inputHoldRef.value = val;
+        updateHoldPreview(inputHoldNormal?.value, val);
+      });
+    }
+
+    if (btnDecHoldNormal && inputHoldNormal) {
+      btnDecHoldNormal.addEventListener('click', () => {
+        let cur = Number(inputHoldNormal.value) || 3;
+        let next = Math.max(1, cur - 1);
+        inputHoldNormal.value = next;
+        updateHoldPreview(next, inputHoldRef?.value);
+      });
+    }
+
+    if (btnIncHoldNormal && inputHoldNormal) {
+      btnIncHoldNormal.addEventListener('click', () => {
+        let cur = Number(inputHoldNormal.value) || 3;
+        let next = Math.min(30, cur + 1);
+        inputHoldNormal.value = next;
+        updateHoldPreview(next, inputHoldRef?.value);
+      });
+    }
+
+    if (btnDecHoldRef && inputHoldRef) {
+      btnDecHoldRef.addEventListener('click', () => {
+        let cur = Number(inputHoldRef.value) || 2;
+        let next = Math.max(1, cur - 1);
+        inputHoldRef.value = next;
+        updateHoldPreview(inputHoldNormal?.value, next);
+      });
+    }
+
+    if (btnIncHoldRef && inputHoldRef) {
+      btnIncHoldRef.addEventListener('click', () => {
+        let cur = Number(inputHoldRef.value) || 2;
+        let next = Math.min(30, cur + 1);
+        inputHoldRef.value = next;
+        updateHoldPreview(inputHoldNormal?.value, next);
+      });
+    }
+
+    presetNormalBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-val');
+        if (inputHoldNormal && val !== null) {
+          inputHoldNormal.value = val;
+          updateHoldPreview(val, inputHoldRef?.value);
+        }
+      });
+    });
+
+    presetRefBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-val');
+        if (inputHoldRef && val !== null) {
+          inputHoldRef.value = val;
+          updateHoldPreview(inputHoldNormal?.value, val);
+        }
+      });
+    });
+
     // Sinkronkan form dengan config terbaru dari database di background
     this.dataService.fetchConfigFromSupabase().then(latestCfg => {
       if (!latestCfg || !container) return;
@@ -374,6 +618,10 @@ export class SettingsView {
         form.elements['referralPercent'].value = latestCfg.referralPercent ?? 5;
         updatePreview(latestCfg.referralPercent ?? 5);
       }
+      if (form.elements['holdDaysNormal']) form.elements['holdDaysNormal'].value = latestCfg.holdDaysNormal ?? 3;
+      if (form.elements['holdDaysReferral']) form.elements['holdDaysReferral'].value = latestCfg.holdDaysReferral ?? 2;
+      updateHoldPreview(latestCfg.holdDaysNormal ?? 3, latestCfg.holdDaysReferral ?? 2);
+
       if (form.elements['feeDana']) form.elements['feeDana'].value = latestCfg.feeDana ?? 1000;
       if (form.elements['feeGopay']) form.elements['feeGopay'].value = latestCfg.feeGopay ?? 1000;
       if (form.elements['feeOvo']) form.elements['feeOvo'].value = latestCfg.feeOvo ?? 1000;
@@ -398,6 +646,8 @@ export class SettingsView {
           rewardPerKey: getNum(fd.get('rewardPerKey'), 3000),
           minWithdrawal: getNum(fd.get('minWithdrawal'), 50000),
           referralPercent: getNum(fd.get('referralPercent'), 5),
+          holdDaysNormal: getNum(fd.get('holdDaysNormal'), 3),
+          holdDaysReferral: getNum(fd.get('holdDaysReferral'), 2),
           feeDana: getNum(fd.get('feeDana'), 1000),
           feeGopay: getNum(fd.get('feeGopay'), 1000),
           feeOvo: getNum(fd.get('feeOvo'), 1000),
@@ -418,8 +668,11 @@ export class SettingsView {
           form.elements['referralPercent'].value = newConfig.referralPercent;
           updatePreview(newConfig.referralPercent);
         }
+        if (form.elements['holdDaysNormal']) form.elements['holdDaysNormal'].value = newConfig.holdDaysNormal;
+        if (form.elements['holdDaysReferral']) form.elements['holdDaysReferral'].value = newConfig.holdDaysReferral;
+        updateHoldPreview(newConfig.holdDaysNormal, newConfig.holdDaysReferral);
 
-        this.toast.success(`Pengaturan tersimpan! Min penarikan Rp ${newConfig.minWithdrawal.toLocaleString('id-ID')} & komisi referral ${newConfig.referralPercent}% berhasil disinkronkan ke seluruh aplikasi!`, 'Tersimpan');
+        this.toast.success(`Pengaturan tersimpan! Konversi saldo pasif: ${newConfig.holdDaysNormal} hari (standar) & ${newConfig.holdDaysReferral} hari (referral) berhasil disinkronkan ke seluruh sistem!`, 'Tersimpan');
       });
     }
   }
