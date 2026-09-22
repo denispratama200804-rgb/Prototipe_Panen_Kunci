@@ -203,6 +203,7 @@ export class AdminDataService {
     const validKeys = apiKeys.filter(k => k.status === 'valid');
     const invalidKeys = apiKeys.filter(k => k.status === 'invalid');
     const usedKeys = apiKeys.filter(k => k.status === 'used');
+    const pendingKeys = apiKeys.filter(k => k.status === 'pending');
     const totalCredits = validKeys.reduce((sum, k) => {
       const c = (k.credits !== null && k.credits !== undefined && !isNaN(Number(k.credits))) ? Number(k.credits) : 80;
       return sum + c;
