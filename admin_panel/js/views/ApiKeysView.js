@@ -15,6 +15,7 @@ export class ApiKeysView {
     this.isSyncingKie = false;
     this.isAutoValidating = false;
     this.isInspectingMidnight = false;
+    this.isRefreshing = false;
   }
 
   destroy() {
@@ -297,7 +298,7 @@ export class ApiKeysView {
                 }"
                 ${this.isSyncingKie ? 'disabled' : ''}
               >
-                <span class="material-symbols-outlined text-sm ${this.isSyncingKie ? 'animate-spin text-sky-400' : ''}">sync_saved_locally</span>
+                <span class="material-symbols-outlined text-sm ${this.isSyncingKie ? 'text-sky-400' : ''}">sync_saved_locally</span>
                 <span>${this.isSyncingKie ? 'Sinkron Kie...' : 'Sinkron Kie.ai'}</span>
               </button>
               <button
@@ -357,11 +358,20 @@ export class ApiKeysView {
               </div>
             </div>
 
-            <!-- Right Info Badge -->
+            <!-- Right: Refresh Button -->
             <div class="flex items-center gap-2">
-              <span class="text-[11px] text-slate-400 font-mono bg-slate-800/80 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg border border-slate-700/60 hidden sm:inline">
-                ${keys.length} data ditampilkan
-              </span>
+              <button
+                type="button"
+                id="btn-refresh-api-keys"
+                title="Segarkan data API Key (${keys.length} data)"
+                class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/60 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95 ${
+                  this.isRefreshing ? 'opacity-70 cursor-not-allowed' : ''
+                }"
+                ${this.isRefreshing ? 'disabled' : ''}
+              >
+                <span class="material-symbols-outlined text-xs text-slate-400">refresh</span>
+                <span>${this.isRefreshing ? 'Memuat...' : 'Refresh'}</span>
+              </button>
             </div>
           </div>
 
@@ -703,7 +713,47 @@ export class ApiKeysView {
       });
     }
 
-    // Filter Kunci Pasif / Kunci Aktif / Semua Kunci
+    // Tombol Refresh API Keys di Card Header
+    const refreshKeysBtn = container.querySelector('#btn-refresh-api-keys');
+    if (refreshKeysBtn) {
+      refreshKeysBtn.addEventListener('click', async () => {
+        this.isRefreshing = true;
+        refreshCallback();
+        try {
+          await this.dataService.fetchApiKeysFromSupabase();
+          if (typeof this.dataService.autoValidateReadyKeys === 'function') {
+            await this.dataService.autoValidateReadyKeys();
+          }
+          this.toast.success('Data API Key berhasil disegarkan!', 'Refresh');
+        } catch (err) {
+          this.toast.error('Gagal menyegarkan data: ' + (err.message || err));
+        } finally {
+          this.isRefreshing = false;
+          refreshCallback();
+        }
+      });
+    }
+
+    // Tombol Sinkron DB (Supabase) di Header Atas
+    const syncDbBtn = container.querySelector('#btn-sync-supabase-keys');
+    if (syncDbBtn) {
+      syncDbBtn.addEventListener('click', async () => {
+        this.isSyncing = true;
+        refreshCallback();
+        try {
+          await this.dataService.fetchApiKeysFromSupabase();
+          if (typeof this.dataService.autoValidateReadyKeys === 'function') {
+            await this.dataService.autoValidateReadyKeys();
+          }
+          this.toast.success('Data API Key berhasil disinkronkan dari database!', 'Sinkron DB');
+        } catch (err) {
+          this.toast.error('Gagal menyinkronkan data: ' + (err.message || err));
+        } finally {
+          this.isSyncing = false;
+          refreshCallback();
+        }
+      });
+    }
     container.querySelectorAll('[data-filter]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
