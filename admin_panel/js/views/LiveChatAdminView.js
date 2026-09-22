@@ -135,7 +135,9 @@ export class LiveChatAdminView {
     return filtered.map(conv => {
       const isSelected = conv.userId === this.selectedUserId;
       const lastMsgText = conv.lastMessage ? conv.lastMessage.text : 'Memulai obrolan...';
-      const lastMsgTime = conv.lastMessage ? conv.lastMessage.timeStr : '';
+      const lastMsgTime = conv.lastMessage
+        ? this._formatConversationTime(conv.lastMessage.timestamp, conv.lastMessage.timeStr)
+        : '';
       const unread = conv.unreadCount || 0;
 
       return `
@@ -306,12 +308,33 @@ export class LiveChatAdminView {
       `;
     }
 
-    return messages.map(msg => {
+    let lastDateKey = null;
+    let html = '';
+
+    messages.forEach(msg => {
+      const ts = msg.timestamp || (msg.created_at ? new Date(msg.created_at).getTime() : null);
+      const dateBadge = this._formatMessageDateBadge(ts);
+      const dateKey = ts ? new Date(ts).toDateString() : 'default';
+
+      // Tampilkan divider tanggal seperti WhatsApp / Telegram jika berpindah tanggal
+      if (dateKey !== lastDateKey) {
+        lastDateKey = dateKey;
+        html += `
+          <div data-date-divider="true" data-date-key="${dateKey}" class="flex justify-center my-3 select-none">
+            <div class="px-3.5 py-1 rounded-full text-[11px] font-semibold bg-slate-800/90 text-slate-300 border border-slate-700/60 shadow-sm flex items-center gap-1.5 backdrop-blur-xs">
+              <span class="material-symbols-outlined text-[13px] text-indigo-400">calendar_today</span>
+              <span>${dateBadge}</span>
+            </div>
+          </div>
+        `;
+      }
+
       const isAdmin = msg.sender === 'admin';
+      const fullDateTitle = ts ? new Date(ts).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' }) : (msg.timeStr || '');
 
       if (isAdmin) {
         // Admin bubble: on the right (Indigo gradient bubble matching Admin theme)
-        return `
+        html += `
           <div class="flex justify-end w-full animate-fade-in">
             <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-2.5 rounded-2xl rounded-tr-xs max-w-[85%] sm:max-w-xl shadow-md shadow-indigo-600/20 flex flex-col">
               <span class="text-[11px] font-bold text-indigo-200 mb-0.5 flex items-center gap-1.5">
@@ -319,7 +342,7 @@ export class LiveChatAdminView {
                 Admin Support (Anda)
               </span>
               <span class="text-xs sm:text-sm leading-relaxed break-words select-text">${this._escape(msg.text)}</span>
-              <div class="flex items-center justify-end gap-1 mt-1 text-[10px] text-indigo-200 font-mono">
+              <div class="flex items-center justify-end gap-1 mt-1 text-[10px] text-indigo-200 font-mono" title="${fullDateTitle}">
                 <span>${msg.timeStr || ''}</span>
                 <span class="material-symbols-outlined text-[13px]">done_all</span>
               </div>
@@ -329,7 +352,7 @@ export class LiveChatAdminView {
       } else {
         // User bubble: on the left with initial green badge on the left side
         const userInitial = (conv.userName || 'U').charAt(0).toUpperCase();
-        return `
+        html += `
           <div class="flex justify-start items-end gap-2.5 w-full animate-fade-in">
             <div class="chat-user-avatar-initial w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold shrink-0">
               ${userInitial}
@@ -340,12 +363,74 @@ export class LiveChatAdminView {
                 ${conv.userName || 'Pengguna'}
               </span>
               <span class="chat-user-bubble-text text-xs sm:text-sm leading-relaxed break-words select-text">${this._escape(msg.text)}</span>
-              <span class="chat-user-bubble-time text-[10px] font-mono text-right mt-1.5">${msg.timeStr || ''}</span>
+              <span class="chat-user-bubble-time text-[10px] font-mono text-right mt-1.5" title="${fullDateTitle}">${msg.timeStr || ''}</span>
             </div>
           </div>
         `;
       }
-    }).join('');
+    });
+
+    return html;
+  }
+
+  _formatMessageDateBadge(timestamp) {
+    if (!timestamp) return 'Hari Ini';
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Hari Ini';
+
+    const now = new Date();
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    const formattedDate = date.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    if (isToday) {
+      return `Hari Ini, ${formattedDate}`;
+    } else if (isYesterday) {
+      return `Kemarin, ${formattedDate}`;
+    } else {
+      return formattedDate;
+    }
+  }
+
+  _formatConversationTime(timestamp, defaultTimeStr = '') {
+    if (!timestamp) return defaultTimeStr;
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return defaultTimeStr;
+
+    const now = new Date();
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    if (isToday) {
+      return defaultTimeStr || date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    } else if (isYesterday) {
+      return 'Kemarin';
+    } else {
+      return date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    }
   }
 
   _renderEmptyState() {

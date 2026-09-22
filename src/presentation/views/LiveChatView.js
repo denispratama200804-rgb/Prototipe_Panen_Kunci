@@ -149,15 +149,37 @@ export class LiveChatView extends IComponent {
       `;
     }
 
-    return messages.map(msg => {
+    let lastDateKey = null;
+    let html = '';
+
+    messages.forEach(msg => {
+      const ts = msg.timestamp || (msg.created_at ? new Date(msg.created_at).getTime() : null);
+      const dateBadge = this._formatMessageDateBadge(ts);
+      const dateKey = ts ? new Date(ts).toDateString() : 'default';
+
+      // Tampilkan divider tanggal seperti WhatsApp / Telegram jika berpindah tanggal
+      if (dateKey !== lastDateKey) {
+        lastDateKey = dateKey;
+        html += `
+          <div data-date-divider="true" data-date-key="${dateKey}" class="flex justify-center my-3 select-none">
+            <div class="px-3.5 py-1 rounded-full text-[11px] font-semibold bg-slate-200/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/60 shadow-sm flex items-center gap-1.5 backdrop-blur-xs">
+              <span class="material-symbols-outlined text-[13px] text-primary dark:text-indigo-400">calendar_today</span>
+              <span>${dateBadge}</span>
+            </div>
+          </div>
+        `;
+      }
+
       const isUser = msg.sender === 'user';
+      const fullDateTitle = ts ? new Date(ts).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' }) : (msg.timeStr || '');
+
       if (isUser) {
         // User bubble: Right side, green background, white text, timestamp bottom right (Persis Foto 2)
-        return `
+        html += `
           <div data-msg-id="${msg.id}" class="flex justify-end w-full animate-fade-in">
             <div class="bg-[#16a34a] text-white px-4 py-2.5 rounded-2xl rounded-tr-xs max-w-[82%] shadow-sm flex flex-col">
               <span class="text-[13px] leading-relaxed break-words select-text">${this._escapeAndFormat(msg.text)}</span>
-              <div class="flex items-center justify-end gap-1 mt-1">
+              <div class="flex items-center justify-end gap-1 mt-1" title="${fullDateTitle}">
                 <span class="text-[10px] text-white/80 font-medium">${msg.timeStr || ''}</span>
                 <span class="material-symbols-outlined text-[13px] text-white/80">done_all</span>
               </div>
@@ -166,7 +188,7 @@ export class LiveChatView extends IComponent {
         `;
       } else {
         // Admin bubble: Left side, white/light background, dark text (Persis Foto 2)
-        return `
+        html += `
           <div data-msg-id="${msg.id}" class="flex justify-start items-end gap-2 w-full animate-fade-in">
             <div class="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs shrink-0 border border-primary/20">
               <span class="material-symbols-outlined text-[16px]">support_agent</span>
@@ -174,12 +196,14 @@ export class LiveChatView extends IComponent {
             <div class="bg-white dark:bg-[#121c30] text-text-heading border border-surface-container dark:border-white/10 px-4 py-2.5 rounded-2xl rounded-tl-xs max-w-[82%] shadow-sm flex flex-col">
               <span class="text-[11px] font-bold text-primary dark:text-indigo-400 mb-0.5">${msg.userName || 'Admin Panen Kunci'}</span>
               <span class="text-[13px] leading-relaxed break-words select-text text-text-heading">${this._escapeAndFormat(msg.text)}</span>
-              <span class="text-[10px] text-text-body/70 font-medium text-right mt-1">${msg.timeStr || ''}</span>
+              <span class="text-[10px] text-text-body/70 font-medium text-right mt-1" title="${fullDateTitle}">${msg.timeStr || ''}</span>
             </div>
           </div>
         `;
       }
-    }).join('');
+    });
+
+    return html;
   }
 
   _escapeAndFormat(text = '') {
@@ -322,8 +346,31 @@ export class LiveChatView extends IComponent {
     if (!streamEl || !msg) return;
     if (streamEl.querySelector(`[data-msg-id="${msg.id}"]`)) return; // Cegah duplikasi ID yang sama
 
+    const ts = msg.timestamp || Date.now();
+    const dateBadge = this._formatMessageDateBadge(ts);
+    const dateKey = new Date(ts).toDateString();
+
+    // Periksa apakah tanggal berbeda dengan divider tanggal terakhir di stream
+    const lastDateDivider = streamEl.querySelector('[data-date-divider]:last-of-type');
+    const lastDateKey = lastDateDivider ? lastDateDivider.getAttribute('data-date-key') : null;
+
+    if (dateKey !== lastDateKey) {
+      const divider = document.createElement('div');
+      divider.setAttribute('data-date-divider', 'true');
+      divider.setAttribute('data-date-key', dateKey);
+      divider.className = 'flex justify-center my-3 select-none';
+      divider.innerHTML = `
+        <div class="px-3.5 py-1 rounded-full text-[11px] font-semibold bg-slate-200/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/60 shadow-sm flex items-center gap-1.5 backdrop-blur-xs">
+          <span class="material-symbols-outlined text-[13px] text-primary dark:text-indigo-400">calendar_today</span>
+          <span>${dateBadge}</span>
+        </div>
+      `;
+      streamEl.appendChild(divider);
+    }
+
     const temp = document.createElement('div');
     const isUser = msg.sender === 'user';
+    const fullDateTitle = new Date(ts).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' });
     temp.setAttribute('data-msg-id', msg.id);
 
     if (isUser) {
@@ -331,7 +378,7 @@ export class LiveChatView extends IComponent {
       temp.innerHTML = `
         <div class="bg-[#16a34a] text-white px-4 py-2.5 rounded-2xl rounded-tr-xs max-w-[82%] shadow-sm flex flex-col">
           <span class="text-[13px] leading-relaxed break-words select-text">${this._escapeAndFormat(msg.text)}</span>
-          <div class="flex items-center justify-end gap-1 mt-1">
+          <div class="flex items-center justify-end gap-1 mt-1" title="${fullDateTitle}">
             <span class="text-[10px] text-white/80 font-medium">${msg.timeStr || ''}</span>
             <span class="material-symbols-outlined text-[13px] text-white/80">done_all</span>
           </div>
@@ -346,12 +393,45 @@ export class LiveChatView extends IComponent {
         <div class="bg-white dark:bg-[#121c30] text-text-heading border border-surface-container dark:border-white/10 px-4 py-2.5 rounded-2xl rounded-tl-xs max-w-[82%] shadow-sm flex flex-col">
           <span class="text-[11px] font-bold text-primary dark:text-indigo-400 mb-0.5">${msg.userName || 'Admin Panen Kunci'}</span>
           <span class="text-[13px] leading-relaxed break-words select-text text-text-heading">${this._escapeAndFormat(msg.text)}</span>
-          <span class="text-[10px] text-text-body/70 font-medium text-right mt-1">${msg.timeStr || ''}</span>
+          <span class="text-[10px] text-text-body/70 font-medium text-right mt-1" title="${fullDateTitle}">${msg.timeStr || ''}</span>
         </div>
       `;
     }
 
     streamEl.appendChild(temp);
+  }
+
+  _formatMessageDateBadge(timestamp) {
+    if (!timestamp) return 'Hari Ini';
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Hari Ini';
+
+    const now = new Date();
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    const formattedDate = date.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    if (isToday) {
+      return `Hari Ini, ${formattedDate}`;
+    } else if (isYesterday) {
+      return `Kemarin, ${formattedDate}`;
+    } else {
+      return formattedDate;
+    }
   }
 
   _scrollToBottom(el) {
