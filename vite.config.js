@@ -635,10 +635,14 @@ export default defineConfig(({ mode }) => {
 
                       if (error) {
                         console.warn('[vite-proxy] Join error on transactions, fallback to select *:', error.message);
-                        const fallback = await adminSupabase
+                        let fallbackQuery = adminSupabase
                           .from('transactions')
                           .select('*')
                           .order('created_at', { ascending: false });
+                        if (targetUserId) {
+                          fallbackQuery = fallbackQuery.eq('user_id', targetUserId);
+                        }
+                        const fallback = await fallbackQuery;
                         if (fallback.error) {
                           res.statusCode = 400;
                           res.end(JSON.stringify({ success: false, error: fallback.error.message }));

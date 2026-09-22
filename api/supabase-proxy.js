@@ -732,10 +732,14 @@ export default async function handler(req, res) {
 
       if (error) {
         console.warn('[supabase-proxy] Join error on transactions, fallback to select *:', error.message);
-        const fallback = await adminSupabase
+        let fallbackQuery = adminSupabase
           .from('transactions')
           .select('*')
           .order('created_at', { ascending: false });
+        if (targetUserId) {
+          fallbackQuery = fallbackQuery.eq('user_id', targetUserId);
+        }
+        const fallback = await fallbackQuery;
         if (fallback.error) {
           return res.status(400).json({ success: false, error: fallback.error.message });
         }
@@ -2081,6 +2085,32 @@ export default async function handler(req, res) {
                 updated_at: new Date().toISOString()
               })
               .eq('id', targetKeyId);
+
+            // Perbarui mutasi deposit di tabel transactions Supabase menjadi success
+            try {
+              const suffix = (apiKeyString && apiKeyString.length >= 4) ? apiKeyString.slice(-4) : '';
+              const { data: userTxs } = await adminSupabase
+                .from('transactions')
+                .select('id, description')
+                .eq('type', 'deposit')
+                .order('created_at', { ascending: false });
+
+              const matchTx = (userTxs || []).find(t =>
+                (suffix && t.description?.includes(suffix)) ||
+                t.description?.includes(targetKeyId)
+              );
+
+              if (matchTx) {
+                await adminSupabase
+                  .from('transactions')
+                  .update({
+                    status: 'success',
+                    title: 'Setoran API Key (Terverifikasi)',
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', matchTx.id);
+              }
+            } catch (_) {}
           }
 
           return res.status(200).json({
@@ -2181,6 +2211,32 @@ export default async function handler(req, res) {
                     updated_at: new Date().toISOString()
                   })
                   .eq('id', item.id);
+
+                // Perbarui mutasi deposit di tabel transactions Supabase menjadi success
+                try {
+                  const suffix = (keyString && keyString.length >= 4) ? keyString.slice(-4) : '';
+                  const { data: userTxs } = await adminSupabase
+                    .from('transactions')
+                    .select('id, description')
+                    .eq('type', 'deposit')
+                    .order('created_at', { ascending: false });
+
+                  const matchTx = (userTxs || []).find(t =>
+                    (suffix && t.description?.includes(suffix)) ||
+                    t.description?.includes(item.id)
+                  );
+
+                  if (matchTx) {
+                    await adminSupabase
+                      .from('transactions')
+                      .update({
+                        status: 'success',
+                        title: 'Setoran API Key (Terverifikasi)',
+                        updated_at: new Date().toISOString()
+                      })
+                      .eq('id', matchTx.id);
+                  }
+                } catch (_) {}
 
                 results.push({ id: item.id, status: 'valid', credit: creditVal, success: true });
               } else {

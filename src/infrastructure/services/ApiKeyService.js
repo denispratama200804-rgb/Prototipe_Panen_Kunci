@@ -211,13 +211,34 @@ export class ApiKeyService {
     try {
       // Filter key HANYA untuk pengguna yang sedang aktif
       const remoteKeys = await this._apiKeyRepository.getAll(userId);
-      if (remoteKeys && Array.isArray(remoteKeys)) {
-        this._keys = remoteKeys;
+      if (remoteKeys && Array.isArray(remoteKeys) && remoteKeys.length > 0) {
+        const keyMap = new Map();
+        // Masukkan key lokal terlebih dahulu
+        (this._keys || []).forEach(k => {
+          const id = k.id || k.keyString;
+          keyMap.set(id, k);
+        });
+
+        remoteKeys.forEach(rk => {
+          const id = rk.id || rk.keyString;
+          if (keyMap.has(id)) {
+            const existing = keyMap.get(id);
+            // Jika lokal sudah valid, pertahankan status valid (jangan downgrade ke pending!)
+            if (existing.status === 'valid' && rk.status !== 'valid') {
+              // Jika remote masih pending, sync kembali ke Supabase di background agar data Supabase konsisten
+              if (this._apiKeyRepository && existing.id && typeof this._apiKeyRepository.update === 'function') {
+                this._apiKeyRepository.update(existing.id, { status: 'valid', error_message: '' }).catch(() => {});
+              }
+            } else {
+              keyMap.set(id, rk);
+            }
+          } else {
+            keyMap.set(id, rk);
+          }
+        });
+
+        this._keys = Array.from(keyMap.values()).map(k => (k instanceof ApiKey ? k : new ApiKey(k)));
         this._persist();
-        if (remoteKeys.length === 0) {
-          const globalKeys = (this._storage.get('api_keys') || []).filter(k => k.userId !== userId);
-          this._storage.set('api_keys', globalKeys);
-        }
         this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});
       }
     } catch (err) {

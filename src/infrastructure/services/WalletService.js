@@ -638,15 +638,34 @@ export class WalletService {
       const globalKeys = (this._storage.get('api_keys') || []).filter(k => k.userId === userId);
       let combinedKeys = savedUserKeys.length > 0 ? savedUserKeys : globalKeys;
 
-      // Jika remote transactions kosong dan apiKeyRepository juga kosong, bersihkan cache lokal key pengguna
+      // Ambil data remoteKeys untuk menyelaraskan data key, tetapi JANGAN PERNAH menghapus cache lokal jika remote kosong!
       if (this._apiKeyRepository) {
         try {
           const remoteKeys = await this._apiKeyRepository.getAll(userId);
-          if (Array.isArray(remoteKeys) && remoteKeys.length === 0 && combinedKeys.length > 0) {
-            this._storage.set(userKeysKey, []);
-            const cleanGlobal = (this._storage.get('api_keys') || []).filter(k => k.userId !== userId);
-            this._storage.set('api_keys', cleanGlobal);
-            combinedKeys = [];
+          if (Array.isArray(remoteKeys) && remoteKeys.length > 0) {
+            const keyMap = new Map();
+            combinedKeys.forEach(k => {
+              const id = k.id || k.keyString;
+              keyMap.set(id, k);
+            });
+
+            remoteKeys.forEach(rk => {
+              const id = rk.id || rk.keyString;
+              if (keyMap.has(id)) {
+                const existing = keyMap.get(id);
+                // Jika lokal sudah valid, pertahankan status valid (jangan downgrade ke pending)
+                if (existing.status === 'valid' && rk.status !== 'valid') {
+                  // Tetap valid
+                } else {
+                  keyMap.set(id, { ...existing, ...rk });
+                }
+              } else {
+                keyMap.set(id, rk);
+              }
+            });
+
+            combinedKeys = Array.from(keyMap.values());
+            this._storage.set(userKeysKey, combinedKeys);
           }
         } catch (e) {}
       }
@@ -710,7 +729,7 @@ export class WalletService {
               return;
             }
 
-            const hasMatchingKey = combinedKeys.some(k => {
+            const matchingKey = combinedKeys.find(k => {
               const suffix = (k.keyString && k.keyString.length >= 4) ? k.keyString.slice(-4) : '';
               const masked = k.keyString && k.keyString.length > 12
                 ? `${k.keyString.slice(0, 9)}...${k.keyString.slice(-4)}`
@@ -724,9 +743,29 @@ export class WalletService {
               );
             });
 
-            if (!hasMatchingKey) {
+            if (!matchingKey) {
               if (tx.id) orphanIdsToDelete.push(tx.id);
               return;
+            }
+
+            // Rekonsiliasi status transaksi deposit dengan status key saat ini
+            if (matchingKey.status === 'valid') {
+              if (tx.status !== 'success') {
+                tx.status = 'success';
+                tx.title = 'Setoran API Key (Terverifikasi)';
+                tx.amount = Number(matchingKey.rewardAmount) || tx.amount || 3000;
+                if (this._transactionRepository && tx.id) {
+                  this._transactionRepository.updateStatus(tx.id, 'success').catch(() => {});
+                }
+              }
+            } else if (matchingKey.status === 'invalid') {
+              if (tx.status !== 'failed') {
+                tx.status = 'failed';
+                tx.title = 'Setoran API Key (Invalid)';
+                if (this._transactionRepository && tx.id) {
+                  this._transactionRepository.updateStatus(tx.id, 'failed').catch(() => {});
+                }
+              }
             }
           }
           reconciledTxs.push(tx);
@@ -747,34 +786,43 @@ export class WalletService {
 
         this._transactions = reconciledTxs;
 
-        let calculatedLifetime = 0;
-        let calculatedBalance = 0;
+        // Pastikan semua key valid/pending terjamin memiliki mutasi transaksi di daftar
+        this._ensureDepositTransactions(combinedKeys);
 
-        deduplicatedTxs.forEach(tx => {
+        let calculatedLifetime = 0;
+        let calculatedDepositSuccess = 0;
+        let calculatedWithdrawals = 0;
+
+        this._transactions.forEach(tx => {
           const amt = Number(tx.amount) || 0;
           if (tx.type === 'deposit') {
             if (tx.status === 'success') {
-              calculatedBalance += amt;
+              calculatedDepositSuccess += amt;
               calculatedLifetime += amt;
             }
           } else if (tx.type === 'withdrawal') {
             const rawStatus = String(tx.status || '').trim().toLowerCase();
             if (rawStatus === 'success' || rawStatus === 'valid' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'pending') {
-              calculatedBalance -= amt;
+              calculatedWithdrawals += amt;
             }
           }
         });
 
         // Selaraskan dengan data key agar tidak ada saldo yang hilang atau menggelembung
-        const remoteCommissions = deduplicatedTxs
+        const remoteCommissions = this._transactions
           .filter(t => (t.method === 'referral_commission' || t.title?.includes('Referral') || t.description?.includes('Referral')) && t.status === 'success')
           .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        this._balance = Math.max(0, calculatedBalance);
+        // Saldo deposit valid authoritative: dijamin tidak boleh lebih kecil dari expectedActive yang dihitung dari key valid!
+        const totalValidDeposit = Math.max(calculatedDepositSuccess, expectedActive);
+
+        this._balance = Math.max(0, totalValidDeposit + remoteCommissions - calculatedWithdrawals);
         this._passiveBalance = expectedPassive;
-        this._lifetimeEarnings = Math.max(calculatedLifetime, expectedActive + remoteCommissions);
+        this._lifetimeEarnings = Math.max(calculatedLifetime, expectedActive + remoteCommissions, this._lifetimeEarnings || 0);
       } else {
         // Jika remoteTxs belum ada/kosong di database, gunakan perhitungan authoritative dari daftar key user + komisi referral!
+        this._ensureDepositTransactions(combinedKeys);
+
         const totalWithdrawals = this._transactions
           .filter(t => {
             if (t.type !== 'withdrawal') return false;
@@ -792,7 +840,6 @@ export class WalletService {
         this._lifetimeEarnings = Math.max(expectedActive + totalCommissions, this._lifetimeEarnings || 0);
       }
 
-      this._ensureDepositTransactions(combinedKeys);
       this._persist();
 
       this._eventBus.emit(AppEvents.BALANCE_UPDATED, {

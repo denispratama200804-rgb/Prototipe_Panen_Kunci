@@ -741,12 +741,39 @@ export class AdminDataService {
               t.type === 'deposit' &&
               ((keySuffix && t.description?.includes(keySuffix)) ||
                (masked && t.description?.includes(masked)) ||
+               (key.keyString && t.description?.includes(key.keyString)) ||
                t.description?.includes(keyId))
             );
             if (foundTx) {
               existingTxId = foundTx.id;
             }
           }
+        }
+
+        // Jika tidak ditemukan dengan filter targetUserId, coba cari global tanpa filter userId
+        if (!existingTxId) {
+          try {
+            const globalTxRes = await fetch('/api/supabase-proxy', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'get_transactions', table: 'transactions' })
+            });
+            if (globalTxRes.ok) {
+              const gJson = await globalTxRes.json();
+              if (gJson.success && Array.isArray(gJson.data)) {
+                const foundGlobal = gJson.data.find(t =>
+                  t.type === 'deposit' &&
+                  ((keySuffix && t.description?.includes(keySuffix)) ||
+                   (masked && t.description?.includes(masked)) ||
+                   (key.keyString && t.description?.includes(key.keyString)) ||
+                   t.description?.includes(keyId))
+                );
+                if (foundGlobal) {
+                  existingTxId = foundGlobal.id;
+                }
+              }
+            }
+          } catch (_) {}
         }
 
         if (existingTxId) {
@@ -765,6 +792,14 @@ export class AdminDataService {
               }
             })
           });
+
+          if (isSupabaseConfigured() && supabase) {
+            supabase.from('transactions').update({
+              status: 'success',
+              title: 'Setoran API Key (Terverifikasi)',
+              description: `Terverifikasi Otomatis oleh Sistem: ${masked || key.id}`
+            }).eq('id', existingTxId).then(() => {}).catch(() => {});
+          }
         } else {
           // Hanya insert jika belum pernah ada transaksi sama sekali
           await fetch('/api/supabase-proxy', {
