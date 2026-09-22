@@ -259,6 +259,8 @@ export class DashboardView extends IComponent {
       `;
     }
 
+    const user = this._authService ? this._authService.getCurrentUser() : null;
+
     return recentActivities.map(tx => {
       const isDeposit = tx.type === 'deposit';
       const rawStatus = String(tx.status || '').trim().toLowerCase();
