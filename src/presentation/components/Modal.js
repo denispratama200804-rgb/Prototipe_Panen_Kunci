@@ -152,6 +152,7 @@ export class ModalComponent {
             isChecked
           });
           if (result === false || options.autoClose === false) {
+            if (confirmBtn) confirmBtn.disabled = false;
             return;
           }
         }
