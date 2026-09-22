@@ -520,6 +520,32 @@ export class ProfileView extends IComponent {
   }
 
   mount(container) {
+    // Sinkronkan status kelayakan ganti nickname di background jika belum ada data lokal
+    const currentUser = this._authService.getCurrentUser();
+    if (currentUser && !currentUser.nicknameUpdatedAt) {
+      this._authService.checkNicknameEligibility?.().then(cloudStatus => {
+        if (cloudStatus && !cloudStatus.allowed) {
+          const editBtn = container.querySelector('#btnEditNickname');
+          if (editBtn) {
+            editBtn.title = `Nickname dapat diganti ${cloudStatus.daysLeft} hari lagi`;
+          }
+          // Jika status badge belum ada, render badge cooldown
+          const statusBadge = container.querySelector('#nicknameStatusBadge');
+          if (!statusBadge) {
+            const headingContainer = container.querySelector('#profileUserName')?.parentElement;
+            if (headingContainer) {
+              const badgeDiv = document.createElement('div');
+              badgeDiv.id = 'nicknameStatusBadge';
+              badgeDiv.className = 'mt-0.5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container text-[10px] font-medium text-text-body/80 border border-surface-container';
+              badgeDiv.title = 'Batas ganti nickname 1 bulan sekali';
+              badgeDiv.innerHTML = `<span>Ganti nickname lagi dalam <strong>${cloudStatus.daysLeft} hari</strong></span>`;
+              headingContainer.parentElement?.insertBefore(badgeDiv, headingContainer.nextSibling);
+            }
+          }
+        }
+      }).catch(() => {});
+    }
+
     // Avatar upload / update & sync
     const avatarInput = container.querySelector('#avatarFileInput');
     const avatarContainer = container.querySelector('#avatarContainer');
@@ -775,13 +801,31 @@ export class ProfileView extends IComponent {
     const liveChatBtn = container.querySelector('#btnLiveChatAdmin');
 
     // Handler Ganti Nickname Pengguna (Aturan: 1 Bulan Sekali)
-    editNicknameBtn?.addEventListener('click', () => {
+    editNicknameBtn?.addEventListener('click', async () => {
       const user = this._authService.getCurrentUser();
       if (!user) return;
 
-      const check = typeof user.canChangeNickname === 'function'
-        ? user.canChangeNickname()
-        : { allowed: true, daysLeft: 0, nextDate: null };
+      // Cek status kelayakan ganti nickname secara realtime ke cloud (sinkron lintas device/browser)
+      let check = { allowed: true, daysLeft: 0, nextDate: null };
+      if (typeof this._authService.checkNicknameEligibility === 'function') {
+        const origContent = editNicknameBtn.innerHTML;
+        editNicknameBtn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span>';
+        editNicknameBtn.disabled = true;
+        try {
+          check = await this._authService.checkNicknameEligibility();
+        } catch (_) {
+          check = typeof user.canChangeNickname === 'function'
+            ? user.canChangeNickname()
+            : { allowed: true, daysLeft: 0, nextDate: null };
+        } finally {
+          editNicknameBtn.innerHTML = origContent;
+          editNicknameBtn.disabled = false;
+        }
+      } else {
+        check = typeof user.canChangeNickname === 'function'
+          ? user.canChangeNickname()
+          : { allowed: true, daysLeft: 0, nextDate: null };
+      }
 
       // Jika belum melewati masa cooldown 30 hari
       if (!check.allowed) {
@@ -914,9 +958,9 @@ export class ProfileView extends IComponent {
         },
         onConfirm: async ({ close, confirmBtn }) => {
           const freshUser = this._authService.getCurrentUser();
-          const userCheck = typeof freshUser?.canChangeNickname === 'function'
-            ? freshUser.canChangeNickname()
-            : { allowed: true };
+          const userCheck = typeof this._authService.checkNicknameEligibility === 'function'
+            ? await this._authService.checkNicknameEligibility()
+            : (typeof freshUser?.canChangeNickname === 'function' ? freshUser.canChangeNickname() : { allowed: true });
           if (!userCheck.allowed) {
             this._notification.error(`Anda tidak dapat mengganti nickname lebih dari 1x dalam sebulan (Sisa tunggu: ${userCheck.daysLeft} hari lagi).`);
             close();

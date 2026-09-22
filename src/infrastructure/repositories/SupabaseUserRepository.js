@@ -56,16 +56,37 @@ export class SupabaseUserRepository extends IUserRepository {
 
     if (!data) return null;
 
-    // Jika tabel DB belum memiliki kolom referred_by, sinkronkan dari user_metadata session auth atau localStorage
+    // Sinkronkan referred_by dan nickname_updated_at dari user_metadata session auth atau localStorage
     try {
       const { data: authData } = await supabase.auth.getUser();
       if (authData?.user && (authData.user.id === data.id || authData.user.email?.toLowerCase() === data.email?.toLowerCase())) {
+        const metaNickTime = authData.user.user_metadata?.nickname_updated_at;
+        if (metaNickTime && !data.nickname_updated_at) {
+          data.nickname_updated_at = metaNickTime;
+        }
         const metaRef = authData.user.user_metadata?.referred_by || authData.user.user_metadata?.referredBy;
         if (metaRef && !data.referred_by) {
           data.referred_by = String(metaRef).trim().toUpperCase();
         }
       }
     } catch (_) {}
+
+    if (!data.nickname_updated_at && typeof localStorage !== 'undefined') {
+      try {
+        const localNick = (data.id && localStorage.getItem('pk_nickname_updated_' + data.id)) ||
+                          (data.email && localStorage.getItem('pk_nickname_updated_' + String(data.email).toLowerCase()));
+        if (localNick) {
+          data.nickname_updated_at = localNick;
+        }
+      } catch (_) {}
+    }
+
+    if (data.nickname_updated_at && typeof localStorage !== 'undefined') {
+      try {
+        if (data.id) localStorage.setItem('pk_nickname_updated_' + data.id, data.nickname_updated_at);
+        if (data.email) localStorage.setItem('pk_nickname_updated_' + String(data.email).toLowerCase(), data.nickname_updated_at);
+      } catch (_) {}
+    }
 
     if (!data.referred_by && typeof localStorage !== 'undefined') {
       try {
@@ -120,16 +141,37 @@ export class SupabaseUserRepository extends IUserRepository {
 
     if (!data) return null;
 
-    // Sinkronkan referred_by jika kolom DB belum terisi
+    // Sinkronkan referred_by dan nickname_updated_at jika kolom DB belum terisi
     try {
       const { data: authData } = await supabase.auth.getUser();
       if (authData?.user && (authData.user.id === data.id || authData.user.email?.toLowerCase() === cleanEmail)) {
+        const metaNickTime = authData.user.user_metadata?.nickname_updated_at;
+        if (metaNickTime && !data.nickname_updated_at) {
+          data.nickname_updated_at = metaNickTime;
+        }
         const metaRef = authData.user.user_metadata?.referred_by || authData.user.user_metadata?.referredBy;
         if (metaRef && !data.referred_by) {
           data.referred_by = String(metaRef).trim().toUpperCase();
         }
       }
     } catch (_) {}
+
+    if (!data.nickname_updated_at && typeof localStorage !== 'undefined') {
+      try {
+        const localNick = (data.id && localStorage.getItem('pk_nickname_updated_' + data.id)) ||
+                          (cleanEmail && localStorage.getItem('pk_nickname_updated_' + cleanEmail));
+        if (localNick) {
+          data.nickname_updated_at = localNick;
+        }
+      } catch (_) {}
+    }
+
+    if (data.nickname_updated_at && typeof localStorage !== 'undefined') {
+      try {
+        if (data.id) localStorage.setItem('pk_nickname_updated_' + data.id, data.nickname_updated_at);
+        if (cleanEmail) localStorage.setItem('pk_nickname_updated_' + cleanEmail, data.nickname_updated_at);
+      } catch (_) {}
+    }
 
     if (!data.referred_by && typeof localStorage !== 'undefined') {
       try {

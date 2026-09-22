@@ -189,6 +189,21 @@ export class AuthService {
         }
       }
 
+      // Sinkronkan nicknameUpdatedAt dari Supabase Auth user_metadata secara cloud (lintas device)
+      if (isSupabaseConfigured()) {
+        supabase.auth.getUser().then(({ data: authData }) => {
+          const metaNickTime = authData?.user?.user_metadata?.nickname_updated_at;
+          if (metaNickTime && this._currentUser) {
+            this._currentUser.nicknameUpdatedAt = metaNickTime;
+            if (typeof localStorage !== 'undefined') {
+              if (this._currentUser.id) localStorage.setItem('pk_nickname_updated_' + this._currentUser.id, metaNickTime);
+              if (this._currentUser.email) localStorage.setItem('pk_nickname_updated_' + this._currentUser.email.toLowerCase(), metaNickTime);
+            }
+            this._saveSession(this._currentUser, this._currentUser.role || 'user');
+          }
+        }).catch(() => {});
+      }
+
       // Pastikan role bersih, tegas, dan konsisten (mencegah perpindahan sesi ke admin secara otomatis)
       const isExplicitAdmin = (this._currentUser.role === 'admin') ||
                               (this._currentUser.email === 'admin@panenkunci.id') ||
@@ -243,6 +258,22 @@ export class AuthService {
                   }
                 }
               }
+
+              // Jika remote masih belum memiliki nicknameUpdatedAt, periksa Supabase Auth user_metadata
+              if (!remote.nicknameUpdatedAt && isSupabaseConfigured()) {
+                try {
+                  const { data: authData } = await supabase.auth.getUser();
+                  const metaTime = authData?.user?.user_metadata?.nickname_updated_at;
+                  if (metaTime) {
+                    remote.nicknameUpdatedAt = metaTime;
+                    if (typeof localStorage !== 'undefined') {
+                      if (remote.id) localStorage.setItem('pk_nickname_updated_' + remote.id, metaTime);
+                      if (remote.email) localStorage.setItem('pk_nickname_updated_' + (remote.email || '').toLowerCase(), metaTime);
+                    }
+                  }
+                } catch (_) {}
+              }
+
               if (!remote.referredBy && prevReferredBy) {
                 remote.referredBy = prevReferredBy;
               }
@@ -436,6 +467,18 @@ export class AuthService {
             userProfile.referredBy = metaRef;
           }
 
+          const metaNickTime = authData.user.user_metadata?.nickname_updated_at;
+          if (userProfile && !userProfile.nicknameUpdatedAt && metaNickTime) {
+            userProfile.nicknameUpdatedAt = metaNickTime;
+          }
+
+          if (metaNickTime && typeof localStorage !== 'undefined') {
+            try {
+              if (authData.user.id) localStorage.setItem('pk_nickname_updated_' + authData.user.id, metaNickTime);
+              if (authData.user.email) localStorage.setItem('pk_nickname_updated_' + authData.user.email.toLowerCase(), metaNickTime);
+            } catch (_) {}
+          }
+
           const resolvedUser = userProfile || new User({
             id: authData.user.id,
             name: authData.user.user_metadata?.name || email.split('@')[0],
@@ -448,7 +491,8 @@ export class AuthService {
             accountHolder: (authData.user.user_metadata?.name || email.split('@')[0]).toUpperCase(),
             isVerified: false,
             referralCode: authData.user.user_metadata?.referral_code || authData.user.user_metadata?.referralCode || User.generateReferralCode(authData.user.id),
-            referredBy: metaRef
+            referredBy: metaRef,
+            nicknameUpdatedAt: metaNickTime || null
           });
 
           const role = isRoleAdmin ? 'admin' : 'user';
@@ -841,6 +885,63 @@ export class AuthService {
   }
 
   /**
+   * Memeriksa kelayakan pergantian nickname secara cloud realtime (lintas device/browser)
+   * @returns {Promise<{ allowed: boolean, daysLeft: number, nextDate: Date|null }>}
+   */
+  async checkNicknameEligibility() {
+    if (!this._currentUser) {
+      return { allowed: false, daysLeft: 0, nextDate: null };
+    }
+
+    // 1. Cek dulu domain model & localStorage lokal
+    const localCheck = this._currentUser.canChangeNickname();
+    if (!localCheck.allowed) {
+      return localCheck;
+    }
+
+    // 2. Jika secara lokal tampak boleh, verifikasi ke Cloud (proxy) untuk memastikan tidak pernah diubah di device lain
+    if (isSupabaseConfigured() && (this._currentUser.id || this._currentUser.email)) {
+      try {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'check_nickname_cooldown',
+            userId: this._currentUser.id,
+            email: this._currentUser.email
+          })
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) {
+            if (json.nicknameUpdatedAt) {
+              this._currentUser.nicknameUpdatedAt = json.nicknameUpdatedAt;
+              if (typeof localStorage !== 'undefined') {
+                if (this._currentUser.id) localStorage.setItem('pk_nickname_updated_' + this._currentUser.id, json.nicknameUpdatedAt);
+                if (this._currentUser.email) localStorage.setItem('pk_nickname_updated_' + this._currentUser.email.toLowerCase(), json.nicknameUpdatedAt);
+              }
+              this._saveSession(this._currentUser, this._currentUser.role || 'user');
+            }
+
+            if (!json.allowed) {
+              return {
+                allowed: false,
+                daysLeft: json.daysLeft || 30,
+                nextDate: json.nextDate ? new Date(json.nextDate) : null
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[AuthService] checkNicknameEligibility cloud check note:', err.message);
+      }
+    }
+
+    return this._currentUser.canChangeNickname();
+  }
+
+  /**
    * Mengganti nickname pengguna dengan batasan 1 kali sebulan (30 hari).
    * Sinkron secara realtime ke database Supabase (tabel users), Auth user_metadata, dan Admin Panel.
    * @param {string} newNickname
@@ -868,8 +969,8 @@ export class AuthService {
       throw new Error('Nickname baru tidak boleh sama dengan nickname saat ini.');
     }
 
-    // 1. Cek batasan cooldown 1 bulan (30 hari)
-    const check = this._currentUser.canChangeNickname();
+    // 1. Cek batasan cooldown 1 bulan (30 hari) secara komprehensif (lokal + cloud)
+    const check = await this.checkNicknameEligibility();
     if (!check.allowed) {
       const formattedDate = check.nextDate ? check.nextDate.toLocaleDateString('id-ID', {
         day: 'numeric',
@@ -896,7 +997,7 @@ export class AuthService {
     this._saveSession(this._currentUser, this._currentUser.role || 'user');
 
     // 2. Simpan ke database Supabase dan Auth metadata
-    if (isSupabaseConfigured() && this._currentUser.id) {
+    if (isSupabaseConfigured() && (this._currentUser.id || this._currentUser.email)) {
       let proxySuccess = false;
       // A. Coba update via Server Proxy (action: 'update_nickname' yang meng-handle bypass RLS & metadata)
       try {
@@ -906,29 +1007,37 @@ export class AuthService {
           body: JSON.stringify({
             action: 'update_nickname',
             userId: this._currentUser.id,
+            email: this._currentUser.email,
             name: trimmed,
             nicknameUpdatedAt: nowIso
           })
         });
-        if (proxyRes.ok) {
-          const proxyJson = await proxyRes.json();
-          if (proxyJson.success) {
-            proxySuccess = true;
-          } else if (proxyJson.error) {
-            throw new Error(proxyJson.error);
+
+        const proxyJson = await proxyRes.json().catch(() => ({}));
+        if (proxyRes.ok && proxyJson.success) {
+          proxySuccess = true;
+        } else {
+          // Jika server proxy menolak (misal: cooldown 30 hari aktif), KEMBALIKAN state dan batalkan segera!
+          const errMsg = proxyJson.error || 'Gagal memperbarui nickname di server.';
+          this._currentUser.name = oldName;
+          if (proxyJson.nicknameUpdatedAt) {
+            this._currentUser.nicknameUpdatedAt = proxyJson.nicknameUpdatedAt;
+            if (typeof localStorage !== 'undefined') {
+              if (this._currentUser.id) localStorage.setItem('pk_nickname_updated_' + this._currentUser.id, proxyJson.nicknameUpdatedAt);
+              if (this._currentUser.email) localStorage.setItem('pk_nickname_updated_' + this._currentUser.email.toLowerCase(), proxyJson.nicknameUpdatedAt);
+            }
           }
+          this._saveSession(this._currentUser, this._currentUser.role || 'user');
+          throw new Error(errMsg);
         }
       } catch (proxyErr) {
-        console.warn('[AuthService] Server proxy update_nickname warning:', proxyErr.message);
-        if (proxyErr.message && proxyErr.message.includes('sebulan')) {
-          this._currentUser.name = oldName;
-          this._saveSession(this._currentUser, this._currentUser.role || 'user');
-          throw proxyErr;
-        }
+        this._currentUser.name = oldName;
+        this._saveSession(this._currentUser, this._currentUser.role || 'user');
+        throw proxyErr;
       }
 
-      // B. Fallback update langsung ke tabel users via supabase client jika proxy belum aktif
-      if (!proxySuccess && this._userRepository) {
+      // B. Update langsung ke tabel users via supabase client jika proxy belum aktif
+      if (!proxySuccess && this._userRepository && this._currentUser.id) {
         try {
           await this._userRepository.update(this._currentUser.id, { name: trimmed, nicknameUpdatedAt: nowIso });
         } catch (dbErr) {

@@ -1084,15 +1084,98 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
+                  // 4a. Cek status cooldown nickname pengguna dari Supabase (auth.users & public.users)
+                  if (action === 'check_nickname_cooldown') {
+                    if (adminSupabase) {
+                      const targetUserId = parsed.userId || parsed.id;
+                      const targetEmail = parsed.email ? String(parsed.email).trim().toLowerCase() : null;
+
+                      let lastChangeTime = null;
+
+                      if (targetUserId) {
+                        try {
+                          const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
+                          if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
+                            lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
+                          }
+                        } catch (_) {}
+
+                        try {
+                          const { data: dbUser } = await adminSupabase.from('users').select('nickname_updated_at').eq('id', targetUserId).maybeSingle();
+                          if (dbUser?.nickname_updated_at) {
+                            const dbTime = new Date(dbUser.nickname_updated_at).getTime();
+                            if (!isNaN(dbTime) && (!lastChangeTime || dbTime > lastChangeTime)) {
+                              lastChangeTime = dbTime;
+                            }
+                          }
+                        } catch (_) {}
+                      }
+
+                      if (targetEmail) {
+                        try {
+                          const { data: dbUserByEmail } = await adminSupabase.from('users').select('nickname_updated_at').ilike('email', targetEmail).maybeSingle();
+                          if (dbUserByEmail?.nickname_updated_at) {
+                            const dbTime = new Date(dbUserByEmail.nickname_updated_at).getTime();
+                            if (!isNaN(dbTime) && (!lastChangeTime || dbTime > lastChangeTime)) {
+                              lastChangeTime = dbTime;
+                            }
+                          }
+                        } catch (_) {}
+
+                        if (!lastChangeTime) {
+                          try {
+                            const { data: listData } = await adminSupabase.auth.admin.listUsers();
+                            const authUser = listData?.users?.find(u => u.email?.toLowerCase() === targetEmail);
+                            if (authUser?.user_metadata?.nickname_updated_at) {
+                              const authTime = new Date(authUser.user_metadata.nickname_updated_at).getTime();
+                              if (!isNaN(authTime) && (!lastChangeTime || authTime > lastChangeTime)) {
+                                lastChangeTime = authTime;
+                              }
+                            }
+                          } catch (_) {}
+                        }
+                      }
+
+                      if (lastChangeTime && !isNaN(lastChangeTime)) {
+                        const cooldownMs = 30 * 24 * 60 * 60 * 1000;
+                        const elapsed = Date.now() - lastChangeTime;
+                        if (elapsed < cooldownMs) {
+                          const remainingDays = Math.max(1, Math.ceil((cooldownMs - elapsed) / (1000 * 60 * 60 * 24)));
+                          const nextDate = new Date(lastChangeTime + cooldownMs);
+                          res.statusCode = 200;
+                          res.end(JSON.stringify({
+                            success: true,
+                            allowed: false,
+                            daysLeft: remainingDays,
+                            nextDate: nextDate.toISOString(),
+                            nicknameUpdatedAt: new Date(lastChangeTime).toISOString()
+                          }));
+                          return;
+                        }
+                      }
+
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({
+                        success: true,
+                        allowed: true,
+                        daysLeft: 0,
+                        nextDate: null,
+                        nicknameUpdatedAt: lastChangeTime ? new Date(lastChangeTime).toISOString() : null
+                      }));
+                      return;
+                    }
+                  }
+
                   if (action === 'update_nickname') {
                     if (adminSupabase) {
                       const targetUserId = parsed.userId || parsed.id;
+                      const targetEmail = parsed.email ? String(parsed.email).trim().toLowerCase() : null;
                       const newNickname = (parsed.name || '').trim().replace(/\s+/g, ' ');
                       const clientNicknameUpdatedAt = parsed.nicknameUpdatedAt || new Date().toISOString();
 
-                      if (!targetUserId || !newNickname) {
+                      if ((!targetUserId && !targetEmail) || !newNickname) {
                         res.statusCode = 400;
-                        res.end(JSON.stringify({ success: false, error: 'User ID dan nickname baru diperlukan.' }));
+                        res.end(JSON.stringify({ success: false, error: 'Identitas user dan nickname baru diperlukan.' }));
                         return;
                       }
 
@@ -1109,32 +1192,69 @@ export default defineConfig(({ mode }) => {
                       }
 
                       let lastChangeTime = null;
-                      try {
-                        const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
-                        if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
-                          lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
-                        }
-                      } catch (_) {}
+                      let matchedAuthId = targetUserId;
 
-                      try {
-                        const { data: dbUser } = await adminSupabase.from('users').select('nickname_updated_at').eq('id', targetUserId).single();
-                        if (dbUser?.nickname_updated_at) {
-                          const dbTime = new Date(dbUser.nickname_updated_at).getTime();
-                          if (!isNaN(dbTime) && (!lastChangeTime || dbTime > lastChangeTime)) {
-                            lastChangeTime = dbTime;
+                      if (targetUserId) {
+                        try {
+                          const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
+                          if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
+                            lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
                           }
-                        }
-                      } catch (_) {}
+                        } catch (_) {}
+
+                        try {
+                          const { data: dbUser } = await adminSupabase.from('users').select('nickname_updated_at').eq('id', targetUserId).maybeSingle();
+                          if (dbUser?.nickname_updated_at) {
+                            const dbTime = new Date(dbUser.nickname_updated_at).getTime();
+                            if (!isNaN(dbTime) && (!lastChangeTime || dbTime > lastChangeTime)) {
+                              lastChangeTime = dbTime;
+                            }
+                          }
+                        } catch (_) {}
+                      }
+
+                      if (targetEmail) {
+                        try {
+                          const { data: dbUserByEmail } = await adminSupabase.from('users').select('id, nickname_updated_at').ilike('email', targetEmail).maybeSingle();
+                          if (dbUserByEmail?.nickname_updated_at) {
+                            const dbTime = new Date(dbUserByEmail.nickname_updated_at).getTime();
+                            if (!isNaN(dbTime) && (!lastChangeTime || dbTime > lastChangeTime)) {
+                              lastChangeTime = dbTime;
+                            }
+                          }
+                          if (dbUserByEmail?.id && !matchedAuthId) {
+                            matchedAuthId = dbUserByEmail.id;
+                          }
+                        } catch (_) {}
+
+                        try {
+                          const { data: listData } = await adminSupabase.auth.admin.listUsers();
+                          const authUser = listData?.users?.find(u => u.email?.toLowerCase() === targetEmail);
+                          if (authUser) {
+                            matchedAuthId = authUser.id;
+                            if (authUser.user_metadata?.nickname_updated_at) {
+                              const authTime = new Date(authUser.user_metadata.nickname_updated_at).getTime();
+                              if (!isNaN(authTime) && (!lastChangeTime || authTime > lastChangeTime)) {
+                                lastChangeTime = authTime;
+                              }
+                            }
+                          }
+                        } catch (_) {}
+                      }
 
                       if (lastChangeTime && !isNaN(lastChangeTime)) {
                         const cooldownMs = 30 * 24 * 60 * 60 * 1000;
                         const elapsed = Date.now() - lastChangeTime;
                         if (elapsed < cooldownMs) {
                           const remainingDays = Math.max(1, Math.ceil((cooldownMs - elapsed) / (1000 * 60 * 60 * 24)));
+                          const nextDate = new Date(lastChangeTime + cooldownMs);
                           res.statusCode = 400;
                           res.end(JSON.stringify({
                             success: false,
-                            error: `Nickname hanya dapat diganti sebulan sekali (30 hari). Sisa waktu: ${remainingDays} hari.`
+                            error: `Nickname hanya dapat diganti sebulan sekali (30 hari). Sisa waktu: ${remainingDays} hari.`,
+                            allowed: false,
+                            daysLeft: remainingDays,
+                            nextDate: nextDate.toISOString()
                           }));
                           return;
                         }
@@ -1143,22 +1263,21 @@ export default defineConfig(({ mode }) => {
                       const nowIso = clientNicknameUpdatedAt || new Date().toISOString();
 
                       let updatedUser = null;
-                      const { data: updatedWithNickTime, error: updateErr1 } = await adminSupabase
-                        .from('users')
-                        .update({ name: newNickname, updated_at: nowIso, nickname_updated_at: nowIso })
-                        .eq('id', targetUserId)
-                        .select()
-                        .single();
+                      let updateAttempt1 = null;
+                      try {
+                        let q = adminSupabase.from('users').update({ name: newNickname, updated_at: nowIso, nickname_updated_at: nowIso });
+                        if (targetUserId) q = q.eq('id', targetUserId);
+                        else if (targetEmail) q = q.ilike('email', targetEmail);
+                        updateAttempt1 = await q.select().maybeSingle();
+                      } catch (_) {}
 
-                      if (!updateErr1) {
-                        updatedUser = updatedWithNickTime;
+                      if (updateAttempt1?.data) {
+                        updatedUser = updateAttempt1.data;
                       } else {
-                        const { data: updatedBasic, error: updateErr2 } = await adminSupabase
-                          .from('users')
-                          .update({ name: newNickname, updated_at: nowIso })
-                          .eq('id', targetUserId)
-                          .select()
-                          .single();
+                        let q2 = adminSupabase.from('users').update({ name: newNickname, updated_at: nowIso });
+                        if (targetUserId) q2 = q2.eq('id', targetUserId);
+                        else if (targetEmail) q2 = q2.ilike('email', targetEmail);
+                        const { data: updatedBasic, error: updateErr2 } = await q2.select().maybeSingle();
                         if (updateErr2) {
                           res.statusCode = 400;
                           res.end(JSON.stringify({ success: false, error: updateErr2.message }));
@@ -1167,16 +1286,18 @@ export default defineConfig(({ mode }) => {
                         updatedUser = updatedBasic;
                       }
 
-                      try {
-                        await adminSupabase.auth.admin.updateUserById(targetUserId, {
-                          user_metadata: {
-                            name: newNickname,
-                            full_name: newNickname,
-                            nickname_updated_at: nowIso
-                          }
-                        });
-                      } catch (metaErr) {
-                        console.warn('[vite-proxy] Update auth metadata warning:', metaErr.message);
+                      if (matchedAuthId) {
+                        try {
+                          await adminSupabase.auth.admin.updateUserById(matchedAuthId, {
+                            user_metadata: {
+                              name: newNickname,
+                              full_name: newNickname,
+                              nickname_updated_at: nowIso
+                            }
+                          });
+                        } catch (metaErr) {
+                          console.warn('[vite-proxy] Update auth metadata warning:', metaErr.message);
+                        }
                       }
 
                       res.statusCode = 200;
