@@ -940,6 +940,9 @@ export class ProfileView extends IComponent {
         </optgroup>
       `).join('');
 
+      const rawAcc = (user.accountNumber || '').includes('*') ? '' : (user.accountNumber || '').replace(/\D/g, '').slice(0, 16);
+      const rawPhone = (user.phone || '').includes('*') ? '' : (user.phone || '').replace(/\D/g, '').slice(0, 16);
+
       this._notification.showModal({
         title: 'Perbarui Rekening / E-Wallet',
         html: `
@@ -954,14 +957,38 @@ export class ProfileView extends IComponent {
 
             <!-- Kolom Nomor Rekening (Khusus Bank) -->
             <div id="wrapAccountNum" class="flex flex-col gap-1 transition-all">
-              <label class="text-[11px] font-bold text-text-heading uppercase">Nomor Rekening</label>
-              <input type="text" id="editAccountNum" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Masukkan nomor rekening Anda" value="${user.accountNumber || ''}" />
+              <div class="flex items-center justify-between">
+                <label class="text-[11px] font-bold text-text-heading uppercase">Nomor Rekening</label>
+                <span id="accNumCounter" class="text-[10px] text-text-muted transition-colors">10 - 16 digit</span>
+              </div>
+              <input
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="16"
+                id="editAccountNum"
+                class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none font-mono"
+                placeholder="Masukkan nomor rekening (10 - 16 digit)"
+                value="${rawAcc}"
+              />
             </div>
 
             <!-- Kolom Nomor HP E-Wallet (Khusus E-Wallet) -->
             <div id="wrapPhone" class="flex flex-col gap-1 transition-all">
-              <label class="text-[11px] font-bold text-text-heading uppercase">Nomor HP / E-Wallet</label>
-              <input type="tel" id="editPhone" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Contoh: 081234567890" value="${user.phone || user.accountNumber || ''}" />
+              <div class="flex items-center justify-between">
+                <label class="text-[11px] font-bold text-text-heading uppercase">Nomor HP / E-Wallet</label>
+                <span id="phoneCounter" class="text-[10px] text-text-muted transition-colors">10 - 16 digit</span>
+              </div>
+              <input
+                type="tel"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="16"
+                id="editPhone"
+                class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none font-mono"
+                placeholder="Contoh: 081234567890"
+                value="${rawPhone || rawAcc}"
+              />
             </div>
 
             <!-- Kolom Nama Pemilik Rekening / Akun -->
@@ -980,6 +1007,10 @@ export class ProfileView extends IComponent {
           const wrapAcc = modal.querySelector('#wrapAccountNum');
           const wrapPh = modal.querySelector('#wrapPhone');
           const lblHolder = modal.querySelector('#labelAccountHolder');
+          const inputAcc = modal.querySelector('#editAccountNum');
+          const counterAcc = modal.querySelector('#accNumCounter');
+          const inputPhone = modal.querySelector('#editPhone');
+          const counterPhone = modal.querySelector('#phoneCounter');
 
           const updateVisibility = (val) => {
             const meta = getPaymentMethodMetadata(val);
@@ -995,6 +1026,35 @@ export class ProfileView extends IComponent {
               if (lblHolder) lblHolder.textContent = 'Nama Pemilik Rekening';
             }
           };
+
+          const setupNumericConstraint = (inputEl, counterEl, defaultHint = '10 - 16 digit') => {
+            if (!inputEl) return;
+            const updateCount = () => {
+              const digitsOnly = inputEl.value.replace(/\D/g, '').slice(0, 16);
+              if (inputEl.value !== digitsOnly) {
+                inputEl.value = digitsOnly;
+              }
+              if (counterEl) {
+                const len = digitsOnly.length;
+                if (len === 0) {
+                  counterEl.textContent = defaultHint;
+                  counterEl.className = 'text-[10px] text-text-muted transition-colors';
+                } else if (len < 10) {
+                  counterEl.textContent = `${len}/16 digit (Kurang ${10 - len} digit)`;
+                  counterEl.className = 'text-[10px] text-amber-500 font-semibold transition-colors';
+                } else {
+                  counterEl.textContent = `${len}/16 digit (Sesuai)`;
+                  counterEl.className = 'text-[10px] text-emerald-500 font-semibold transition-colors';
+                }
+              }
+            };
+            inputEl.addEventListener('input', updateCount);
+            inputEl.addEventListener('paste', () => setTimeout(updateCount, 0));
+            updateCount();
+          };
+
+          setupNumericConstraint(inputAcc, counterAcc);
+          setupNumericConstraint(inputPhone, counterPhone);
 
           if (selectBank) {
             updateVisibility(selectBank.value || currentBank || 'DANA');
@@ -1018,17 +1078,33 @@ export class ProfileView extends IComponent {
           const accountHolder = document.getElementById('editAccountHolder')?.value?.trim();
 
           if (isEw) {
-            phone = document.getElementById('editPhone')?.value?.trim() || '';
+            phone = document.getElementById('editPhone')?.value?.trim().replace(/\D/g, '') || '';
             accountNumber = phone; // Sinkronkan nomor e-wallet ke accountNumber agar penarikan saldo lancar
             if (!phone) {
               this._notification.error('Nomor HP / E-Wallet wajib diisi!');
               return false;
             }
+            if (phone.length < 10) {
+              this._notification.error('Nomor HP / E-Wallet minimal 10 digit angka!');
+              return false;
+            }
+            if (phone.length > 16) {
+              this._notification.error('Nomor HP / E-Wallet maksimal 16 digit angka!');
+              return false;
+            }
           } else {
-            accountNumber = document.getElementById('editAccountNum')?.value?.trim() || '';
+            accountNumber = document.getElementById('editAccountNum')?.value?.trim().replace(/\D/g, '') || '';
             phone = user.phone || '';
             if (!accountNumber) {
               this._notification.error('Nomor Rekening bank wajib diisi!');
+              return false;
+            }
+            if (accountNumber.length < 10) {
+              this._notification.error('Nomor Rekening minimal 10 digit angka!');
+              return false;
+            }
+            if (accountNumber.length > 16) {
+              this._notification.error('Nomor Rekening maksimal 16 digit angka!');
               return false;
             }
           }
@@ -1060,6 +1136,10 @@ export class ProfileView extends IComponent {
         const wrapAcc = document.getElementById('wrapAccountNum');
         const wrapPh = document.getElementById('wrapPhone');
         const lblHolder = document.getElementById('labelAccountHolder');
+        const inputAcc = document.getElementById('editAccountNum');
+        const counterAcc = document.getElementById('accNumCounter');
+        const inputPhone = document.getElementById('editPhone');
+        const counterPhone = document.getElementById('phoneCounter');
 
         if (selectBank) {
           const updateVisibility = (val) => {
@@ -1082,6 +1162,36 @@ export class ProfileView extends IComponent {
             updateVisibility(e.target.value);
           });
         }
+
+        const setupNumericConstraint = (inputEl, counterEl, defaultHint = '10 - 16 digit') => {
+          if (!inputEl || inputEl.dataset.hasNumericConstraint) return;
+          inputEl.dataset.hasNumericConstraint = 'true';
+          const updateCount = () => {
+            const digitsOnly = inputEl.value.replace(/\D/g, '').slice(0, 16);
+            if (inputEl.value !== digitsOnly) {
+              inputEl.value = digitsOnly;
+            }
+            if (counterEl) {
+              const len = digitsOnly.length;
+              if (len === 0) {
+                counterEl.textContent = defaultHint;
+                counterEl.className = 'text-[10px] text-text-muted transition-colors';
+              } else if (len < 10) {
+                counterEl.textContent = `${len}/16 digit (Kurang ${10 - len} digit)`;
+                counterEl.className = 'text-[10px] text-amber-500 font-semibold transition-colors';
+              } else {
+                counterEl.textContent = `${len}/16 digit (Sesuai)`;
+                counterEl.className = 'text-[10px] text-emerald-500 font-semibold transition-colors';
+              }
+            }
+          };
+          inputEl.addEventListener('input', updateCount);
+          inputEl.addEventListener('paste', () => setTimeout(updateCount, 0));
+          updateCount();
+        };
+
+        setupNumericConstraint(inputAcc, counterAcc);
+        setupNumericConstraint(inputPhone, counterPhone);
       }, 0);
     });
 
