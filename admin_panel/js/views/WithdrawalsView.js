@@ -73,7 +73,7 @@ export class WithdrawalsView {
                   <span class="inline sm:hidden">Pending</span>
                   <span class="hidden sm:inline">Antrean Pending</span>
                 </span>
-                ${pendingCount > 0 ? '<span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>' : ''}
+                ${pendingCount > 0 ? '<span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400"></span>' : ''}
               </div>
               <div class="text-sm sm:text-2xl font-extrabold text-white font-mono leading-tight truncate">
                 ${pendingCount} <span class="text-[10px] sm:text-xs font-normal text-slate-400">Permintaan</span>
@@ -84,7 +84,7 @@ export class WithdrawalsView {
               </div>
             </div>
             <div class="w-7 h-7 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 self-end sm:self-center">
-              <span class="material-symbols-outlined text-base sm:text-2xl ${pendingCount > 0 ? 'animate-bounce' : ''}">hourglass_empty</span>
+              <span class="material-symbols-outlined text-base sm:text-2xl">hourglass_empty</span>
             </div>
           </div>
 
@@ -388,7 +388,7 @@ export class WithdrawalsView {
                           </span>`
                         : isPending
                         ? `<span class="badge-unverified inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-amber-500/40 bg-amber-950/60 text-amber-400 tracking-wider">
-                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                             <span>PENDING</span>
                           </span>`
                         : `<span class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-rose-500/40 bg-rose-950/60 text-rose-400 tracking-wider">
