@@ -1043,8 +1043,26 @@ export class ProfileView extends IComponent {
             updateHint();
           };
 
+          const initHolderValidation = (root) => {
+            const holderInput = root.querySelector('#editAccountHolder');
+            if (!holderInput || holderInput.dataset.bound) return;
+            holderInput.dataset.bound = 'true';
+
+            const filterHolder = () => {
+              // Hanya huruf abjad (A-Z, a-z) dan spasi
+              const clean = holderInput.value.replace(/[^a-zA-Z\s]/g, '');
+              if (holderInput.value !== clean) {
+                holderInput.value = clean;
+              }
+            };
+
+            holderInput.addEventListener('input', filterHolder);
+            filterHolder();
+          };
+
           initAccountValidation(modal);
           initPhoneValidation(modal);
+          initHolderValidation(modal);
 
           const updateVisibility = (val) => {
             const meta = getPaymentMethodMetadata(val);
@@ -1061,6 +1079,7 @@ export class ProfileView extends IComponent {
               if (lblHolder) lblHolder.textContent = 'Nama Pemilik Rekening';
               initAccountValidation(modal);
             }
+            initHolderValidation(modal);
           };
 
           if (selectBank) {
@@ -1082,7 +1101,8 @@ export class ProfileView extends IComponent {
 
           let accountNumber = '';
           let phone = '';
-          const accountHolder = document.getElementById('editAccountHolder')?.value?.trim();
+          const rawHolder = document.getElementById('editAccountHolder')?.value || '';
+          const accountHolder = rawHolder.replace(/[^a-zA-Z\s]/g, '').trim().replace(/\s+/g, ' ');
 
           if (isEw) {
             phone = document.getElementById('editPhone')?.value?.trim().replace(/\D/g, '') || '';
@@ -1117,7 +1137,12 @@ export class ProfileView extends IComponent {
           }
 
           if (!accountHolder) {
-            this._notification.error('Nama pemilik rekening/akun wajib diisi!');
+            this._notification.error('Nama pemilik rekening/akun wajib diisi dan hanya boleh berupa huruf abjad!');
+            return false;
+          }
+
+          if (!/^[a-zA-Z\s]+$/.test(accountHolder)) {
+            this._notification.error('Nama pemilik rekening/akun hanya boleh berisi huruf abjad (tidak boleh mengandung angka atau simbol)!');
             return false;
           }
 
@@ -1147,6 +1172,7 @@ export class ProfileView extends IComponent {
         const accHint = document.getElementById('accountValidationHint');
         const phoneInput = document.getElementById('editPhone');
         const phoneHint = document.getElementById('phoneValidationHint');
+        const holderInput = document.getElementById('editAccountHolder');
 
         if (accInput && accHint && !accInput.dataset.bound) {
           accInput.dataset.bound = 'true';
@@ -1194,6 +1220,18 @@ export class ProfileView extends IComponent {
 
           phoneInput.addEventListener('input', updateHint);
           updateHint();
+        }
+
+        if (holderInput && !holderInput.dataset.bound) {
+          holderInput.dataset.bound = 'true';
+          const filterHolder = () => {
+            const clean = holderInput.value.replace(/[^a-zA-Z\s]/g, '');
+            if (holderInput.value !== clean) {
+              holderInput.value = clean;
+            }
+          };
+          holderInput.addEventListener('input', filterHolder);
+          filterHolder();
         }
 
         if (selectBank) {
