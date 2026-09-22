@@ -406,15 +406,28 @@ export class ApiKeyService {
       }
     }
 
-    const defaultNormal = (config && config.holdDaysNormal !== undefined && !isNaN(Number(config.holdDaysNormal)))
-      ? Number(config.holdDaysNormal)
-      : 3;
-    const defaultReferral = (config && config.holdDaysReferral !== undefined && !isNaN(Number(config.holdDaysReferral)))
-      ? Number(config.holdDaysReferral)
-      : 2;
+    const defaultNormalVal = (config && config.holdValueNormal !== undefined && !isNaN(Number(config.holdValueNormal)))
+      ? Number(config.holdValueNormal)
+      : ((config && config.holdDaysNormal !== undefined && !isNaN(Number(config.holdDaysNormal))) ? Number(config.holdDaysNormal) : 3);
+    const defaultNormalUnit = (config && config.holdUnitNormal) || 'days';
 
-    const holdDurationDays = isReferred ? defaultReferral : defaultNormal;
-    const holdUntil = new Date(Date.now() + holdDurationDays * 24 * 60 * 60 * 1000).toISOString();
+    const defaultReferralVal = (config && config.holdValueReferral !== undefined && !isNaN(Number(config.holdValueReferral)))
+      ? Number(config.holdValueReferral)
+      : ((config && config.holdDaysReferral !== undefined && !isNaN(Number(config.holdDaysReferral))) ? Number(config.holdDaysReferral) : 2);
+    const defaultReferralUnit = (config && config.holdUnitReferral) || 'days';
+
+    const targetVal = isReferred ? defaultReferralVal : defaultNormalVal;
+    const targetUnit = isReferred ? defaultReferralUnit : defaultNormalUnit;
+
+    let durationMs = targetVal * 24 * 60 * 60 * 1000;
+    if (targetUnit === 'minutes') {
+      durationMs = targetVal * 60 * 1000;
+    } else if (targetUnit === 'hours') {
+      durationMs = targetVal * 60 * 60 * 1000;
+    }
+
+    const holdDurationDays = durationMs / (24 * 60 * 60 * 1000);
+    const holdUntil = new Date(Date.now() + durationMs).toISOString();
     const newApiKey = new ApiKey({
       id: 'key_' + Math.random().toString(36).substring(2, 9),
       keyString: trimmed,

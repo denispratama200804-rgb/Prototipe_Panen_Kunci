@@ -260,7 +260,12 @@ export class SetorApiKeyView extends IComponent {
         } else {
           const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
           const hours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
-          holdInfo = { isReady: false, text: days > 0 ? `Sisa ${days}h ${hours}j` : `Sisa ${hours}j` };
+          const minutes = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+          let text = '';
+          if (days > 0) text = `Sisa ${days}h ${hours}j`;
+          else if (hours > 0) text = `Sisa ${hours}j ${minutes}m`;
+          else text = `Sisa ${Math.max(1, minutes)}m`;
+          holdInfo = { isReady: false, text };
         }
       }
 

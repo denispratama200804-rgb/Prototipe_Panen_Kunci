@@ -1195,19 +1195,27 @@ export class AdminDataService {
       const isKieActive = syncRes.isValidKey === true;
       const isCredit80 = (liveCredit === 80 || liveCredit >= 80);
 
-      // Hitung masa pemantauan (mengikuti konfigurasi sistem admin)
+      // Hitung masa pemantauan (mengikuti konfigurasi sistem admin: menit, jam, atau hari)
       const config = this.getConfig();
-      const defaultNormal = config.holdDaysNormal ?? 3;
-      const defaultReferral = config.holdDaysReferral ?? 2;
-      let holdDays = key.holdDurationDays || defaultNormal;
-      if (!key.holdDurationDays && key.userId) {
-        const users = this.getUsers();
-        const u = users.find(user => user.id === key.userId || (key.userEmail && user.email === key.userEmail));
-        if (u && (u.referredBy || u.referred_by)) {
-          holdDays = defaultReferral;
-        }
-      }
-      const holdTime = new Date(key.holdUntil || (new Date(key.createdAt).getTime() + holdDays * 24 * 60 * 60 * 1000)).getTime();
+      let durationMs = 3 * 24 * 60 * 60 * 1000;
+      const users = this.getUsers();
+      const u = (key.userId || key.userEmail)
+        ? users.find(user => user.id === key.userId || (key.userEmail && user.email === key.userEmail))
+        : null;
+      const isReferred = Boolean(u && (u.referredBy || u.referred_by));
+
+      const val = isReferred
+        ? (config.holdValueReferral ?? config.holdDaysReferral ?? 2)
+        : (config.holdValueNormal ?? config.holdDaysNormal ?? 3);
+      const unit = isReferred
+        ? (config.holdUnitReferral || 'days')
+        : (config.holdUnitNormal || 'days');
+
+      if (unit === 'minutes') durationMs = val * 60 * 1000;
+      else if (unit === 'hours') durationMs = val * 60 * 60 * 1000;
+      else durationMs = val * 24 * 60 * 60 * 1000;
+
+      const holdTime = new Date(key.holdUntil || (new Date(key.createdAt).getTime() + durationMs)).getTime();
       const isHoldExpired = Date.now() >= holdTime;
       const diffMs = holdTime - Date.now();
       const daysRemaining = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
@@ -2559,6 +2567,10 @@ export class AdminDataService {
       referralPercent: 5,
       holdDaysNormal: 3,
       holdDaysReferral: 2,
+      holdValueNormal: 3,
+      holdUnitNormal: 'days',
+      holdValueReferral: 2,
+      holdUnitReferral: 'days',
       validationMode: 'simulation',
       autoApproveThreshold: 0
     });

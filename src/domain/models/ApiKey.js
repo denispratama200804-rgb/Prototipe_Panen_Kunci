@@ -67,22 +67,26 @@ export class ApiKey {
   }
 
   /**
-   * Menghitung sisa hari / jam masa pemantauan
-   * @returns {{ days: number, hours: number, isReady: boolean, text: string }}
+   * Menghitung sisa hari / jam / menit masa pemantauan
+   * @returns {{ days: number, hours: number, minutes: number, isReady: boolean, text: string }}
    */
   getHoldRemaining() {
     const defaultDays = this.holdDurationDays || 3;
     const holdTime = new Date(this.holdUntil || new Date(this.createdAt).getTime() + defaultDays * 24 * 60 * 60 * 1000).getTime();
     const diffMs = holdTime - Date.now();
     if (diffMs <= 0) {
-      return { days: 0, hours: 0, isReady: true, text: 'Siap divalidasi' };
+      return { days: 0, hours: 0, minutes: 0, isReady: true, text: 'Siap divalidasi' };
     }
     const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
     const hours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    const minutes = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
     if (days > 0) {
-      return { days, hours, isReady: false, text: `Sisa ${days} hari ${hours} jam` };
+      return { days, hours, minutes, isReady: false, text: `Sisa ${days} hari ${hours} jam` };
     }
-    return { days: 0, hours, isReady: false, text: `Sisa ${hours} jam` };
+    if (hours > 0) {
+      return { days: 0, hours, minutes, isReady: false, text: `Sisa ${hours} jam ${minutes} menit` };
+    }
+    return { days: 0, hours: 0, minutes: Math.max(1, minutes), isReady: false, text: `Sisa ${Math.max(1, minutes)} menit` };
   }
 
   /**

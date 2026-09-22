@@ -460,13 +460,18 @@ export class ApiKeysView {
                             } else {
                               const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
                               const hours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+                              const minutes = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+                              let timeStr = '';
+                              if (days > 0) timeStr = `${days}h ${hours}j`;
+                              else if (hours > 0) timeStr = `${hours}j ${minutes}m`;
+                              else timeStr = `${Math.max(1, minutes)}m`;
                               const isRefBonus = holdDays === defaultReferral && defaultReferral < defaultNormal;
-                              const refTag = isRefBonus ? ` (Ref ${defaultReferral}h)` : '';
-                              holdText = days > 0 ? `⏳ Sisa ${days}h ${hours}j${refTag}` : `⏳ Sisa ${hours}j${refTag}`;
+                              const refTag = isRefBonus ? ` (Ref)` : '';
+                              holdText = `⏳ Sisa ${timeStr}${refTag}`;
                             }
                             const isRefBonus = holdDays === defaultReferral && defaultReferral < defaultNormal;
                             statusBadge = `
-                              <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border ${isReady ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/15 text-amber-300 border-amber-500/40'} inline-flex items-center gap-1 whitespace-nowrap" title="${isRefBonus ? `Masa pantau ${defaultReferral} hari (Bonus Referral)` : `Masa pantau ${holdDays} hari standar`} - Dipantau otomatis setiap 00:00 WIB">
+                              <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border ${isReady ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/15 text-amber-300 border-amber-500/40'} inline-flex items-center gap-1 whitespace-nowrap" title="${isRefBonus ? `Masa pantau holding (Bonus Referral)` : `Masa pantau holding standar`} - Dipantau otomatis">
                                 <span class="w-1.5 h-1.5 rounded-full ${isReady ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse"></span>
                                 <span>${holdText}</span>
                               </span>

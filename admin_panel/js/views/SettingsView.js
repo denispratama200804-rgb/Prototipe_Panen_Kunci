@@ -174,14 +174,14 @@ export class SettingsView {
                   <div>
                     <div class="flex items-center gap-2 flex-wrap">
                       <label class="block text-xs font-bold text-indigo-300 uppercase tracking-wider">
-                        Masa Tunggu Konversi Saldo Pasif (Hari)
+                        Masa Tunggu Konversi Saldo Pasif
                       </label>
                       <span class="px-2 py-0.2 text-[10px] font-bold rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                         Otomatis ke Saldo Aktif
                       </span>
                     </div>
                     <p class="text-[11px] text-slate-400 leading-relaxed">
-                      Jangka waktu holding sebelum saldo pasif dari setoran API Key otomatis dikonversi menjadi saldo aktif yang siap dicairkan.
+                      Jangka waktu holding sebelum saldo pasif dari setoran API Key otomatis dikonversi menjadi saldo aktif. Bisa diatur dalam satuan Menit, Jam, atau Hari.
                     </p>
                   </div>
                 </div>
@@ -190,19 +190,18 @@ export class SettingsView {
               <!-- Grid 2 Kolom: Standar vs Dengan Referral -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                 <!-- Kolom 1: Masa Tunggu Standar (Tanpa Referral) -->
-                <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5">
-                  <div class="flex items-center justify-between gap-2">
+                <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div class="flex items-center gap-1.5">
                       <span class="material-symbols-outlined text-sm text-slate-400">person</span>
                       <span class="text-xs font-bold text-slate-200">Standar (Tanpa Referral)</span>
                     </div>
-                    <div class="flex items-center gap-1 flex-wrap">
-                      <span class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mr-0.5">Preset:</span>
-                      <button type="button" class="btn-hold-normal-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="1">1h</button>
-                      <button type="button" class="btn-hold-normal-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="2">2h</button>
-                      <button type="button" class="btn-hold-normal-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="3">3h</button>
-                      <button type="button" class="btn-hold-normal-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="5">5h</button>
-                      <button type="button" class="btn-hold-normal-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="7">7h</button>
+
+                    <!-- Unit Selector: Menit / Jam / Hari -->
+                    <div class="inline-flex p-0.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-semibold self-start sm:self-auto" id="unitToggleContainerNormal">
+                      <button type="button" class="btn-unit-normal px-2.5 py-1 rounded-md transition-all cursor-pointer ${unitNormal === 'minutes' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-slate-400 hover:text-white'}" data-unit="minutes">Menit</button>
+                      <button type="button" class="btn-unit-normal px-2.5 py-1 rounded-md transition-all cursor-pointer ${unitNormal === 'hours' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-slate-400 hover:text-white'}" data-unit="hours">Jam</button>
+                      <button type="button" class="btn-unit-normal px-2.5 py-1 rounded-md transition-all cursor-pointer ${unitNormal === 'days' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-slate-400 hover:text-white'}" data-unit="days">Hari</button>
                     </div>
                   </div>
 
@@ -213,7 +212,7 @@ export class SettingsView {
                     <button
                       type="button"
                       id="btnDecHoldNormal"
-                      title="Kurangi 1 hari"
+                      title="Kurangi durasi"
                       class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-indigo-400 flex items-center justify-center font-bold text-lg border border-slate-700 active:scale-95 transition-all cursor-pointer select-none shrink-0"
                     >
                       <span class="material-symbols-outlined text-lg">remove</span>
@@ -222,21 +221,21 @@ export class SettingsView {
                     <div class="relative flex-1">
                       <input
                         type="number"
-                        name="holdDaysNormal"
-                        id="inputHoldDaysNormal"
-                        value="${config.holdDaysNormal ?? 3}"
+                        name="holdValueNormal"
+                        id="inputHoldValueNormal"
+                        value="${valNormal}"
                         step="1"
                         min="1"
-                        max="30"
-                        class="w-full text-center pl-3 pr-10 py-2 bg-slate-900 border border-indigo-500/40 rounded-xl text-base sm:text-sm font-extrabold text-indigo-300 focus:outline-none focus:border-indigo-400 font-mono transition-colors"
+                        class="w-full text-center pl-3 pr-14 py-2.5 bg-slate-900 border border-indigo-500/40 rounded-xl text-base sm:text-sm font-extrabold text-indigo-300 focus:outline-none focus:border-indigo-400 font-mono transition-colors"
                       />
-                      <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-indigo-400 font-sans">Hari</span>
+                      <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-indigo-400 font-sans pointer-events-none select-none" id="unitLabelNormal">${getUnitLabel(unitNormal)}</span>
+                      <input type="hidden" name="holdUnitNormal" id="inputHoldUnitNormal" value="${unitNormal}" />
                     </div>
 
                     <button
                       type="button"
                       id="btnIncHoldNormal"
-                      title="Tambah 1 hari"
+                      title="Tambah durasi"
                       class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-indigo-400 flex items-center justify-center font-bold text-lg border border-slate-700 active:scale-95 transition-all cursor-pointer select-none shrink-0"
                     >
                       <span class="material-symbols-outlined text-lg">add</span>
@@ -244,21 +243,20 @@ export class SettingsView {
                   </div>
                 </div>
 
-                <!-- Kolom 2: Masa Tunggu dengan Kode Referral (Diskon) -->
-                <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5">
-                  <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-1.5">
+                <!-- Kolom 2: Masa Tunggu dengan Kode Referral -->
+                <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 flex-wrap">
                       <span class="material-symbols-outlined text-sm text-emerald-400">group_add</span>
                       <span class="text-xs font-bold text-emerald-300">Dengan Kode Referral</span>
                       <span class="px-1.5 py-0.2 text-[9px] font-bold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Lebih Cepat</span>
                     </div>
-                    <div class="flex items-center gap-1 flex-wrap">
-                      <span class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mr-0.5">Preset:</span>
-                      <button type="button" class="btn-hold-ref-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="1">1h</button>
-                      <button type="button" class="btn-hold-ref-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="2">2h</button>
-                      <button type="button" class="btn-hold-ref-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="3">3h</button>
-                      <button type="button" class="btn-hold-ref-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="4">4h</button>
-                      <button type="button" class="btn-hold-ref-preset px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-colors cursor-pointer" data-val="5">5h</button>
+
+                    <!-- Unit Selector: Menit / Jam / Hari -->
+                    <div class="inline-flex p-0.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-semibold self-start sm:self-auto" id="unitToggleContainerRef">
+                      <button type="button" class="btn-unit-ref px-2.5 py-1 rounded-md transition-all cursor-pointer ${unitRef === 'minutes' ? 'bg-emerald-600 text-white shadow-xs font-bold' : 'text-slate-400 hover:text-white'}" data-unit="minutes">Menit</button>
+                      <button type="button" class="btn-unit-ref px-2.5 py-1 rounded-md transition-all cursor-pointer ${unitRef === 'hours' ? 'bg-emerald-600 text-white shadow-xs font-bold' : 'text-slate-400 hover:text-white'}" data-unit="hours">Jam</button>
+                      <button type="button" class="btn-unit-ref px-2.5 py-1 rounded-md transition-all cursor-pointer ${unitRef === 'days' ? 'bg-emerald-600 text-white shadow-xs font-bold' : 'text-slate-400 hover:text-white'}" data-unit="days">Hari</button>
                     </div>
                   </div>
 
@@ -269,7 +267,7 @@ export class SettingsView {
                     <button
                       type="button"
                       id="btnDecHoldReferral"
-                      title="Kurangi 1 hari"
+                      title="Kurangi durasi"
                       class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-emerald-400 flex items-center justify-center font-bold text-lg border border-slate-700 active:scale-95 transition-all cursor-pointer select-none shrink-0"
                     >
                       <span class="material-symbols-outlined text-lg">remove</span>
@@ -278,21 +276,21 @@ export class SettingsView {
                     <div class="relative flex-1">
                       <input
                         type="number"
-                        name="holdDaysReferral"
-                        id="inputHoldDaysReferral"
-                        value="${config.holdDaysReferral ?? 2}"
+                        name="holdValueReferral"
+                        id="inputHoldValueReferral"
+                        value="${valRef}"
                         step="1"
                         min="1"
-                        max="30"
-                        class="w-full text-center pl-3 pr-10 py-2 bg-slate-900 border border-emerald-500/40 rounded-xl text-base sm:text-sm font-extrabold text-emerald-300 focus:outline-none focus:border-emerald-400 font-mono transition-colors"
+                        class="w-full text-center pl-3 pr-14 py-2.5 bg-slate-900 border border-emerald-500/40 rounded-xl text-base sm:text-sm font-extrabold text-emerald-300 focus:outline-none focus:border-emerald-400 font-mono transition-colors"
                       />
-                      <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-400 font-sans">Hari</span>
+                      <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-400 font-sans pointer-events-none select-none" id="unitLabelReferral">${getUnitLabel(unitRef)}</span>
+                      <input type="hidden" name="holdUnitReferral" id="inputHoldUnitReferral" value="${unitRef}" />
                     </div>
 
                     <button
                       type="button"
                       id="btnIncHoldReferral"
-                      title="Tambah 1 hari"
+                      title="Tambah durasi"
                       class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-emerald-400 flex items-center justify-center font-bold text-lg border border-slate-700 active:scale-95 transition-all cursor-pointer select-none shrink-0"
                     >
                       <span class="material-symbols-outlined text-lg">add</span>
@@ -308,7 +306,7 @@ export class SettingsView {
                   <span>Simulasi Konversi Saldo Pasif:</span>
                 </span>
                 <span class="font-mono text-[11px] text-slate-200" id="holdSimulationPreview">
-                  Standar: <strong class="text-indigo-300">${config.holdDaysNormal ?? 3} Hari</strong> ➔ Referral: <strong class="text-emerald-400">${config.holdDaysReferral ?? 2} Hari</strong> (${Math.max(0, (config.holdDaysNormal ?? 3) - (config.holdDaysReferral ?? 2))} hari lebih cepat)
+                  Standar: <strong class="text-indigo-300">${valNormal} ${getUnitLabel(unitNormal)}</strong> ➔ Referral: <strong class="text-emerald-400">${valRef} ${getUnitLabel(unitRef)}</strong>
                 </span>
               </div>
             </div>
@@ -511,100 +509,164 @@ export class SettingsView {
       });
     });
 
-    // ── Stepper & Presets: Masa Tunggu Konversi Saldo Pasif (Hari) ──
-    const inputHoldNormal = container.querySelector('#inputHoldDaysNormal');
-    const inputHoldRef = container.querySelector('#inputHoldDaysReferral');
+    // ── Stepper & Unit Toggles: Masa Tunggu Konversi Saldo Pasif ──
+    const inputHoldValNormal = container.querySelector('#inputHoldValueNormal');
+    const inputHoldUnitNormal = container.querySelector('#inputHoldUnitNormal');
+    const unitLabelNormal = container.querySelector('#unitLabelNormal');
     const btnDecHoldNormal = container.querySelector('#btnDecHoldNormal');
     const btnIncHoldNormal = container.querySelector('#btnIncHoldNormal');
+    const unitBtnsNormal = container.querySelectorAll('.btn-unit-normal');
+
+    const inputHoldValRef = container.querySelector('#inputHoldValueReferral');
+    const inputHoldUnitRef = container.querySelector('#inputHoldUnitReferral');
+    const unitLabelRef = container.querySelector('#unitLabelReferral');
     const btnDecHoldRef = container.querySelector('#btnDecHoldReferral');
     const btnIncHoldRef = container.querySelector('#btnIncHoldReferral');
-    const holdPreviewEl = container.querySelector('#holdSimulationPreview');
-    const presetNormalBtns = container.querySelectorAll('.btn-hold-normal-preset');
-    const presetRefBtns = container.querySelectorAll('.btn-hold-ref-preset');
+    const unitBtnsRef = container.querySelectorAll('.btn-unit-ref');
 
-    const updateHoldPreview = (normalDays, refDays) => {
-      const norm = Math.max(1, Math.min(30, Math.round(Number(normalDays) || 3)));
-      const ref = Math.max(1, Math.min(30, Math.round(Number(refDays) || 2)));
+    const holdPreviewEl = container.querySelector('#holdSimulationPreview');
+
+    const getUnitText = (u) => {
+      if (u === 'minutes') return 'Menit';
+      if (u === 'hours') return 'Jam';
+      return 'Hari';
+    };
+
+    const toMs = (val, unit) => {
+      const n = Math.max(1, Number(val) || 1);
+      if (unit === 'minutes') return n * 60 * 1000;
+      if (unit === 'hours') return n * 60 * 60 * 1000;
+      return n * 24 * 60 * 60 * 1000;
+    };
+
+    const formatMs = (ms) => {
+      if (ms <= 0) return '0 Menit';
+      const totalMin = Math.round(ms / (60 * 1000));
+      const days = Math.floor(totalMin / (24 * 60));
+      const hours = Math.floor((totalMin % (24 * 60)) / 60);
+      const minutes = totalMin % 60;
+      const parts = [];
+      if (days > 0) parts.push(`${days} Hari`);
+      if (hours > 0) parts.push(`${hours} Jam`);
+      if (minutes > 0) parts.push(`${minutes} Menit`);
+      return parts.join(' ') || '0 Menit';
+    };
+
+    const updateHoldPreview = () => {
+      const valNorm = Math.max(1, Number(inputHoldValNormal?.value) || 1);
+      const unitNorm = inputHoldUnitNormal?.value || 'days';
+      const valRef = Math.max(1, Number(inputHoldValRef?.value) || 1);
+      const unitRef = inputHoldUnitRef?.value || 'days';
+
+      const normMs = toMs(valNorm, unitNorm);
+      const refMs = toMs(valRef, unitRef);
+      const diffMs = normMs - refMs;
+
       if (holdPreviewEl) {
-        const diff = Math.max(0, norm - ref);
-        const diffText = diff > 0 ? `(${diff} hari lebih cepat)` : '(durasi sama)';
-        holdPreviewEl.innerHTML = `Standar: <strong class="text-indigo-300">${norm} Hari</strong> ➔ Referral: <strong class="text-emerald-400">${ref} Hari</strong> ${diffText}`;
+        let diffStr = '';
+        if (diffMs > 0) {
+          diffStr = `(Hemat ${formatMs(diffMs)} lebih cepat)`;
+        } else if (diffMs === 0) {
+          diffStr = '(durasi sama)';
+        } else {
+          diffStr = `(referral ${formatMs(Math.abs(diffMs))} lebih lama dari standar)`;
+        }
+        holdPreviewEl.innerHTML = `Standar: <strong class="text-indigo-300">${valNorm} ${getUnitText(unitNorm)}</strong> ➔ Referral: <strong class="text-emerald-400">${valRef} ${getUnitText(unitRef)}</strong> ${diffStr}`;
       }
     };
 
-    if (inputHoldNormal) {
-      inputHoldNormal.addEventListener('input', () => updateHoldPreview(inputHoldNormal.value, inputHoldRef?.value));
-      inputHoldNormal.addEventListener('change', () => {
-        let val = Math.max(1, Math.min(30, Math.round(Number(inputHoldNormal.value) || 3)));
-        inputHoldNormal.value = val;
-        updateHoldPreview(val, inputHoldRef?.value);
+    // Unit toggle Normal
+    unitBtnsNormal.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const u = btn.getAttribute('data-unit') || 'days';
+        if (inputHoldUnitNormal) inputHoldUnitNormal.value = u;
+        if (unitLabelNormal) unitLabelNormal.textContent = getUnitText(u);
+        unitBtnsNormal.forEach(b => {
+          if (b.getAttribute('data-unit') === u) {
+            b.className = 'btn-unit-normal px-2.5 py-1 rounded-md transition-all cursor-pointer bg-indigo-600 text-white shadow-xs font-bold';
+          } else {
+            b.className = 'btn-unit-normal px-2.5 py-1 rounded-md transition-all cursor-pointer text-slate-400 hover:text-white';
+          }
+        });
+        updateHoldPreview();
+      });
+    });
+
+    // Unit toggle Referral
+    unitBtnsRef.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const u = btn.getAttribute('data-unit') || 'days';
+        if (inputHoldUnitRef) inputHoldUnitRef.value = u;
+        if (unitLabelRef) unitLabelRef.textContent = getUnitText(u);
+        unitBtnsRef.forEach(b => {
+          if (b.getAttribute('data-unit') === u) {
+            b.className = 'btn-unit-ref px-2.5 py-1 rounded-md transition-all cursor-pointer bg-emerald-600 text-white shadow-xs font-bold';
+          } else {
+            b.className = 'btn-unit-ref px-2.5 py-1 rounded-md transition-all cursor-pointer text-slate-400 hover:text-white';
+          }
+        });
+        updateHoldPreview();
+      });
+    });
+
+    // Inputs & Steppers
+    if (inputHoldValNormal) {
+      inputHoldValNormal.addEventListener('input', updateHoldPreview);
+      inputHoldValNormal.addEventListener('change', () => {
+        let val = Math.max(1, Math.round(Number(inputHoldValNormal.value) || 1));
+        inputHoldValNormal.value = val;
+        updateHoldPreview();
       });
     }
 
-    if (inputHoldRef) {
-      inputHoldRef.addEventListener('input', () => updateHoldPreview(inputHoldNormal?.value, inputHoldRef.value));
-      inputHoldRef.addEventListener('change', () => {
-        let val = Math.max(1, Math.min(30, Math.round(Number(inputHoldRef.value) || 2)));
-        inputHoldRef.value = val;
-        updateHoldPreview(inputHoldNormal?.value, val);
+    if (inputHoldValRef) {
+      inputHoldValRef.addEventListener('input', updateHoldPreview);
+      inputHoldValRef.addEventListener('change', () => {
+        let val = Math.max(1, Math.round(Number(inputHoldValRef.value) || 1));
+        inputHoldValRef.value = val;
+        updateHoldPreview();
       });
     }
 
-    if (btnDecHoldNormal && inputHoldNormal) {
+    if (btnDecHoldNormal && inputHoldValNormal) {
       btnDecHoldNormal.addEventListener('click', () => {
-        let cur = Number(inputHoldNormal.value) || 3;
-        let next = Math.max(1, cur - 1);
-        inputHoldNormal.value = next;
-        updateHoldPreview(next, inputHoldRef?.value);
+        let cur = Number(inputHoldValNormal.value) || 1;
+        const u = inputHoldUnitNormal?.value || 'days';
+        let step = (u === 'minutes' && cur > 5 && cur % 5 === 0) ? 5 : 1;
+        inputHoldValNormal.value = Math.max(1, cur - step);
+        updateHoldPreview();
       });
     }
 
-    if (btnIncHoldNormal && inputHoldNormal) {
+    if (btnIncHoldNormal && inputHoldValNormal) {
       btnIncHoldNormal.addEventListener('click', () => {
-        let cur = Number(inputHoldNormal.value) || 3;
-        let next = Math.min(30, cur + 1);
-        inputHoldNormal.value = next;
-        updateHoldPreview(next, inputHoldRef?.value);
+        let cur = Number(inputHoldValNormal.value) || 1;
+        const u = inputHoldUnitNormal?.value || 'days';
+        let step = (u === 'minutes' && cur >= 5 && cur % 5 === 0) ? 5 : 1;
+        inputHoldValNormal.value = cur + step;
+        updateHoldPreview();
       });
     }
 
-    if (btnDecHoldRef && inputHoldRef) {
+    if (btnDecHoldRef && inputHoldValRef) {
       btnDecHoldRef.addEventListener('click', () => {
-        let cur = Number(inputHoldRef.value) || 2;
-        let next = Math.max(1, cur - 1);
-        inputHoldRef.value = next;
-        updateHoldPreview(inputHoldNormal?.value, next);
+        let cur = Number(inputHoldValRef.value) || 1;
+        const u = inputHoldUnitRef?.value || 'days';
+        let step = (u === 'minutes' && cur > 5 && cur % 5 === 0) ? 5 : 1;
+        inputHoldValRef.value = Math.max(1, cur - step);
+        updateHoldPreview();
       });
     }
 
-    if (btnIncHoldRef && inputHoldRef) {
+    if (btnIncHoldRef && inputHoldValRef) {
       btnIncHoldRef.addEventListener('click', () => {
-        let cur = Number(inputHoldRef.value) || 2;
-        let next = Math.min(30, cur + 1);
-        inputHoldRef.value = next;
-        updateHoldPreview(inputHoldNormal?.value, next);
+        let cur = Number(inputHoldValRef.value) || 1;
+        const u = inputHoldUnitRef?.value || 'days';
+        let step = (u === 'minutes' && cur >= 5 && cur % 5 === 0) ? 5 : 1;
+        inputHoldValRef.value = cur + step;
+        updateHoldPreview();
       });
     }
-
-    presetNormalBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const val = btn.getAttribute('data-val');
-        if (inputHoldNormal && val !== null) {
-          inputHoldNormal.value = val;
-          updateHoldPreview(val, inputHoldRef?.value);
-        }
-      });
-    });
-
-    presetRefBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const val = btn.getAttribute('data-val');
-        if (inputHoldRef && val !== null) {
-          inputHoldRef.value = val;
-          updateHoldPreview(inputHoldNormal?.value, val);
-        }
-      });
-    });
 
     // Sinkronkan form dengan config terbaru dari database di background
     this.dataService.fetchConfigFromSupabase().then(latestCfg => {
@@ -618,9 +680,42 @@ export class SettingsView {
         form.elements['referralPercent'].value = latestCfg.referralPercent ?? 5;
         updatePreview(latestCfg.referralPercent ?? 5);
       }
-      if (form.elements['holdDaysNormal']) form.elements['holdDaysNormal'].value = latestCfg.holdDaysNormal ?? 3;
-      if (form.elements['holdDaysReferral']) form.elements['holdDaysReferral'].value = latestCfg.holdDaysReferral ?? 2;
-      updateHoldPreview(latestCfg.holdDaysNormal ?? 3, latestCfg.holdDaysReferral ?? 2);
+
+      // Hold Normal
+      if (latestCfg.holdValueNormal !== undefined && form.elements['holdValueNormal']) {
+        form.elements['holdValueNormal'].value = latestCfg.holdValueNormal;
+      } else if (latestCfg.holdDaysNormal !== undefined && form.elements['holdValueNormal']) {
+        form.elements['holdValueNormal'].value = latestCfg.holdDaysNormal;
+      }
+      if (latestCfg.holdUnitNormal && inputHoldUnitNormal) {
+        inputHoldUnitNormal.value = latestCfg.holdUnitNormal;
+        if (unitLabelNormal) unitLabelNormal.textContent = getUnitText(latestCfg.holdUnitNormal);
+        unitBtnsNormal.forEach(b => {
+          const isActive = b.getAttribute('data-unit') === latestCfg.holdUnitNormal;
+          b.className = isActive
+            ? 'btn-unit-normal px-2.5 py-1 rounded-md transition-all cursor-pointer bg-indigo-600 text-white shadow-xs font-bold'
+            : 'btn-unit-normal px-2.5 py-1 rounded-md transition-all cursor-pointer text-slate-400 hover:text-white';
+        });
+      }
+
+      // Hold Referral
+      if (latestCfg.holdValueReferral !== undefined && form.elements['holdValueReferral']) {
+        form.elements['holdValueReferral'].value = latestCfg.holdValueReferral;
+      } else if (latestCfg.holdDaysReferral !== undefined && form.elements['holdValueReferral']) {
+        form.elements['holdValueReferral'].value = latestCfg.holdDaysReferral;
+      }
+      if (latestCfg.holdUnitReferral && inputHoldUnitRef) {
+        inputHoldUnitRef.value = latestCfg.holdUnitReferral;
+        if (unitLabelRef) unitLabelRef.textContent = getUnitText(latestCfg.holdUnitReferral);
+        unitBtnsRef.forEach(b => {
+          const isActive = b.getAttribute('data-unit') === latestCfg.holdUnitReferral;
+          b.className = isActive
+            ? 'btn-unit-ref px-2.5 py-1 rounded-md transition-all cursor-pointer bg-emerald-600 text-white shadow-xs font-bold'
+            : 'btn-unit-ref px-2.5 py-1 rounded-md transition-all cursor-pointer text-slate-400 hover:text-white';
+        });
+      }
+
+      updateHoldPreview();
 
       if (form.elements['feeDana']) form.elements['feeDana'].value = latestCfg.feeDana ?? 1000;
       if (form.elements['feeGopay']) form.elements['feeGopay'].value = latestCfg.feeGopay ?? 1000;
@@ -642,12 +737,25 @@ export class SettingsView {
 
         const fd = new FormData(form);
         const getNum = (val, def) => (val !== null && String(val).trim() !== '' && !isNaN(Number(val))) ? Number(val) : def;
+
+        const holdValNorm = getNum(fd.get('holdValueNormal'), 3);
+        const holdUnitNorm = fd.get('holdUnitNormal') || 'days';
+        const holdValRef = getNum(fd.get('holdValueReferral'), 2);
+        const holdUnitRef = fd.get('holdUnitReferral') || 'days';
+
+        const daysNormal = holdUnitNorm === 'minutes' ? (holdValNorm / 1440) : (holdUnitNorm === 'hours' ? (holdValNorm / 24) : holdValNorm);
+        const daysReferral = holdUnitRef === 'minutes' ? (holdValRef / 1440) : (holdUnitRef === 'hours' ? (holdValRef / 24) : holdValRef);
+
         const newConfig = {
           rewardPerKey: getNum(fd.get('rewardPerKey'), 3000),
           minWithdrawal: getNum(fd.get('minWithdrawal'), 50000),
           referralPercent: getNum(fd.get('referralPercent'), 5),
-          holdDaysNormal: getNum(fd.get('holdDaysNormal'), 3),
-          holdDaysReferral: getNum(fd.get('holdDaysReferral'), 2),
+          holdValueNormal: holdValNorm,
+          holdUnitNormal: holdUnitNorm,
+          holdDaysNormal: daysNormal,
+          holdValueReferral: holdValRef,
+          holdUnitReferral: holdUnitRef,
+          holdDaysReferral: daysReferral,
           feeDana: getNum(fd.get('feeDana'), 1000),
           feeGopay: getNum(fd.get('feeGopay'), 1000),
           feeOvo: getNum(fd.get('feeOvo'), 1000),
@@ -668,11 +776,11 @@ export class SettingsView {
           form.elements['referralPercent'].value = newConfig.referralPercent;
           updatePreview(newConfig.referralPercent);
         }
-        if (form.elements['holdDaysNormal']) form.elements['holdDaysNormal'].value = newConfig.holdDaysNormal;
-        if (form.elements['holdDaysReferral']) form.elements['holdDaysReferral'].value = newConfig.holdDaysReferral;
-        updateHoldPreview(newConfig.holdDaysNormal, newConfig.holdDaysReferral);
+        if (form.elements['holdValueNormal']) form.elements['holdValueNormal'].value = newConfig.holdValueNormal;
+        if (form.elements['holdValueReferral']) form.elements['holdValueReferral'].value = newConfig.holdValueReferral;
+        updateHoldPreview();
 
-        this.toast.success(`Pengaturan tersimpan! Konversi saldo pasif: ${newConfig.holdDaysNormal} hari (standar) & ${newConfig.holdDaysReferral} hari (referral) berhasil disinkronkan ke seluruh sistem!`, 'Tersimpan');
+        this.toast.success(`Pengaturan tersimpan! Konversi saldo pasif: ${holdValNorm} ${getUnitText(holdUnitNorm)} (standar) & ${holdValRef} ${getUnitText(holdUnitRef)} (referral) berhasil disinkronkan!`, 'Tersimpan');
       });
     }
   }
