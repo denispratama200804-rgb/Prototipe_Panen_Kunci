@@ -1670,10 +1670,19 @@ export default async function handler(req, res) {
         }
       }
 
+      const numAmount = Number(data.amount || 0);
+      if (numAmount <= 0) {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: 'Transaksi dengan amount <= 0 dilewati (database check constraint transactions_amount_check).'
+        });
+      }
+
       const txPayload = {
         user_id: validUserId,
         type: data.type || 'deposit',
-        amount: Number(data.amount || 0),
+        amount: numAmount,
         fee: Number(data.fee || 0),
         title: data.title || 'Transaksi',
         description: data.description || '',

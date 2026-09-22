@@ -1036,10 +1036,21 @@ export default defineConfig(({ mode }) => {
                       }
                     }
 
+                    const numAmount = Number(data.amount || 0);
+                    if (numAmount <= 0) {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({
+                        success: true,
+                        skipped: true,
+                        message: 'Transaksi dengan amount <= 0 dilewati (database check constraint transactions_amount_check).'
+                      }));
+                      return;
+                    }
+
                     const txPayload = {
                       user_id: validUserId,
                       type: data.type || 'deposit',
-                      amount: Number(data.amount || 0),
+                      amount: numAmount,
                       fee: Number(data.fee || 0),
                       title: data.title || 'Transaksi',
                       description: data.description || '',

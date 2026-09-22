@@ -87,6 +87,12 @@ export class SupabaseTransactionRepository extends ITransactionRepository {
     const numAmount = Number(tx.amount || 0);
     const numFee = Number(tx.fee || 0);
 
+    // Database check constraint 'transactions_amount_check': amount HARUS > 0
+    if (numAmount <= 0) {
+      console.warn('[SupabaseTransactionRepository] Lewati insert transaksi: amount harus > 0 (CHECK constraint transactions_amount_check). Data:', tx);
+      return tx;
+    }
+
     const payload = {
       user_id: validUserId,
       type: tx.type,

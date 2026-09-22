@@ -585,7 +585,7 @@ export class WalletService {
       const isValid = k.status === 'valid';
       const isPending = k.status === 'pending';
       const isInvalid = !isValid && !isPending;
-      const reward = (isValid || isPending) ? (Number(k.rewardAmount) || 3000) : 0;
+      const reward = Number(k.rewardAmount) || 3000;
 
       const title = isValid
         ? 'Setoran API Key (Terverifikasi)'
@@ -609,7 +609,7 @@ export class WalletService {
         this._transactions.unshift(newTx);
         hasNewTx = true;
 
-        if (this._transactionRepository) {
+        if (this._transactionRepository && newTx.amount > 0) {
           this._transactionRepository.create(newTx).catch(() => {});
         }
       } else {
@@ -627,7 +627,7 @@ export class WalletService {
           existing.status = 'failed';
           existing.title = 'Setoran API Key (Invalid)';
           existing.description = k.errorMessage || `API Key Invalid: ${masked}`;
-          existing.amount = 0;
+          existing.amount = Number(existing.amount) > 0 ? Number(existing.amount) : reward;
           hasNewTx = true;
 
           if (this._transactionRepository && existing.id && existing.id.includes('-')) {
@@ -1170,11 +1170,12 @@ export class WalletService {
    */
   addFailedDeposit(apiKey) {
     const masked = typeof apiKey?.getMaskedKey === 'function' ? apiKey.getMaskedKey() : (apiKey?.keyString || 'API Key');
+    const reward = Number(apiKey?.rewardAmount) || 3000;
     const tx = new Transaction({
       id: 'tx_' + Math.random().toString(36).substring(2, 9),
       userId: apiKey?.userId || this._getUserId() || 'usr_current',
       type: 'deposit',
-      amount: 0,
+      amount: reward,
       title: 'Setoran API Key (Invalid)',
       description: apiKey?.errorMessage || `Verifikasi gagal (Invalid): ${masked}`,
       status: 'failed',
@@ -1184,7 +1185,7 @@ export class WalletService {
     this._transactions.unshift(tx);
     this._persist();
 
-    if (this._transactionRepository) {
+    if (this._transactionRepository && tx.amount > 0) {
       this._transactionRepository.create(tx)
         .then(saved => {
           if (saved && saved.id) tx.id = saved.id;
