@@ -180,6 +180,17 @@ export class AuthService {
         } catch (_) {}
       }
 
+      // Sinkronkan cadangan pk_nickname_updated_ jika properti nicknameUpdatedAt kosong
+      if (!this._currentUser.nicknameUpdatedAt && typeof localStorage !== 'undefined') {
+        try {
+          const localTs = localStorage.getItem('pk_nickname_updated_' + this._currentUser.id) ||
+                          localStorage.getItem('pk_nickname_updated_' + (this._currentUser.email || '').toLowerCase());
+          if (localTs) {
+            this._currentUser.nicknameUpdatedAt = localTs;
+          }
+        } catch (_) {}
+      }
+
       // Pastikan role bersih, tegas, dan konsisten (mencegah perpindahan sesi ke admin secara otomatis)
       const isExplicitAdmin = (this._currentUser.role === 'admin') ||
                               (this._currentUser.email === 'admin@panenkunci.id') ||
@@ -223,8 +234,14 @@ export class AuthService {
                                     (remote.email === 'admin@panenkunci.com');
               const validatedRole = isRemoteAdmin ? 'admin' : 'user';
               remote.role = validatedRole;
-              if (!remote.nicknameUpdatedAt && prevNicknameUpdatedAt) {
-                remote.nicknameUpdatedAt = prevNicknameUpdatedAt;
+              if (!remote.nicknameUpdatedAt) {
+                if (prevNicknameUpdatedAt) {
+                  remote.nicknameUpdatedAt = prevNicknameUpdatedAt;
+                } else if (typeof localStorage !== 'undefined') {
+                  const localTs = localStorage.getItem('pk_nickname_updated_' + remote.id) ||
+                                  localStorage.getItem('pk_nickname_updated_' + (remote.email || '').toLowerCase());
+                  if (localTs) remote.nicknameUpdatedAt = localTs;
+                }
               }
               if (!remote.referredBy && prevReferredBy) {
                 remote.referredBy = prevReferredBy;
@@ -869,6 +886,15 @@ export class AuthService {
     this._currentUser.nicknameUpdatedAt = nowIso;
     this._saveSession(this._currentUser, this._currentUser.role || 'user');
 
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('pk_nickname_updated_' + this._currentUser.id, nowIso);
+        if (this._currentUser.email) {
+          localStorage.setItem('pk_nickname_updated_' + this._currentUser.email.toLowerCase(), nowIso);
+        }
+      } catch (_) {}
+    }
+
     // 2. Simpan ke database Supabase dan Auth metadata
     if (isSupabaseConfigured() && this._currentUser.id) {
       let proxySuccess = false;
@@ -904,7 +930,7 @@ export class AuthService {
       // B. Fallback update langsung ke tabel users via supabase client jika proxy belum aktif
       if (!proxySuccess && this._userRepository) {
         try {
-          await this._userRepository.update(this._currentUser.id, { name: trimmed });
+          await this._userRepository.update(this._currentUser.id, { name: trimmed, nicknameUpdatedAt: nowIso });
         } catch (dbErr) {
           console.warn('[AuthService] Direct users table update note:', dbErr.message);
         }

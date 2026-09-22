@@ -277,6 +277,7 @@ export class SupabaseUserRepository extends IUserRepository {
     if (updates.accountHolder !== undefined) payload.account_holder = updates.accountHolder;
     if (updates.isVerified !== undefined) payload.is_verified = updates.isVerified;
     if (updates.avatar !== undefined) payload.avatar = (updates.avatar && updates.avatar !== '/avatar.png') ? updates.avatar : '';
+    if (updates.nicknameUpdatedAt !== undefined) payload.nickname_updated_at = updates.nicknameUpdatedAt;
     if (updates.referralCode !== undefined) payload.referral_code = updates.referralCode;
     if (updates.referredBy !== undefined) {
       payload.referred_by = updates.referredBy;

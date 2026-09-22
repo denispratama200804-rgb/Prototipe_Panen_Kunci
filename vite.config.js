@@ -1104,11 +1104,24 @@ export default defineConfig(({ mode }) => {
 
                       let lastChangeTime = null;
                       try {
-                        const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
-                        if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
-                          lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
+                        const { data: dbUser } = await adminSupabase
+                          .from('users')
+                          .select('nickname_updated_at')
+                          .eq('id', targetUserId)
+                          .single();
+                        if (dbUser?.nickname_updated_at) {
+                          lastChangeTime = new Date(dbUser.nickname_updated_at).getTime();
                         }
                       } catch (_) {}
+
+                      if (!lastChangeTime) {
+                        try {
+                          const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
+                          if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
+                            lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
+                          }
+                        } catch (_) {}
+                      }
 
                       if (lastChangeTime && !isNaN(lastChangeTime)) {
                         const cooldownMs = 30 * 24 * 60 * 60 * 1000;
@@ -1128,7 +1141,7 @@ export default defineConfig(({ mode }) => {
 
                       const { data: updatedUser, error: updateErr } = await adminSupabase
                         .from('users')
-                        .update({ name: newNickname, updated_at: nowIso })
+                        .update({ name: newNickname, nickname_updated_at: nowIso, updated_at: nowIso })
                         .eq('id', targetUserId)
                         .select()
                         .single();

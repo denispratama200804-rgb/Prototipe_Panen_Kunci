@@ -90,7 +90,7 @@ const strategyFactory = new WithdrawalStrategyFactory();
 const walletService = new WalletService(storage, withdrawalValidator, strategyFactory, eventBus);
 const apiKeyValidator = new ApiKeyValidator();
 const apiKeyService = new ApiKeyService(storage, apiKeyValidator, walletService, eventBus);
-const notificationService = new NotificationService();
+const notificationService = new NotificationService(eventBus, storage);
 
 container.registerSingleton('EventBus', eventBus);
 container.registerSingleton('IStorage', storage);
