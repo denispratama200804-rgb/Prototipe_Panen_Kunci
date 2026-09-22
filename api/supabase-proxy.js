@@ -1726,27 +1726,24 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Nickname harus antara 3 sampai 30 karakter.' });
       }
 
-      // 1. Cek riwayat pergantian sebelumnya dari auth user metadata
+      // 1. Cek riwayat pergantian sebelumnya dari auth user metadata dan tabel users
       let lastChangeTime = null;
       try {
-        const { data: dbUser } = await adminSupabase
-          .from('users')
-          .select('nickname_updated_at')
-          .eq('id', targetUserId)
-          .single();
-        if (dbUser?.nickname_updated_at) {
-          lastChangeTime = new Date(dbUser.nickname_updated_at).getTime();
+        const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
+        if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
+          lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
         }
       } catch (_) {}
 
-      if (!lastChangeTime) {
-        try {
-          const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
-          if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
-            lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
+      try {
+        const { data: dbUser } = await adminSupabase.from('users').select('nickname_updated_at').eq('id', targetUserId).single();
+        if (dbUser?.nickname_updated_at) {
+          const dbTime = new Date(dbUser.nickname_updated_at).getTime();
+          if (!isNaN(dbTime) && (!lastChangeTime || dbTime > lastChangeTime)) {
+            lastChangeTime = dbTime;
           }
-        } catch (_) {}
-      }
+        }
+      } catch (_) {}
 
       if (lastChangeTime && !isNaN(lastChangeTime)) {
         const cooldownMs = 30 * 24 * 60 * 60 * 1000;
@@ -1762,16 +1759,28 @@ export default async function handler(req, res) {
 
       const nowIso = clientNicknameUpdatedAt || new Date().toISOString();
 
-      // 2. Update kolom name dan nickname_updated_at di public.users
-      const { data: updatedUser, error: updateErr } = await adminSupabase
+      // 2. Update kolom name & nickname_updated_at di public.users
+      let updatedUser = null;
+      const { data: updatedWithNickTime, error: updateErr1 } = await adminSupabase
         .from('users')
-        .update({ name: newNickname, nickname_updated_at: nowIso, updated_at: nowIso })
+        .update({ name: newNickname, updated_at: nowIso, nickname_updated_at: nowIso })
         .eq('id', targetUserId)
         .select()
         .single();
 
-      if (updateErr) {
-        return res.status(400).json({ success: false, error: updateErr.message });
+      if (!updateErr1) {
+        updatedUser = updatedWithNickTime;
+      } else {
+        const { data: updatedBasic, error: updateErr2 } = await adminSupabase
+          .from('users')
+          .update({ name: newNickname, updated_at: nowIso })
+          .eq('id', targetUserId)
+          .select()
+          .single();
+        if (updateErr2) {
+          return res.status(400).json({ success: false, error: updateErr2.message });
+        }
+        updatedUser = updatedBasic;
       }
 
       // 3. Update metadata di auth.users

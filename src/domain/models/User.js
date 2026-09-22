@@ -49,7 +49,15 @@ export class User {
     this.accountHolder = accountHolder || '';
     this.createdAt = createdAt;
     this.avatar = (avatar && avatar !== '/avatar.png') ? avatar : '';
-    this.nicknameUpdatedAt = nicknameUpdatedAt || null;
+    let resolvedNicknameUpdated = nicknameUpdatedAt || null;
+    if (!resolvedNicknameUpdated && typeof localStorage !== 'undefined') {
+      try {
+        resolvedNicknameUpdated = (id && localStorage.getItem('pk_nickname_updated_' + id)) ||
+                                  (email && localStorage.getItem('pk_nickname_updated_' + String(email).toLowerCase())) ||
+                                  null;
+      } catch (_) {}
+    }
+    this.nicknameUpdatedAt = resolvedNicknameUpdated;
     this.referralCode = referralCode || User.generateReferralCode(id || email || name);
     this.referredBy = referredBy || '';
 
@@ -100,16 +108,25 @@ export class User {
    * @returns {{ allowed: boolean, daysLeft: number, nextDate: Date | null }}
    */
   canChangeNickname() {
-    if (!this.nicknameUpdatedAt) {
+    let updatedAt = this.nicknameUpdatedAt;
+    if (!updatedAt && typeof localStorage !== 'undefined') {
+      try {
+        updatedAt = (this.id && localStorage.getItem('pk_nickname_updated_' + this.id)) ||
+                    (this.email && localStorage.getItem('pk_nickname_updated_' + String(this.email).toLowerCase())) ||
+                    null;
+      } catch (_) {}
+    }
+
+    if (!updatedAt) {
       return { allowed: true, daysLeft: 0, nextDate: null };
     }
 
-    const lastTime = new Date(this.nicknameUpdatedAt).getTime();
+    const lastTime = new Date(updatedAt).getTime();
     if (isNaN(lastTime)) {
       return { allowed: true, daysLeft: 0, nextDate: null };
     }
 
-    const cooldownMs = 30 * 24 * 60 * 60 * 1000; // 30 hari dalam milidetik
+    const cooldownMs = 30 * 24 * 60 * 60 * 1000; // 30 hari dalam milidetik (1 bulan)
     const elapsed = Date.now() - lastTime;
 
     if (elapsed >= cooldownMs) {

@@ -278,6 +278,7 @@ export class SupabaseUserRepository extends IUserRepository {
     if (updates.isVerified !== undefined) payload.is_verified = updates.isVerified;
     if (updates.avatar !== undefined) payload.avatar = (updates.avatar && updates.avatar !== '/avatar.png') ? updates.avatar : '';
     if (updates.nicknameUpdatedAt !== undefined) payload.nickname_updated_at = updates.nicknameUpdatedAt;
+    if (updates.nickname_updated_at !== undefined) payload.nickname_updated_at = updates.nickname_updated_at;
     if (updates.referralCode !== undefined) payload.referral_code = updates.referralCode;
     if (updates.referredBy !== undefined) {
       payload.referred_by = updates.referredBy;
@@ -303,6 +304,14 @@ export class SupabaseUserRepository extends IUserRepository {
       .eq('id', id)
       .select()
       .single();
+
+    if (error && payload.nickname_updated_at !== undefined) {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.nickname_updated_at;
+      const res = await supabase.from(this.tableName).update(fallbackPayload).eq('id', id).select().single();
+      data = res.data;
+      error = res.error;
+    }
 
     // Fallback otomatis jika ada kolom yang belum ada di schema database Supabase (misal: referral_code, referred_by)
     let updateRetries = 0;

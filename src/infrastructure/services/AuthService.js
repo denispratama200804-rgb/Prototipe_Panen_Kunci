@@ -180,15 +180,13 @@ export class AuthService {
         } catch (_) {}
       }
 
-      // Sinkronkan cadangan pk_nickname_updated_ jika properti nicknameUpdatedAt kosong
+      // Pastikan nicknameUpdatedAt tersinkron dari fallback localStorage jika belum ada
       if (!this._currentUser.nicknameUpdatedAt && typeof localStorage !== 'undefined') {
-        try {
-          const localTs = localStorage.getItem('pk_nickname_updated_' + this._currentUser.id) ||
-                          localStorage.getItem('pk_nickname_updated_' + (this._currentUser.email || '').toLowerCase());
-          if (localTs) {
-            this._currentUser.nicknameUpdatedAt = localTs;
-          }
-        } catch (_) {}
+        const savedTime = (this._currentUser.id && localStorage.getItem('pk_nickname_updated_' + this._currentUser.id)) ||
+                          (this._currentUser.email && localStorage.getItem('pk_nickname_updated_' + this._currentUser.email.toLowerCase()));
+        if (savedTime) {
+          this._currentUser.nicknameUpdatedAt = savedTime;
+        }
       }
 
       // Pastikan role bersih, tegas, dan konsisten (mencegah perpindahan sesi ke admin secara otomatis)
@@ -238,9 +236,11 @@ export class AuthService {
                 if (prevNicknameUpdatedAt) {
                   remote.nicknameUpdatedAt = prevNicknameUpdatedAt;
                 } else if (typeof localStorage !== 'undefined') {
-                  const localTs = localStorage.getItem('pk_nickname_updated_' + remote.id) ||
-                                  localStorage.getItem('pk_nickname_updated_' + (remote.email || '').toLowerCase());
-                  if (localTs) remote.nicknameUpdatedAt = localTs;
+                  const savedTime = (remote.id && localStorage.getItem('pk_nickname_updated_' + remote.id)) ||
+                                    (remote.email && localStorage.getItem('pk_nickname_updated_' + (remote.email || '').toLowerCase()));
+                  if (savedTime) {
+                    remote.nicknameUpdatedAt = savedTime;
+                  }
                 }
               }
               if (!remote.referredBy && prevReferredBy) {
@@ -884,16 +884,13 @@ export class AuthService {
     // Update di model domain lokal & sesi
     this._currentUser.name = trimmed;
     this._currentUser.nicknameUpdatedAt = nowIso;
-    this._saveSession(this._currentUser, this._currentUser.role || 'user');
-
     if (typeof localStorage !== 'undefined') {
       try {
-        localStorage.setItem('pk_nickname_updated_' + this._currentUser.id, nowIso);
-        if (this._currentUser.email) {
-          localStorage.setItem('pk_nickname_updated_' + this._currentUser.email.toLowerCase(), nowIso);
-        }
+        if (this._currentUser.id) localStorage.setItem('pk_nickname_updated_' + this._currentUser.id, nowIso);
+        if (this._currentUser.email) localStorage.setItem('pk_nickname_updated_' + this._currentUser.email.toLowerCase(), nowIso);
       } catch (_) {}
     }
+    this._saveSession(this._currentUser, this._currentUser.role || 'user');
 
     // 2. Simpan ke database Supabase dan Auth metadata
     if (isSupabaseConfigured() && this._currentUser.id) {

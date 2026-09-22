@@ -1104,24 +1104,21 @@ export default defineConfig(({ mode }) => {
 
                       let lastChangeTime = null;
                       try {
-                        const { data: dbUser } = await adminSupabase
-                          .from('users')
-                          .select('nickname_updated_at')
-                          .eq('id', targetUserId)
-                          .single();
-                        if (dbUser?.nickname_updated_at) {
-                          lastChangeTime = new Date(dbUser.nickname_updated_at).getTime();
+                        const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
+                        if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
+                          lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
                         }
                       } catch (_) {}
 
-                      if (!lastChangeTime) {
-                        try {
-                          const { data: authUserData, error: authUserErr } = await adminSupabase.auth.admin.getUserById(targetUserId);
-                          if (!authUserErr && authUserData?.user?.user_metadata?.nickname_updated_at) {
-                            lastChangeTime = new Date(authUserData.user.user_metadata.nickname_updated_at).getTime();
+                      try {
+                        const { data: dbUser } = await adminSupabase.from('users').select('nickname_updated_at').eq('id', targetUserId).single();
+                        if (dbUser?.nickname_updated_at) {
+                          const dbTime = new Date(dbUser.nickname_updated_at).getTime();
+                          if (!isNaN(dbTime) && (!lastChangeTime || dbTime > lastChangeTime)) {
+                            lastChangeTime = dbTime;
                           }
-                        } catch (_) {}
-                      }
+                        }
+                      } catch (_) {}
 
                       if (lastChangeTime && !isNaN(lastChangeTime)) {
                         const cooldownMs = 30 * 24 * 60 * 60 * 1000;
@@ -1139,17 +1136,29 @@ export default defineConfig(({ mode }) => {
 
                       const nowIso = clientNicknameUpdatedAt || new Date().toISOString();
 
-                      const { data: updatedUser, error: updateErr } = await adminSupabase
+                      let updatedUser = null;
+                      const { data: updatedWithNickTime, error: updateErr1 } = await adminSupabase
                         .from('users')
-                        .update({ name: newNickname, nickname_updated_at: nowIso, updated_at: nowIso })
+                        .update({ name: newNickname, updated_at: nowIso, nickname_updated_at: nowIso })
                         .eq('id', targetUserId)
                         .select()
                         .single();
 
-                      if (updateErr) {
-                        res.statusCode = 400;
-                        res.end(JSON.stringify({ success: false, error: updateErr.message }));
-                        return;
+                      if (!updateErr1) {
+                        updatedUser = updatedWithNickTime;
+                      } else {
+                        const { data: updatedBasic, error: updateErr2 } = await adminSupabase
+                          .from('users')
+                          .update({ name: newNickname, updated_at: nowIso })
+                          .eq('id', targetUserId)
+                          .select()
+                          .single();
+                        if (updateErr2) {
+                          res.statusCode = 400;
+                          res.end(JSON.stringify({ success: false, error: updateErr2.message }));
+                          return;
+                        }
+                        updatedUser = updatedBasic;
                       }
 
                       try {

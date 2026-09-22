@@ -848,7 +848,7 @@ export class ProfileView extends IComponent {
             <div class="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 flex items-start gap-2.5">
               <span class="material-symbols-outlined text-amber-600 text-lg shrink-0 mt-0.5">warning</span>
               <p class="text-[11px] text-amber-800 dark:text-amber-300 leading-tight">
-                <strong>Ketentuan Penting:</strong> Anda hanya dapat mengganti nickname <strong>1 kali setiap sebulan (30 hari)</strong>. Pastikan ejaan nickname Anda sudah sesuai sebelum menyimpan.
+                <strong>Ketentuan Penting:</strong> Anda hanya dapat mengganti nickname <strong>1 kali setiap sebulan (30 hari)</strong>. Setelah disimpan, Anda tidak dapat mengubah nickname lagi selama 1 bulan penuh.
               </p>
             </div>
           </div>
@@ -859,6 +859,16 @@ export class ProfileView extends IComponent {
         showCancel: true,
         autoClose: false,
         onConfirm: async ({ close, confirmBtn }) => {
+          const freshUser = this._authService.getCurrentUser();
+          const userCheck = typeof freshUser?.canChangeNickname === 'function'
+            ? freshUser.canChangeNickname()
+            : { allowed: true };
+          if (!userCheck.allowed) {
+            this._notification.error(`Anda tidak dapat mengganti nickname lebih dari 1x dalam sebulan (Sisa tunggu: ${userCheck.daysLeft} hari lagi).`);
+            close();
+            return;
+          }
+
           const input = document.getElementById('inputNewNickname');
           const newNick = (input?.value || '').trim();
 
