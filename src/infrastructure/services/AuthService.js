@@ -851,12 +851,15 @@ export class AuthService {
       throw new Error('Pengguna belum masuk akun.');
     }
 
-    const trimmed = (newNickname || '').trim();
+    const trimmed = (newNickname || '').trim().replace(/\s+/g, ' ');
     if (!trimmed) {
       throw new Error('Nickname tidak boleh kosong.');
     }
-    if (trimmed.length < 3) {
-      throw new Error('Nickname minimal terdiri dari 3 karakter.');
+    if (!/^[a-zA-Z\s]+$/.test(trimmed)) {
+      throw new Error('Nickname hanya boleh berisi huruf abjad dan spasi (tidak boleh mengandung angka atau simbol).');
+    }
+    if (trimmed.replace(/\s+/g, '').length < 3) {
+      throw new Error('Nickname minimal terdiri dari 3 huruf abjad.');
     }
     if (trimmed.length > 30) {
       throw new Error('Nickname maksimal 30 karakter.');

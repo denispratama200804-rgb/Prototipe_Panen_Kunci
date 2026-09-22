@@ -1087,12 +1087,18 @@ export default defineConfig(({ mode }) => {
                   if (action === 'update_nickname') {
                     if (adminSupabase) {
                       const targetUserId = parsed.userId || parsed.id;
-                      const newNickname = (parsed.name || '').trim();
+                      const newNickname = (parsed.name || '').trim().replace(/\s+/g, ' ');
                       const clientNicknameUpdatedAt = parsed.nicknameUpdatedAt || new Date().toISOString();
 
                       if (!targetUserId || !newNickname) {
                         res.statusCode = 400;
                         res.end(JSON.stringify({ success: false, error: 'User ID dan nickname baru diperlukan.' }));
+                        return;
+                      }
+
+                      if (!/^[a-zA-Z\s]+$/.test(newNickname) || newNickname.replace(/\s+/g, '').length < 3) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: 'Nickname hanya boleh berisi huruf abjad dan spasi (tidak boleh mengandung angka atau simbol, minimal 3 abjad).' }));
                         return;
                       }
 

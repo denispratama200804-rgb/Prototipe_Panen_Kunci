@@ -823,6 +823,9 @@ export class ProfileView extends IComponent {
         return;
       }
 
+      // Bersihkan nickname awal agar tidak memuat angka atau simbol lama (seperti 679)
+      const initialNick = (user.name || '').replace(/[^a-zA-Z\s]/g, '').trim();
+
       // Tampilkan Modal Form Ganti Nickname jika eligible
       this._notification.showModal({
         title: 'Ganti Nickname Akun',
@@ -837,13 +840,15 @@ export class ProfileView extends IComponent {
                 type="text"
                 id="inputNewNickname"
                 class="w-full bg-bg-subtle text-sm p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none font-semibold text-text-heading"
-                placeholder="Masukkan nickname (3-30 karakter)"
-                value="${user.name || ''}"
+                placeholder="Masukkan nickname (hanya huruf abjad & spasi)"
+                value="${initialNick}"
                 maxlength="30"
                 minlength="3"
                 autocomplete="off"
               />
-              <span class="text-[10px] text-text-body/70 mt-0.5">Minimal 3 karakter, maksimal 30 karakter.</span>
+              <span id="nicknameInputHelper" class="text-[10px] text-text-body/70 mt-0.5 transition-colors duration-200">
+                Hanya boleh huruf abjad (A-Z) dan spasi. Angka & simbol tidak diizinkan (3-30 karakter).
+              </span>
             </div>
             <div class="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 flex items-start gap-2.5">
               <span class="material-symbols-outlined text-amber-600 text-lg shrink-0 mt-0.5">warning</span>
@@ -858,6 +863,55 @@ export class ProfileView extends IComponent {
         cancelText: 'Batal',
         showCancel: true,
         autoClose: false,
+        onRender: (modalWrapper) => {
+          const input = modalWrapper.querySelector('#inputNewNickname');
+          const helper = modalWrapper.querySelector('#nicknameInputHelper');
+          if (!input) return;
+
+          // Cegah ketikan karakter angka atau simbol
+          input.addEventListener('keydown', (e) => {
+            // Biarkan tombol kontrol (Backspace, Tab, Delete, panah, dll.) dan shortcut keyboard (Ctrl+A/C/V/X)
+            if (e.ctrlKey || e.metaKey || e.altKey || e.key.length > 1) {
+              return;
+            }
+
+            // Hanya izinkan abjad (a-z, A-Z) dan spasi
+            if (!/^[a-zA-Z\s]$/.test(e.key)) {
+              e.preventDefault();
+              if (helper) {
+                helper.className = 'text-[10px] text-error-ruby font-medium mt-0.5 transition-colors duration-200';
+                helper.textContent = 'Angka & simbol tidak diizinkan! Hanya boleh huruf abjad dan spasi.';
+                clearTimeout(input._warnTimeout);
+                input._warnTimeout = setTimeout(() => {
+                  if (helper) {
+                    helper.className = 'text-[10px] text-text-body/70 mt-0.5 transition-colors duration-200';
+                    helper.textContent = 'Hanya boleh huruf abjad (A-Z) dan spasi. Angka & simbol tidak diizinkan (3-30 karakter).';
+                  }
+                }, 2500);
+              }
+            }
+          });
+
+          // Otomatis bersihkan jika ada paste atau auto-fill yang membawa angka/simbol
+          input.addEventListener('input', (e) => {
+            const originalVal = e.target.value;
+            const cleanedVal = originalVal.replace(/[^a-zA-Z\s]/g, '');
+            if (originalVal !== cleanedVal) {
+              e.target.value = cleanedVal;
+              if (helper) {
+                helper.className = 'text-[10px] text-error-ruby font-medium mt-0.5 transition-colors duration-200';
+                helper.textContent = 'Angka atau simbol telah dihapus otomatis. Hanya abjad dan spasi yang diizinkan.';
+                clearTimeout(input._warnTimeout);
+                input._warnTimeout = setTimeout(() => {
+                  if (helper) {
+                    helper.className = 'text-[10px] text-text-body/70 mt-0.5 transition-colors duration-200';
+                    helper.textContent = 'Hanya boleh huruf abjad (A-Z) dan spasi. Angka & simbol tidak diizinkan (3-30 karakter).';
+                  }
+                }, 2500);
+              }
+            }
+          });
+        },
         onConfirm: async ({ close, confirmBtn }) => {
           const freshUser = this._authService.getCurrentUser();
           const userCheck = typeof freshUser?.canChangeNickname === 'function'
@@ -870,14 +924,19 @@ export class ProfileView extends IComponent {
           }
 
           const input = document.getElementById('inputNewNickname');
-          const newNick = (input?.value || '').trim();
+          const rawVal = input?.value || '';
+          const newNick = rawVal.trim().replace(/\s+/g, ' ');
 
           if (!newNick) {
             this._notification.error('Nickname tidak boleh kosong.');
             return;
           }
-          if (newNick.length < 3) {
-            this._notification.error('Nickname minimal 3 karakter.');
+          if (!/^[a-zA-Z\s]+$/.test(newNick)) {
+            this._notification.error('Nickname hanya boleh berisi huruf abjad dan spasi (tidak boleh mengandung angka atau simbol).');
+            return;
+          }
+          if (newNick.replace(/\s+/g, '').length < 3) {
+            this._notification.error('Nickname minimal harus terdiri dari 3 huruf abjad.');
             return;
           }
           if (newNick.length > 30) {

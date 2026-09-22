@@ -1715,11 +1715,15 @@ export default async function handler(req, res) {
     // 4b. Update nickname dengan batasan sebulan sekali (30 hari)
     if (action === 'update_nickname') {
       const targetUserId = body.userId || body.id;
-      const newNickname = (body.name || '').trim();
+      const newNickname = (body.name || '').trim().replace(/\s+/g, ' ');
       const clientNicknameUpdatedAt = body.nicknameUpdatedAt || new Date().toISOString();
 
       if (!targetUserId || !newNickname) {
         return res.status(400).json({ success: false, error: 'User ID dan nickname baru diperlukan.' });
+      }
+
+      if (!/^[a-zA-Z\s]+$/.test(newNickname) || newNickname.replace(/\s+/g, '').length < 3) {
+        return res.status(400).json({ success: false, error: 'Nickname hanya boleh berisi huruf abjad dan spasi (tidak boleh mengandung angka atau simbol, minimal 3 abjad).' });
       }
 
       if (newNickname.length < 3 || newNickname.length > 30) {
