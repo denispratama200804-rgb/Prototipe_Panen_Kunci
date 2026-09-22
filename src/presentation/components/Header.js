@@ -186,6 +186,12 @@ export class HeaderComponent {
     const backBtn = this._element.querySelector('#header-back-btn');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
+        // Jika sedang di halaman login, register, atau reset password, arahkan langsung ke Landing Page (/)
+        if (isLogin || isRegister || isResetPassword) {
+          window.location.hash = '/';
+          return;
+        }
+
         const currentHash = window.location.hash;
         window.history.back();
         setTimeout(() => {

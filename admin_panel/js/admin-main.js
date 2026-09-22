@@ -51,6 +51,7 @@ import { UsersView } from './views/UsersView.js';
 import { SettingsView } from './views/SettingsView.js';
 import { LiveChatAdminView } from './views/LiveChatAdminView.js';
 import { chatService } from '../../src/infrastructure/services/ChatService.js';
+import { supabase, isSupabaseConfigured } from '../../src/infrastructure/supabase/supabaseClient.js';
 
 class AdminApp {
   constructor() {
@@ -116,26 +117,18 @@ class AdminApp {
                     localStorage.getItem('panenkunci:auth_role') === 'admin';
 
     if (!isAdmin) {
-      this.appRoot.innerHTML = `
-        <div class="flex flex-col items-center justify-center min-h-screen bg-[#060b18] text-white p-6">
-          <div class="max-w-md w-full bg-[#0d1527] border border-red-500/30 rounded-2xl p-8 text-center shadow-2xl">
-            <div class="w-16 h-16 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4">
-              <span class="material-symbols-outlined text-3xl">lock</span>
-            </div>
-            <h2 class="text-xl font-bold mb-2">Akses Dibatasi</h2>
-            <p class="text-sm text-gray-400 mb-6">Halaman ini hanya dapat diakses oleh Administrator. Sesi Anda bukan admin atau belum login.</p>
-            <a href="/#/login" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all">
-              <span class="material-symbols-outlined text-base">login</span>
-              <span>Masuk sebagai Admin</span>
-            </a>
-          </div>
-        </div>
-      `;
-      setTimeout(() => {
-        window.location.href = '/#/login';
-      }, 2000);
+      window.location.replace('/#/login');
       return;
     }
+
+    // Cegah akses kembali melalui Back-Forward Cache (bfcache) browser saat sesi telah berakhir
+    window.addEventListener('pageshow', (event) => {
+      const isStillAdmin = localStorage.getItem('panenkunci:admin_logged_in') === 'true' ||
+                           localStorage.getItem('panenkunci:auth_role') === 'admin';
+      if (!isStillAdmin) {
+        window.location.replace('/#/login');
+      }
+    });
 
     // PWA Service Worker Registration
     if ('serviceWorker' in navigator) {
@@ -412,12 +405,26 @@ class AdminApp {
     this.refreshCurrentView(false);
   }
 
-  _handleLogout() {
+  async _handleLogout() {
     localStorage.removeItem('panenkunci:admin_logged_in');
     localStorage.removeItem('panenkunci:auth_role');
+    localStorage.removeItem('panenkunci:current_user');
+    localStorage.removeItem('panenkunci:session');
+    try {
+      sessionStorage.clear();
+    } catch (_) {}
+
+    if (isSupabaseConfigured() && supabase?.auth) {
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn('[AdminApp] Supabase signOut note:', err?.message);
+      }
+    }
+
     toast.info('Sesi administrator telah berakhir.', 'Logout Berhasil');
     setTimeout(() => {
-      window.location.href = '/#/login';
+      window.location.replace('/#/login');
     }, 400);
   }
 }
