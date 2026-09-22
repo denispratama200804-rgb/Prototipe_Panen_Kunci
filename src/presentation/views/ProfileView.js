@@ -586,7 +586,7 @@ export class ProfileView extends IComponent {
         }
 
         await this._authService.updateProfile({ avatar: avatarUrl });
-        this._notification.success('Foto profil berhasil diunggah ke Cloudflare R2 dan disimpan!');
+        this._notification.success('Foto profil berhasil diperbarui!');
       } catch (err) {
         console.error('Upload avatar error:', err);
         this._notification.error('Gagal memperbarui foto profil: ' + (err.message || 'Terjadi kesalahan'));
@@ -832,7 +832,7 @@ export class ProfileView extends IComponent {
         html: `
           <div class="flex flex-col gap-3 text-left">
             <p class="text-xs text-text-body">
-              Masukkan nickname baru Anda. Nickname ini akan disinkronkan secara realtime ke database dan panel admin.
+              Masukkan nickname baru Anda.
             </p>
             <div class="flex flex-col gap-1">
               <label class="text-[11px] font-bold text-text-heading uppercase">Nickname Baru</label>
