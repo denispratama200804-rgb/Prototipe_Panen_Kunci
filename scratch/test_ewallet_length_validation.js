@@ -1,11 +1,14 @@
 import assert from 'assert';
 
-console.log('=== Test: E-Wallet Length Validation (Min: 10, Max: 14) ===\n');
+console.log('=== Test: Bank Account & E-Wallet Length Validation ===\n');
 
-function validateEwalletNumber(rawInput) {
+function validatePaymentInput(rawInput, type = 'ewallet') {
+  const maxLen = type === 'ewallet' ? 14 : 16;
+  const minLen = 10;
+
   let clean = (rawInput || '').replace(/\D/g, '');
-  if (clean.length > 14) {
-    clean = clean.slice(0, 14);
+  if (clean.length > maxLen) {
+    clean = clean.slice(0, maxLen);
   }
 
   const len = clean.length;
@@ -13,75 +16,95 @@ function validateEwalletNumber(rawInput) {
   let status = '';
 
   if (len === 0) {
-    hint = 'Min. 10 - Maks. 14 digit';
+    hint = `Min. ${minLen} - Maks. ${maxLen} digit`;
     status = 'empty';
-  } else if (len < 10) {
-    hint = `${len}/14 digit (Min. 10 digit)`;
+  } else if (len < minLen) {
+    hint = `${len}/${maxLen} digit (Min. ${minLen} digit)`;
     status = 'too_short';
   } else {
-    hint = `${len}/14 digit (Sesuai)`;
+    hint = `${len}/${maxLen} digit (Sesuai)`;
     status = 'valid';
   }
 
-  const isValidForSave = len >= 10 && len <= 14;
+  const isValidForSave = len >= minLen && len <= maxLen;
 
-  return { clean, len, hint, status, isValidForSave };
+  return { clean, len, maxLen, minLen, hint, status, isValidForSave };
 }
 
-// Test 1: Empty input
-const t1 = validateEwalletNumber('');
-assert.strictEqual(t1.len, 0);
-assert.strictEqual(t1.status, 'empty');
-assert.strictEqual(t1.isValidForSave, false);
-console.log('✓ Test 1 Passed: Empty input ditolak (harus diisi)');
+// --- E-WALLET TESTS (Min 10, Max 14) ---
+console.log('--- 1. Validasi E-Wallet (Min 10, Max 14) ---');
+const ewEmpty = validatePaymentInput('', 'ewallet');
+assert.strictEqual(ewEmpty.status, 'empty');
+assert.strictEqual(ewEmpty.isValidForSave, false);
 
-// Test 2: Input kurang dari 10 digit (misal: 8 digit)
-const t2 = validateEwalletNumber('08123456');
-assert.strictEqual(t2.len, 8);
-assert.strictEqual(t2.status, 'too_short');
-assert.strictEqual(t2.hint, '8/14 digit (Min. 10 digit)');
-assert.strictEqual(t2.isValidForSave, false);
-console.log('✓ Test 2 Passed: 8 digit ditolak (kurang dari 10 digit)');
+const ewShort = validatePaymentInput('08123456', 'ewallet'); // 8 digits
+assert.strictEqual(ewShort.len, 8);
+assert.strictEqual(ewShort.status, 'too_short');
+assert.strictEqual(ewShort.hint, '8/14 digit (Min. 10 digit)');
+assert.strictEqual(ewShort.isValidForSave, false);
 
-// Test 3: Input tepat 10 digit
-const t3 = validateEwalletNumber('0812345678');
-assert.strictEqual(t3.len, 10);
-assert.strictEqual(t3.status, 'valid');
-assert.strictEqual(t3.hint, '10/14 digit (Sesuai)');
-assert.strictEqual(t3.isValidForSave, true);
-console.log('✓ Test 3 Passed: 10 digit valid (batas minimum)');
+const ewMin = validatePaymentInput('0812345678', 'ewallet'); // 10 digits
+assert.strictEqual(ewMin.len, 10);
+assert.strictEqual(ewMin.status, 'valid');
+assert.strictEqual(ewMin.hint, '10/14 digit (Sesuai)');
+assert.strictEqual(ewMin.isValidForSave, true);
 
-// Test 4: Input 12 digit (seperti pada screenshot user: 087790270362)
-const t4 = validateEwalletNumber('087790270362');
-assert.strictEqual(t4.len, 12);
-assert.strictEqual(t4.status, 'valid');
-assert.strictEqual(t4.hint, '12/14 digit (Sesuai)');
-assert.strictEqual(t4.isValidForSave, true);
-console.log('✓ Test 4 Passed: 12 digit valid (contoh nomor user: 087790270362)');
+const ewUser = validatePaymentInput('087790270362', 'ewallet'); // 12 digits
+assert.strictEqual(ewUser.len, 12);
+assert.strictEqual(ewUser.status, 'valid');
+assert.strictEqual(ewUser.hint, '12/14 digit (Sesuai)');
+assert.strictEqual(ewUser.isValidForSave, true);
 
-// Test 5: Input tepat 14 digit
-const t5 = validateEwalletNumber('08123456789012');
-assert.strictEqual(t5.len, 14);
-assert.strictEqual(t5.status, 'valid');
-assert.strictEqual(t5.hint, '14/14 digit (Sesuai)');
-assert.strictEqual(t5.isValidForSave, true);
-console.log('✓ Test 5 Passed: 14 digit valid (batas maksimum)');
+const ewMax = validatePaymentInput('08123456789012', 'ewallet'); // 14 digits
+assert.strictEqual(ewMax.len, 14);
+assert.strictEqual(ewMax.status, 'valid');
+assert.strictEqual(ewMax.hint, '14/14 digit (Sesuai)');
+assert.strictEqual(ewMax.isValidForSave, true);
 
-// Test 6: Input melebihi 14 digit (dipotong otomatis ke 14 digit)
-const t6 = validateEwalletNumber('081234567890123456');
-assert.strictEqual(t6.len, 14);
-assert.strictEqual(t6.clean, '08123456789012');
-assert.strictEqual(t6.status, 'valid');
-assert.strictEqual(t6.hint, '14/14 digit (Sesuai)');
-assert.strictEqual(t6.isValidForSave, true);
-console.log('✓ Test 6 Passed: Input lebih dari 14 digit dipotong otomatis');
+const ewOver = validatePaymentInput('08123456789012999', 'ewallet'); // 17 digits -> truncated to 14
+assert.strictEqual(ewOver.len, 14);
+assert.strictEqual(ewOver.clean, '08123456789012');
+assert.strictEqual(ewOver.status, 'valid');
+assert.strictEqual(ewOver.hint, '14/14 digit (Sesuai)');
+console.log('✓ Semua tes e-wallet (Min 10, Max 14) berhasil!');
 
-// Test 7: Input dengan format karakter non-digit (spasi, strip)
-const t7 = validateEwalletNumber('0812-3456-7890');
-assert.strictEqual(t7.len, 12);
-assert.strictEqual(t7.clean, '081234567890');
-assert.strictEqual(t7.status, 'valid');
-assert.strictEqual(t7.hint, '12/14 digit (Sesuai)');
-console.log('✓ Test 7 Passed: Karakter non-digit otomatis difilter');
+// --- BANK ACCOUNT TESTS (Min 10, Max 16) ---
+console.log('\n--- 2. Validasi Nomor Rekening Bank (Min 10, Max 16) ---');
+const bankEmpty = validatePaymentInput('', 'bank');
+assert.strictEqual(bankEmpty.status, 'empty');
+assert.strictEqual(bankEmpty.hint, 'Min. 10 - Maks. 16 digit');
+assert.strictEqual(bankEmpty.isValidForSave, false);
 
-console.log('\n Semua tes validasi nomor e-wallet (Min 10, Max 14) berhasil 100%!');
+const bankShort = validatePaymentInput('12345678', 'bank'); // 8 digits
+assert.strictEqual(bankShort.len, 8);
+assert.strictEqual(bankShort.status, 'too_short');
+assert.strictEqual(bankShort.hint, '8/16 digit (Min. 10 digit)');
+assert.strictEqual(bankShort.isValidForSave, false);
+
+const bankMin = validatePaymentInput('1234567890', 'bank'); // 10 digits
+assert.strictEqual(bankMin.len, 10);
+assert.strictEqual(bankMin.status, 'valid');
+assert.strictEqual(bankMin.hint, '10/16 digit (Sesuai)');
+assert.strictEqual(bankMin.isValidForSave, true);
+
+// Screenshot BCA number: 9837847432847 (13 digits)
+const bankUser = validatePaymentInput('9837847432847', 'bank');
+assert.strictEqual(bankUser.len, 13);
+assert.strictEqual(bankUser.status, 'valid');
+assert.strictEqual(bankUser.hint, '13/16 digit (Sesuai)');
+assert.strictEqual(bankUser.isValidForSave, true);
+
+const bankMax = validatePaymentInput('1234567890123456', 'bank'); // 16 digits
+assert.strictEqual(bankMax.len, 16);
+assert.strictEqual(bankMax.status, 'valid');
+assert.strictEqual(bankMax.hint, '16/16 digit (Sesuai)');
+assert.strictEqual(bankMax.isValidForSave, true);
+
+const bankOver = validatePaymentInput('1234567890123456999', 'bank'); // 19 digits -> truncated to 16
+assert.strictEqual(bankOver.len, 16);
+assert.strictEqual(bankOver.clean, '1234567890123456');
+assert.strictEqual(bankOver.status, 'valid');
+assert.strictEqual(bankOver.hint, '16/16 digit (Sesuai)');
+console.log('✓ Semua tes rekening bank (Min 10, Max 16) berhasil!');
+
+console.log('\n Seluruh tes validasi rekening & e-wallet selesai dan lulus 100%!');

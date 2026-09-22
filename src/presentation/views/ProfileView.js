@@ -954,8 +954,11 @@ export class ProfileView extends IComponent {
 
             <!-- Kolom Nomor Rekening (Khusus Bank) -->
             <div id="wrapAccountNum" class="flex flex-col gap-1 transition-all">
-              <label class="text-[11px] font-bold text-text-heading uppercase">Nomor Rekening</label>
-              <input type="text" id="editAccountNum" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Masukkan nomor rekening Anda" value="${user.accountNumber || ''}" />
+              <div class="flex items-center justify-between">
+                <label class="text-[11px] font-bold text-text-heading uppercase">Nomor Rekening</label>
+                <span id="accountValidationHint" class="text-[11px] font-semibold transition-colors"></span>
+              </div>
+              <input type="tel" id="editAccountNum" maxlength="16" class="w-full bg-bg-subtle text-xs p-3 rounded-xl border border-outline-variant/40 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Masukkan nomor rekening Anda" value="${user.accountNumber || ''}" />
             </div>
 
             <!-- Kolom Nomor HP E-Wallet (Khusus E-Wallet) -->
@@ -983,6 +986,34 @@ export class ProfileView extends IComponent {
           const wrapAcc = modal.querySelector('#wrapAccountNum');
           const wrapPh = modal.querySelector('#wrapPhone');
           const lblHolder = modal.querySelector('#labelAccountHolder');
+
+          const initAccountValidation = (root) => {
+            const accInput = root.querySelector('#editAccountNum');
+            const accHint = root.querySelector('#accountValidationHint');
+            if (!accInput || !accHint || accInput.dataset.bound) return;
+            accInput.dataset.bound = 'true';
+
+            const updateHint = () => {
+              let clean = accInput.value.replace(/\D/g, '');
+              if (clean.length > 16) clean = clean.slice(0, 16);
+              if (accInput.value !== clean) accInput.value = clean;
+
+              const len = clean.length;
+              if (len === 0) {
+                accHint.className = 'text-[11px] font-semibold text-text-muted';
+                accHint.textContent = 'Min. 10 - Maks. 16 digit';
+              } else if (len < 10) {
+                accHint.className = 'text-[11px] font-semibold text-amber-500';
+                accHint.textContent = `${len}/16 digit (Min. 10 digit)`;
+              } else {
+                accHint.className = 'text-[11px] font-semibold text-emerald-500';
+                accHint.textContent = `${len}/16 digit (Sesuai)`;
+              }
+            };
+
+            accInput.addEventListener('input', updateHint);
+            updateHint();
+          };
 
           const initPhoneValidation = (root) => {
             const phoneInput = root.querySelector('#editPhone');
@@ -1012,6 +1043,7 @@ export class ProfileView extends IComponent {
             updateHint();
           };
 
+          initAccountValidation(modal);
           initPhoneValidation(modal);
 
           const updateVisibility = (val) => {
@@ -1027,6 +1059,7 @@ export class ProfileView extends IComponent {
               if (wrapAcc) wrapAcc.classList.remove('hidden');
               if (wrapPh) wrapPh.classList.add('hidden');
               if (lblHolder) lblHolder.textContent = 'Nama Pemilik Rekening';
+              initAccountValidation(modal);
             }
           };
 
@@ -1067,10 +1100,18 @@ export class ProfileView extends IComponent {
               return false;
             }
           } else {
-            accountNumber = document.getElementById('editAccountNum')?.value?.trim() || '';
+            accountNumber = document.getElementById('editAccountNum')?.value?.trim().replace(/\D/g, '') || '';
             phone = user.phone || '';
             if (!accountNumber) {
               this._notification.error('Nomor Rekening bank wajib diisi!');
+              return false;
+            }
+            if (accountNumber.length < 10) {
+              this._notification.error('Nomor Rekening bank minimal 10 digit!');
+              return false;
+            }
+            if (accountNumber.length > 16) {
+              this._notification.error('Nomor Rekening bank maksimal 16 digit!');
               return false;
             }
           }
@@ -1102,8 +1143,34 @@ export class ProfileView extends IComponent {
         const wrapAcc = document.getElementById('wrapAccountNum');
         const wrapPh = document.getElementById('wrapPhone');
         const lblHolder = document.getElementById('labelAccountHolder');
+        const accInput = document.getElementById('editAccountNum');
+        const accHint = document.getElementById('accountValidationHint');
         const phoneInput = document.getElementById('editPhone');
         const phoneHint = document.getElementById('phoneValidationHint');
+
+        if (accInput && accHint && !accInput.dataset.bound) {
+          accInput.dataset.bound = 'true';
+          const updateHint = () => {
+            let clean = accInput.value.replace(/\D/g, '');
+            if (clean.length > 16) clean = clean.slice(0, 16);
+            if (accInput.value !== clean) accInput.value = clean;
+
+            const len = clean.length;
+            if (len === 0) {
+              accHint.className = 'text-[11px] font-semibold text-text-muted';
+              accHint.textContent = 'Min. 10 - Maks. 16 digit';
+            } else if (len < 10) {
+              accHint.className = 'text-[11px] font-semibold text-amber-500';
+              accHint.textContent = `${len}/16 digit (Min. 10 digit)`;
+            } else {
+              accHint.className = 'text-[11px] font-semibold text-emerald-500';
+              accHint.textContent = `${len}/16 digit (Sesuai)`;
+            }
+          };
+
+          accInput.addEventListener('input', updateHint);
+          updateHint();
+        }
 
         if (phoneInput && phoneHint && !phoneInput.dataset.bound) {
           phoneInput.dataset.bound = 'true';
