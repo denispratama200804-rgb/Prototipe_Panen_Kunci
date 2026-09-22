@@ -437,7 +437,7 @@ export default async function handler(req, res) {
             userEmail: row.users?.email || '-',
             status: domainStatus,
             rewardAmount: Number(row.reward_amount) || 3000,
-            credits: Number(row.credits) || 80,
+            credits: (row.credits !== null && row.credits !== undefined && !isNaN(Number(row.credits))) ? Number(row.credits) : 80,
             errorMessage: errorMessage,
             createdAt: row.created_at,
             source: 'supabase'
@@ -706,7 +706,7 @@ export default async function handler(req, res) {
           userEmail: row.users?.email || '-',
           status: domainStatus,
           rewardAmount: Number(row.reward_amount) || 3000,
-          credits: Number(row.credits) || 80,
+          credits: (row.credits !== null && row.credits !== undefined && !isNaN(Number(row.credits))) ? Number(row.credits) : 80,
           errorMessage: errorMessage,
           createdAt: row.created_at,
           source: 'supabase'
@@ -1042,12 +1042,20 @@ export default async function handler(req, res) {
 
         const creditAmount = typeof kieJson.data === 'number' ? kieJson.data : (Number(kieJson.data) || 0);
 
-        // Jika ada keyId dan adminSupabase aktif, perbarui kolom credits di Supabase
+        // Jika ada keyId dan adminSupabase aktif, perbarui kolom credits & status di Supabase
         if (keyId && adminSupabase) {
           try {
+            const updatePayload = {
+              credits: creditAmount,
+              updated_at: new Date().toISOString()
+            };
+            if (creditAmount < 80) {
+              updatePayload.status = 'invalid';
+              updatePayload.error_message = `Kredit Kie.ai berkurang menjadi ${creditAmount} cr (syarat minimal: 80 cr)`;
+            }
             await adminSupabase
               .from('api_keys')
-              .update({ credits: creditAmount })
+              .update(updatePayload)
               .eq('id', keyId);
           } catch (dbErr) {
             console.warn('[SupabaseProxy] Gagal update credits di db:', dbErr.message);

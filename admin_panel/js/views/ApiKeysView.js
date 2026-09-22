@@ -528,7 +528,7 @@ export class ApiKeysView {
                       </td>
                       <td>
                         <div class="flex items-center gap-1 whitespace-nowrap">
-                          <span class="font-mono text-xs font-bold text-slate-200">${k.credits !== undefined ? k.credits : 80} cr</span>
+                          <span class="font-mono text-xs font-bold text-slate-200">${(k.credits !== null && k.credits !== undefined && !isNaN(Number(k.credits))) ? Number(k.credits) : 80} cr</span>
                           <button
                             type="button"
                             data-action="sync-single-credit"
@@ -922,6 +922,8 @@ export class ApiKeysView {
           this.toast.success(`Kredit Key: ${res.credit} cr berhasil disinkronkan dari Kie.ai!`, 'Sinkron Berhasil');
         } else {
           this.toast.error(res.message || 'Gagal sinkron kredit dari Kie.ai', 'Gagal');
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
         }
         refreshCallback();
       });

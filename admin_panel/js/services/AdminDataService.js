@@ -203,8 +203,10 @@ export class AdminDataService {
     const validKeys = apiKeys.filter(k => k.status === 'valid');
     const invalidKeys = apiKeys.filter(k => k.status === 'invalid');
     const usedKeys = apiKeys.filter(k => k.status === 'used');
-    const pendingKeys = apiKeys.filter(k => k.status === 'pending');
-    const totalCredits = validKeys.reduce((sum, k) => sum + (Number(k.credits) || 80), 0);
+    const totalCredits = validKeys.reduce((sum, k) => {
+      const c = (k.credits !== null && k.credits !== undefined && !isNaN(Number(k.credits))) ? Number(k.credits) : 80;
+      return sum + c;
+    }, 0);
 
     const withdrawals = transactions.filter(t => t.type === 'withdrawal');
     const pendingWithdrawals = withdrawals.filter(t => t.status === 'pending');
@@ -346,7 +348,7 @@ export class AdminDataService {
                 userEmail: row.users?.email || '-',
                 status: domainStatus,
                 rewardAmount: Number(row.reward_amount) || 3000,
-                credits: Number(row.credits) || 80,
+                credits: (row.credits !== null && row.credits !== undefined && !isNaN(Number(row.credits))) ? Number(row.credits) : 80,
                 errorMessage: errorMessage,
                 createdAt: row.created_at,
                 source: 'supabase'
@@ -381,7 +383,7 @@ export class AdminDataService {
             userEmail: k.userEmail || matchedUser?.email || '-',
             status: domainStatus,
             rewardAmount: Number(k.rewardAmount ?? k.reward_amount ?? 3000),
-            credits: Number(k.credits ?? 80),
+            credits: (k.credits !== null && k.credits !== undefined && !isNaN(Number(k.credits))) ? Number(k.credits) : 80,
             errorMessage: errorMessage,
             createdAt: k.createdAt || k.created_at || new Date().toISOString(),
             source: 'supabase'
@@ -1106,6 +1108,10 @@ export class AdminDataService {
       if (res.ok && json.success) {
         if (key) {
           key.credits = json.credit;
+          if (json.credit < 80) {
+            key.status = 'invalid';
+            key.errorMessage = `Kredit Kie.ai berkurang menjadi ${json.credit} cr (syarat minimal: 80 cr)`;
+          }
           this._set('api_keys', keys);
         }
         await this.fetchApiKeysFromSupabase();
@@ -1198,7 +1204,7 @@ export class AdminDataService {
         success: true,
         validated: key.status === 'valid',
         status: key.status,
-        credit: key.credits || 80,
+        credit: (key.credits !== null && key.credits !== undefined && !isNaN(Number(key.credits))) ? Number(key.credits) : 80,
         message: `Key sudah berstatus ${key.status}`
       };
     }
@@ -1632,7 +1638,7 @@ export class AdminDataService {
     } else if (format === 'csv') {
       filename += '.csv';
       const header = 'ID,API_Key,User_ID,Status,Kredit,Reward,Tanggal_Setor\n';
-      const rows = keys.map(k => `"${k.id}","${k.keyString}","${k.userId}","${k.status}","${k.credits || 80}","${k.rewardAmount || 3000}","${k.createdAt}"`).join('\n');
+      const rows = keys.map(k => `"${k.id}","${k.keyString}","${k.userId}","${k.status}","${(k.credits !== null && k.credits !== undefined && !isNaN(Number(k.credits))) ? Number(k.credits) : 80}","${k.rewardAmount || 3000}","${k.createdAt}"`).join('\n');
       content = header + rows;
       mimeType = 'text/csv;charset=utf-8';
     } else if (format === 'json') {

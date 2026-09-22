@@ -288,7 +288,7 @@ export default defineConfig(({ mode }) => {
                           userEmail: row.users?.email || '-',
                           status: domainStatus,
                           rewardAmount: Number(row.reward_amount) || 3000,
-                          credits: Number(row.credits) || 80,
+                          credits: (row.credits !== null && row.credits !== undefined && !isNaN(Number(row.credits))) ? Number(row.credits) : 80,
                           errorMessage: errorMessage,
                           createdAt: row.created_at,
                           source: 'supabase'
@@ -603,7 +603,7 @@ export default defineConfig(({ mode }) => {
                             userEmail: row.users?.email || '-',
                             status: domainStatus,
                             rewardAmount: Number(row.reward_amount) || 3000,
-                            credits: Number(row.credits) || 80,
+                            credits: (row.credits !== null && row.credits !== undefined && !isNaN(Number(row.credits))) ? Number(row.credits) : 80,
                             errorMessage: errorMessage,
                             createdAt: row.created_at,
                             source: 'supabase'
@@ -1637,12 +1637,17 @@ export default defineConfig(({ mode }) => {
                         const creditVal = typeof resData.data === 'number' ? resData.data : (Number(resData.data) || 0);
 
                         if (targetKeyId && adminSupabase) {
+                          const updatePayload = {
+                            credits: creditVal,
+                            updated_at: new Date().toISOString()
+                          };
+                          if (creditVal < 80) {
+                            updatePayload.status = 'invalid';
+                            updatePayload.error_message = `Kredit Kie.ai berkurang menjadi ${creditVal} cr (syarat minimal: 80 cr)`;
+                          }
                           await adminSupabase
                             .from('api_keys')
-                            .update({
-                              credits: creditVal,
-                              updated_at: new Date().toISOString()
-                            })
+                            .update(updatePayload)
                             .eq('id', targetKeyId);
                         }
 
