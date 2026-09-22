@@ -8,6 +8,16 @@ export class SettingsView {
 
   render() {
     const config = this.dataService.getConfig();
+    const valNormal = config.holdValueNormal ?? config.holdDaysNormal ?? 3;
+    const unitNormal = config.holdUnitNormal || 'days';
+    const valRef = config.holdValueReferral ?? config.holdDaysReferral ?? 2;
+    const unitRef = config.holdUnitReferral || 'days';
+
+    const getUnitLabel = (u) => {
+      if (u === 'minutes') return 'Menit';
+      if (u === 'hours') return 'Jam';
+      return 'Hari';
+    };
 
     return `
       <div class="w-full max-w-5xl mx-auto space-y-6 sm:space-y-8 view-fade-enter">
