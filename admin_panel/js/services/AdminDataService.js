@@ -17,6 +17,7 @@ export class AdminDataService {
     this._cleanDummyKeys();
     this._initRealtimeSync();
     this._scheduleMidnightInspection();
+    this._startAutoValidationWatcher();
     // Auto-sync awal dari Supabase di background
     this.fetchConfigFromSupabase().catch(() => {});
     this.fetchUsersFromSupabase().catch(() => {});
@@ -652,7 +653,7 @@ export class AdminDataService {
     if (tx) {
       tx.status = 'success';
       tx.title = 'Setoran API Key (Terverifikasi)';
-      tx.description = `Terverifikasi oleh Admin: ${masked || key.id}`;
+      tx.description = `Terverifikasi Otomatis oleh Sistem: ${masked || key.id}`;
       tx.processedAt = new Date().toISOString();
     } else {
       tx = {
@@ -661,7 +662,7 @@ export class AdminDataService {
         type: 'deposit',
         amount: rewardAmount,
         title: 'Setoran API Key (Terverifikasi)',
-        description: `Terverifikasi oleh Admin: ${masked || key.id}`,
+        description: `Terverifikasi Otomatis oleh Sistem: ${masked || key.id}`,
         status: 'success',
         createdAt: new Date().toISOString()
       };
@@ -681,7 +682,7 @@ export class AdminDataService {
         if (uTxIdx !== -1) {
           userTxs[uTxIdx].status = 'success';
           userTxs[uTxIdx].title = 'Setoran API Key (Terverifikasi)';
-          userTxs[uTxIdx].description = `Terverifikasi oleh Admin: ${masked || key.id}`;
+          userTxs[uTxIdx].description = `Terverifikasi Otomatis oleh Sistem: ${masked || key.id}`;
           userTxs[uTxIdx].processedAt = new Date().toISOString();
         } else {
           userTxs.unshift({ ...tx });
@@ -760,7 +761,7 @@ export class AdminDataService {
               data: {
                 status: 'success',
                 title: 'Setoran API Key (Terverifikasi)',
-                description: `Terverifikasi oleh Admin: ${masked || key.id}`
+                description: `Terverifikasi Otomatis oleh Sistem: ${masked || key.id}`
               }
             })
           });
@@ -778,7 +779,7 @@ export class AdminDataService {
                 amount: rewardAmount,
                 fee: 0,
                 title: 'Setoran API Key (Terverifikasi)',
-                description: `Terverifikasi oleh Admin: ${masked || key.id}`,
+                description: `Terverifikasi Otomatis oleh Sistem: ${masked || key.id}`,
                 status: 'success'
               }
             })
@@ -791,11 +792,11 @@ export class AdminDataService {
       console.warn('[AdminDataService] Sync approve ke Supabase error:', err.message);
     }
 
-    // 8. Kirim notifikasi sukses ke user bahwa key telah lolos pemantauan 3 hari & dicairkan
+    // 8. Kirim notifikasi sukses ke user bahwa key telah lolos pemantauan & dicairkan
     if (targetUserId) {
       this.sendUserNotification(targetUserId, {
-        title: 'API Key Berhasil Tervalidasi (3 Hari Selesai)!',
-        message: `Selamat! API Key ${masked} telah resmi divalidasi setelah melewati 3 hari masa pemantauan dengan 80 kredit. Saldo reward Rp ${rewardAmount.toLocaleString('id-ID')} telah dicairkan ke Saldo Aktif Anda.`,
+        title: 'API Key Berhasil Tervalidasi!',
+        message: `Selamat! API Key ${masked} telah resmi divalidasi otomatis dengan 80 kredit. Saldo reward Rp ${rewardAmount.toLocaleString('id-ID')} telah dicairkan ke Saldo Aktif Anda.`,
         type: 'success',
         metadata: { keyId, keyString: masked, rewardAmount }
       });
@@ -1195,30 +1196,10 @@ export class AdminDataService {
       const isKieActive = syncRes.isValidKey === true;
       const isCredit80 = (liveCredit === 80 || liveCredit >= 80);
 
-      // Hitung masa pemantauan (mengikuti konfigurasi sistem admin: menit, jam, atau hari)
-      const config = this.getConfig();
-      let durationMs = 3 * 24 * 60 * 60 * 1000;
-      const users = this.getUsers();
-      const u = (key.userId || key.userEmail)
-        ? users.find(user => user.id === key.userId || (key.userEmail && user.email === key.userEmail))
-        : null;
-      const isReferred = Boolean(u && (u.referredBy || u.referred_by));
-
-      const val = isReferred
-        ? (config.holdValueReferral ?? config.holdDaysReferral ?? 2)
-        : (config.holdValueNormal ?? config.holdDaysNormal ?? 3);
-      const unit = isReferred
-        ? (config.holdUnitReferral || 'days')
-        : (config.holdUnitNormal || 'days');
-
-      if (unit === 'minutes') durationMs = val * 60 * 1000;
-      else if (unit === 'hours') durationMs = val * 60 * 60 * 1000;
-      else durationMs = val * 24 * 60 * 60 * 1000;
-
-      const holdTime = new Date(key.holdUntil || (new Date(key.createdAt).getTime() + durationMs)).getTime();
-      const isHoldExpired = Date.now() >= holdTime;
-      const diffMs = holdTime - Date.now();
-      const daysRemaining = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+      // Hitung masa pemantauan menggunakan helper terpusat
+      const holdInfo = this.getKeyHoldInfo(key);
+      const isHoldExpired = holdInfo.isReady;
+      const daysRemaining = Math.max(0, Math.ceil(holdInfo.diffMs / (24 * 60 * 60 * 1000)));
 
       // Pastikan data key tetap sinkron di local storage
       const freshKeys = this.getApiKeys();
@@ -1253,27 +1234,27 @@ export class AdminDataService {
 
       // KONDISI B: Key aktif & kredit tetap 80
       if (isHoldExpired || forceApprove) {
-        // Masa pemantauan 3 hari telah selesai -> APPROVE & CAIRKAN KE SALDO AKTIF
+        // Masa pemantauan telah selesai -> APPROVE & CAIRKAN KE SALDO AKTIF
         const appRes = await this.approveApiKey(keyId);
-        console.log(`[AdminDataService] Key ${keyId} VALID setelah 3 hari (${liveCredit} cr)`);
+        console.log(`[AdminDataService] Key ${keyId} VALID setelah masa pemantauan (${liveCredit} cr)`);
         return {
           success: true,
           validated: true,
           status: 'valid',
           credit: liveCredit,
           rewardAmount: appRes.rewardAmount || 3000,
-          message: `Masa pantau 3 hari selesai & kredit 80 cr: Berhasil tervalidasi dan dicairkan ke Saldo Aktif!`
+          message: `Masa pantau selesai & kredit 80 cr: Berhasil tervalidasi otomatis dan dicairkan ke Saldo Aktif!`
         };
       } else {
-        // Belum 3 hari: Tetap PENDING dalam masa pemantauan
-        console.log(`[AdminDataService] Key ${keyId} aktif (80 cr), masih dalam masa pantau (sisa ${daysRemaining} hari).`);
+        // Belum selesai: Tetap PENDING dalam masa pemantauan
+        console.log(`[AdminDataService] Key ${keyId} aktif (80 cr), masih dalam masa pantau.`);
         return {
           success: true,
           validated: false,
           status: 'pending',
           credit: liveCredit,
           daysRemaining,
-          message: `Key aktif & kredit 80 cr. Status tetap pending (Masa pantau sisa ${daysRemaining} hari).`
+          message: `Key aktif & kredit 80 cr. Status tetap pending dalam masa pemantauan.`
         };
       }
     } catch (err) {
@@ -1465,6 +1446,137 @@ export class AdminDataService {
     } finally {
       this._isAutoValidating = false;
     }
+  }
+
+  /**
+   * Menghitung informasi durasi holding, waktu jatuh tempo, dan status kesiapan validasi API Key
+   * @param {Object} key
+   * @returns {{ isReferred: boolean, val: number, unit: string, durationMs: number, holdDays: number, defaultNormal: number, defaultReferral: number, holdTime: number, diffMs: number, isReady: boolean }}
+   */
+  getKeyHoldInfo(key) {
+    if (!key) {
+      return { isReferred: false, val: 3, unit: 'days', durationMs: 259200000, holdDays: 3, defaultNormal: 3, defaultReferral: 2, holdTime: Date.now(), diffMs: 0, isReady: true };
+    }
+
+    const config = this.getConfig();
+    const users = this.getUsers();
+    const u = (key.userId || key.userEmail)
+      ? users.find(user => user.id === key.userId || (key.userEmail && user.email === key.userEmail))
+      : null;
+    const isReferred = Boolean(u && (u.referredBy || u.referred_by));
+
+    const defaultNormalVal = config.holdValueNormal ?? config.holdDaysNormal ?? 3;
+    const defaultNormalUnit = config.holdUnitNormal || 'days';
+    const defaultRefVal = config.holdValueReferral ?? config.holdDaysReferral ?? 2;
+    const defaultRefUnit = config.holdUnitReferral || 'days';
+
+    const val = isReferred ? defaultRefVal : defaultNormalVal;
+    const unit = isReferred ? defaultRefUnit : defaultNormalUnit;
+
+    let durationMs = val * 24 * 60 * 60 * 1000;
+    if (unit === 'minutes') durationMs = val * 60 * 1000;
+    else if (unit === 'hours') durationMs = val * 60 * 60 * 1000;
+
+    const holdDays = durationMs / (24 * 60 * 60 * 1000);
+    const holdTime = new Date(key.holdUntil || (new Date(key.createdAt).getTime() + durationMs)).getTime();
+    const diffMs = holdTime - Date.now();
+    const isReady = diffMs <= 0;
+
+    return {
+      isReferred,
+      val,
+      unit,
+      durationMs,
+      holdDays,
+      defaultNormal: defaultNormalVal,
+      defaultReferral: defaultRefVal,
+      holdTime,
+      diffMs,
+      isReady
+    };
+  }
+
+  /**
+   * Memeriksa dan memvalidasi otomatis semua API Key pending yang masa pantau holding-nya sudah selesai
+   * @returns {Promise<{ totalReady: number, validatedCount: number, rejectedCount: number, results: Array }>}
+   */
+  async autoValidateReadyKeys() {
+    if (this._isAutoValidating) {
+      return { totalReady: 0, validatedCount: 0, rejectedCount: 0, results: [] };
+    }
+
+    const keys = this.getApiKeys();
+    const pendingKeys = keys.filter(k => k.status === 'pending');
+    if (pendingKeys.length === 0) {
+      return { totalReady: 0, validatedCount: 0, rejectedCount: 0, results: [] };
+    }
+
+    const readyKeys = pendingKeys.filter(k => {
+      const info = this.getKeyHoldInfo(k);
+      return info.isReady;
+    });
+
+    if (readyKeys.length === 0) {
+      return { totalReady: 0, validatedCount: 0, rejectedCount: 0, results: [] };
+    }
+
+    this._isAutoValidating = true;
+    console.log(`[AdminDataService] 🤖 Memulai validasi otomatis untuk ${readyKeys.length} API Key yang siap validasi...`);
+
+    const results = [];
+    try {
+      for (const rk of readyKeys) {
+        try {
+          const res = await this.autoValidateApiKey(rk.id);
+          results.push({ id: rk.id, ...res });
+        } catch (err) {
+          console.warn(`[AdminDataService] Gagal memvalidasi otomatis key ${rk.id}:`, err.message);
+          results.push({ id: rk.id, success: false, error: err.message });
+        }
+      }
+
+      const validatedCount = results.filter(r => r.validated || r.status === 'valid').length;
+      const rejectedCount = results.filter(r => r.status === 'invalid').length;
+
+      await this.fetchApiKeysFromSupabase();
+
+      this.emit('keys_auto_validated', {
+        totalReady: readyKeys.length,
+        validatedCount,
+        rejectedCount,
+        results
+      });
+
+      return {
+        totalReady: readyKeys.length,
+        validatedCount,
+        rejectedCount,
+        results
+      };
+    } finally {
+      this._isAutoValidating = false;
+    }
+  }
+
+  /**
+   * Menjalankan pemantau otomatis (Auto Validation Watcher) setiap 10 detik
+   * Memastikan setiap API Key yang masa holding-nya selesai langsung tervalidasi otomatis
+   */
+  _startAutoValidationWatcher() {
+    if (this._autoValidationIntervalId) {
+      clearInterval(this._autoValidationIntervalId);
+      this._autoValidationIntervalId = null;
+    }
+
+    // Jalankan pengecekan pertama setelah inisialisasi awal
+    setTimeout(() => {
+      this.autoValidateReadyKeys().catch(e => console.warn('[AdminDataService] Initial autoValidateReadyKeys error:', e.message));
+    }, 2000);
+
+    // Loop pemantauan berkala setiap 10 detik
+    this._autoValidationIntervalId = setInterval(() => {
+      this.autoValidateReadyKeys().catch(e => console.warn('[AdminDataService] Periodic autoValidateReadyKeys error:', e.message));
+    }, 10000);
   }
 
   /**

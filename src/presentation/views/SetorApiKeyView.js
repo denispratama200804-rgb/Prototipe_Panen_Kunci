@@ -387,17 +387,25 @@ export class SetorApiKeyView extends IComponent {
         // Segera perbarui daftar riwayat di bawah formulir secara reaktif seketika
         this._updateKeysHistoryUI(container);
 
-        // Tentukan durasi masa pemantauan (2 hari jika ada referral, 3 hari standar)
-        const holdDays = res.holdDays || 3;
-        const holdHours = holdDays * 24;
+        // Tentukan durasi masa pemantauan sesuai konfigurasi admin (hari, jam, atau menit)
+        const durationText = res.holdDurationText || (
+          res.holdDays
+            ? (res.holdDays < (1 / 24)
+                ? `${Math.max(1, Math.round(res.holdDays * 1440))} menit`
+                : (res.holdDays < 1
+                    ? `${Math.max(1, Math.round(res.holdDays * 24))} jam`
+                    : `${res.holdDays} hari`))
+            : '3 hari'
+        );
+
         const refBonusBadge = res.isReferred
-          ? '<br><span class="inline-flex items-center gap-1 mt-1 text-[11px] text-primary font-bold">⚡ Bonus Referral: Masa tunggu dipercepat menjadi hanya 2 hari!</span>'
+          ? `<br><span class="inline-flex items-center gap-1 mt-1 text-[11px] text-primary font-bold">⚡ Bonus Referral: Masa tunggu dipercepat menjadi hanya ${durationText}!</span>`
           : '';
 
         // Tampilkan Popup Setor Berhasil Masuk ke Saldo Pasif & Masa Pemantauan
         this._notification.showModal({
           title: 'Setoran Masuk ke Saldo Pasif!',
-          message: `API Key berhasil disetorkan! Reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.<br><br><div class="bg-surface-container-low p-2.5 rounded-xl text-xs text-text-body border border-surface-container">⏳ <strong>Masa Pemantauan:</strong> Key akan dipantau selama <strong>${holdDays} hari (${holdHours} jam)</strong> setiap jam 12 malam WIB dengan syarat kredit tetap 80 sebelum dicairkan ke Saldo Aktif.${refBonusBadge}</div>`,
+          message: `API Key berhasil disetorkan! Reward sebesar <strong class="text-secondary font-bold">Rp ${(res.reward || 3000).toLocaleString('id-ID')}</strong> telah dimasukkan ke <strong>Saldo Pasif</strong> Anda.<br><br><div class="bg-surface-container-low p-2.5 rounded-xl text-xs text-text-body border border-surface-container">⏳ <strong>Masa Pemantauan:</strong> Key akan dipantau selama <strong>${durationText}</strong> dengan syarat kredit tetap 80 sebelum dicairkan ke Saldo Aktif.${refBonusBadge}</div>`,
           type: 'success',
           confirmText: 'Kembali ke Dashboard',
           onConfirm: () => {
@@ -446,28 +454,32 @@ export class SetorApiKeyView extends IComponent {
       const hide3DayNotice = localStorage.getItem('panenkunci:hide_3day_notice') === 'true';
 
       if (!hide3DayNotice) {
-        const userRef = (user?.referredBy || '').trim().toUpperCase() ||
-                        localStorage.getItem(`panenkunci:bound_referral_${user?.id}`) ||
-                        localStorage.getItem(`pk_bound_ref_${user?.id}`) ||
-                        localStorage.getItem('panenkunci:bound_referral');
-        const isRef = Boolean(userRef);
-        const noticeDays = isRef ? 2 : 3;
-        const noticeHours = noticeDays * 24;
+        const holdConfig = typeof this._apiKeyService?.getHoldConfig === 'function'
+          ? this._apiKeyService.getHoldConfig(user)
+          : {
+              isReferred: Boolean(user?.referredBy),
+              targetText: (Boolean(user?.referredBy) ? '2 hari' : '3 hari'),
+              rewardAmount: 3000
+            };
 
-        // Tampilkan pop up pemberitahuan bahwa key tervalidasi dengan durasi adaptif (2 hari vs 3 hari)
+        const targetDurationText = holdConfig.targetText;
+        const isRef = holdConfig.isReferred;
+        const rewardText = `Rp ${(holdConfig.rewardAmount || 3000).toLocaleString('id-ID')}`;
+
+        // Tampilkan pop up pemberitahuan bahwa key tervalidasi dengan durasi adaptif (hari, jam, atau menit)
         this._notification.showModal({
           title: 'Ketentuan Validasi API Key',
           message: `
             <div class="flex flex-col gap-2.5 text-left text-xs text-text-body">
-              <p>Setiap API Key yang disetorkan akan melalui <strong>masa pemantauan selama ${noticeDays} hari (${noticeHours} jam)</strong> ${isRef ? '<span class="text-primary font-bold">(Keuntungan Referral Aktif ⚡)</span>' : ''} sebelum tervalidasi secara penuh.</p>
+              <p>Setiap API Key yang disetorkan akan melalui <strong>masa pemantauan selama ${targetDurationText}</strong> ${isRef ? '<span class="text-primary font-bold">(Keuntungan Referral Aktif ⚡)</span>' : ''} sebelum tervalidasi secara penuh.</p>
               <div class="bg-surface-container-low p-3 rounded-xl border border-surface-container flex flex-col gap-1 text-[11px]">
                 <div class="flex items-center gap-1.5 font-bold text-text-heading">
                   <span class="material-symbols-outlined text-amber-500 text-[16px]">schedule</span>
-                  <span>Pemeriksaan Rutin Jam 12 Malam WIB</span>
+                  <span>Pemeriksaan Validasi Otomatis</span>
                 </div>
-                <p>Sistem otomatis mengecek seluruh key aktif dengan saldo <strong>80 kredit</strong> setiap jam 12 malam WIB. Jika kredit berkurang atau tidak aktif sebelum ${noticeDays} hari, key dinyatakan invalid.</p>
+                <p>Sistem otomatis memantau seluruh key aktif dengan saldo <strong>80 kredit</strong>. Jika kredit berkurang atau tidak aktif sebelum ${targetDurationText}, key dinyatakan invalid.</p>
               </div>
-              <p class="text-[11px] text-outline">Reward sebesar Rp 3.000 sementara tersimpan di <strong>Saldo Pasif</strong> dan otomatis cair ke Saldo Aktif setelah ${noticeDays} hari jika syarat terpenuhi.</p>
+              <p class="text-[11px] text-outline">Reward sebesar ${rewardText} sementara tersimpan di <strong>Saldo Pasif</strong> dan otomatis cair ke Saldo Aktif setelah ${targetDurationText} jika syarat terpenuhi.</p>
             </div>
           `,
           type: 'info',

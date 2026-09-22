@@ -56,6 +56,8 @@ export class ApiKeyService {
                   duration: 4500
                 });
               }
+            } else if (data && data.type === 'CONFIG_UPDATED' && data.config) {
+              this._storage.set('admin_config', data.config);
             }
           };
         } catch (e) {
@@ -65,7 +67,7 @@ export class ApiKeyService {
 
       // 2. Cross-tab fallback via storage event
       window.addEventListener('storage', (e) => {
-        if (e.key && (e.key.includes('api_keys') || e.key.includes('wallet_balance'))) {
+        if (e.key && (e.key.includes('api_keys') || e.key.includes('wallet_balance') || e.key.includes('admin_config'))) {
           this._loadKeys();
           this._syncFromRemote();
           this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});
@@ -254,6 +256,100 @@ export class ApiKeyService {
   }
 
   /**
+   * Mendapatkan konfigurasi masa pemantauan (holding duration) dari admin_config
+   * @param {Object} [currentUser]
+   * @returns {{
+   *   isReferred: boolean,
+   *   rewardAmount: number,
+   *   targetVal: number,
+   *   targetUnit: string,
+   *   targetText: string,
+   *   durationMs: number,
+   *   holdDurationDays: number,
+   *   normalVal: number,
+   *   normalUnit: string,
+   *   normalText: string,
+   *   referralVal: number,
+   *   referralUnit: string,
+   *   referralText: string
+   * }}
+   */
+  getHoldConfig(currentUser = null) {
+    const config = this._storage.get('admin_config') || {};
+    const rewardAmount = (config.rewardPerKey && !isNaN(Number(config.rewardPerKey)))
+      ? Number(config.rewardPerKey)
+      : 3000;
+
+    const activeUser = currentUser || this._storage.get('current_user') || {};
+    const userId = activeUser.id;
+    let isReferred = Boolean(activeUser.referredBy || activeUser.referred_by);
+
+    if (!isReferred && userId && typeof localStorage !== 'undefined') {
+      const bound = localStorage.getItem('pk_bound_ref_' + userId) ||
+                    localStorage.getItem('panenkunci:bound_referral_' + userId) ||
+                    (activeUser.email ? localStorage.getItem('pk_bound_ref_' + (activeUser.email).toLowerCase()) : null) ||
+                    localStorage.getItem('panenkunci:bound_referral');
+      if (bound) isReferred = true;
+    }
+
+    if (!isReferred && userId) {
+      const allUsers = this._storage.get('all_users') || [];
+      const matched = allUsers.find(u => u.id === userId || (activeUser.email && u.email === activeUser.email));
+      if (matched && (matched.referredBy || matched.referred_by)) {
+        isReferred = true;
+      }
+    }
+
+    const formatText = (val, unit) => {
+      const num = Number(val) || 1;
+      if (unit === 'minutes') return `${num} menit`;
+      if (unit === 'hours') return `${num} jam`;
+      return `${num} hari`;
+    };
+
+    const normalVal = (config.holdValueNormal !== undefined && !isNaN(Number(config.holdValueNormal)))
+      ? Number(config.holdValueNormal)
+      : ((config.holdDaysNormal !== undefined && !isNaN(Number(config.holdDaysNormal))) ? Number(config.holdDaysNormal) : 3);
+    const normalUnit = config.holdUnitNormal || 'days';
+    const normalText = formatText(normalVal, normalUnit);
+
+    const referralVal = (config.holdValueReferral !== undefined && !isNaN(Number(config.holdValueReferral)))
+      ? Number(config.holdValueReferral)
+      : ((config.holdDaysReferral !== undefined && !isNaN(Number(config.holdDaysReferral))) ? Number(config.holdDaysReferral) : 2);
+    const referralUnit = config.holdUnitReferral || 'days';
+    const referralText = formatText(referralVal, referralUnit);
+
+    const targetVal = isReferred ? referralVal : normalVal;
+    const targetUnit = isReferred ? referralUnit : normalUnit;
+    const targetText = formatText(targetVal, targetUnit);
+
+    let durationMs = targetVal * 24 * 60 * 60 * 1000;
+    if (targetUnit === 'minutes') {
+      durationMs = targetVal * 60 * 1000;
+    } else if (targetUnit === 'hours') {
+      durationMs = targetVal * 60 * 60 * 1000;
+    }
+
+    const holdDurationDays = durationMs / (24 * 60 * 60 * 1000);
+
+    return {
+      isReferred,
+      rewardAmount,
+      targetVal,
+      targetUnit,
+      targetText,
+      durationMs,
+      holdDurationDays,
+      normalVal,
+      normalUnit,
+      normalText,
+      referralVal,
+      referralUnit,
+      referralText
+    };
+  }
+
+  /**
    * Proses setoran API Key
    * @param {string} rawKey
    * @param {string} userId
@@ -381,53 +477,13 @@ export class ApiKeyService {
     }
 
     // 4. Sukses: Kuota kredit terverifikasi dari Kie.ai (Aktif & Kredit 80)
-    const config = this._storage.get('admin_config');
-    const rewardAmount = (config && config.rewardPerKey && !isNaN(Number(config.rewardPerKey)))
-      ? Number(config.rewardPerKey)
-      : 3000;
-
-    // Cek apakah user telah menautkan kode referral (Diskon masa pemantauan: 2 hari vs standar 3 hari)
-    const activeUser = currentUser || this._storage.get('current_user') || {};
-    let isReferred = Boolean(activeUser.referredBy);
-    if (!isReferred && userId) {
-      if (typeof localStorage !== 'undefined') {
-        const bound = localStorage.getItem('pk_bound_ref_' + userId) ||
-                      localStorage.getItem('panenkunci:bound_referral_' + userId) ||
-                      (activeUser.email ? localStorage.getItem('pk_bound_ref_' + (activeUser.email).toLowerCase()) : null) ||
-                      localStorage.getItem('panenkunci:bound_referral');
-        if (bound) isReferred = true;
-      }
-    }
-    if (!isReferred && userId) {
-      const allUsers = this._storage.get('all_users') || [];
-      const matched = allUsers.find(u => u.id === userId || (activeUser.email && u.email === activeUser.email));
-      if (matched && (matched.referredBy || matched.referred_by)) {
-        isReferred = true;
-      }
-    }
-
-    const defaultNormalVal = (config && config.holdValueNormal !== undefined && !isNaN(Number(config.holdValueNormal)))
-      ? Number(config.holdValueNormal)
-      : ((config && config.holdDaysNormal !== undefined && !isNaN(Number(config.holdDaysNormal))) ? Number(config.holdDaysNormal) : 3);
-    const defaultNormalUnit = (config && config.holdUnitNormal) || 'days';
-
-    const defaultReferralVal = (config && config.holdValueReferral !== undefined && !isNaN(Number(config.holdValueReferral)))
-      ? Number(config.holdValueReferral)
-      : ((config && config.holdDaysReferral !== undefined && !isNaN(Number(config.holdDaysReferral))) ? Number(config.holdDaysReferral) : 2);
-    const defaultReferralUnit = (config && config.holdUnitReferral) || 'days';
-
-    const targetVal = isReferred ? defaultReferralVal : defaultNormalVal;
-    const targetUnit = isReferred ? defaultReferralUnit : defaultNormalUnit;
-
-    let durationMs = targetVal * 24 * 60 * 60 * 1000;
-    if (targetUnit === 'minutes') {
-      durationMs = targetVal * 60 * 1000;
-    } else if (targetUnit === 'hours') {
-      durationMs = targetVal * 60 * 60 * 1000;
-    }
-
-    const holdDurationDays = durationMs / (24 * 60 * 60 * 1000);
+    const holdConfig = this.getHoldConfig(currentUser);
+    const rewardAmount = holdConfig.rewardAmount;
+    const isReferred = holdConfig.isReferred;
+    const durationMs = holdConfig.durationMs;
+    const holdDurationDays = holdConfig.holdDurationDays;
     const holdUntil = new Date(Date.now() + durationMs).toISOString();
+
     const newApiKey = new ApiKey({
       id: 'key_' + Math.random().toString(36).substring(2, 9),
       keyString: trimmed,
@@ -471,7 +527,13 @@ export class ApiKeyService {
     this._walletService.addPassiveDeposit(rewardAmount, newApiKey);
 
     // 6. Emit event lokal dan BroadcastChannel agar Admin Panel seketika memantau key
-    this._eventBus.emit(AppEvents.API_KEY_SUBMITTED, { apiKey: newApiKey, reward: rewardAmount, holdDays: holdDurationDays, isReferred });
+    this._eventBus.emit(AppEvents.API_KEY_SUBMITTED, {
+      apiKey: newApiKey,
+      reward: rewardAmount,
+      holdDays: holdDurationDays,
+      holdDurationText: holdConfig.targetText,
+      isReferred
+    });
 
     if (typeof BroadcastChannel !== 'undefined') {
       try {
@@ -501,8 +563,13 @@ export class ApiKeyService {
       apiKey: newApiKey,
       reward: rewardAmount,
       holdDays: holdDurationDays,
+      holdDurationText: holdConfig.targetText,
+      holdValue: holdConfig.targetVal,
+      holdUnit: holdConfig.targetUnit,
+      normalDurationText: holdConfig.normalText,
+      referralDurationText: holdConfig.referralText,
       isReferred,
-      message: `API Key valid (80 cr) dan telah disetorkan! Masuk masa pemantauan ${holdDurationDays} hari.`
+      message: `API Key valid (80 cr) dan telah disetorkan! Masuk masa pemantauan ${holdConfig.targetText}.`
     };
   }
 

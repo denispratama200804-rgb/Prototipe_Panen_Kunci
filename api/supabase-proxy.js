@@ -2034,7 +2034,7 @@ export default async function handler(req, res) {
               const createdAtMs = new Date(dbKeyData.created_at).getTime();
               const isReferred = Boolean(dbKeyData.users?.referred_by);
               const holdDays = isReferred ? 2 : 3;
-              const holdUntilMs = createdAtMs + holdDays * 24 * 60 * 60 * 1000;
+              const holdUntilMs = dbKeyData.hold_until ? new Date(dbKeyData.hold_until).getTime() : (createdAtMs + holdDays * 24 * 60 * 60 * 1000);
               const diffMs = holdUntilMs - Date.now();
               isHoldExpired = diffMs <= 0;
               daysRemaining = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));

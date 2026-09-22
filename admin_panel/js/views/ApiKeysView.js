@@ -19,6 +19,10 @@ export class ApiKeysView {
 
   destroy() {
     this.revealedKeys.clear();
+    if (this._unsubAutoValidated) {
+      this._unsubAutoValidated();
+      this._unsubAutoValidated = null;
+    }
   }
 
   getFilteredKeys() {
@@ -440,20 +444,10 @@ export class ApiKeysView {
                           if (k.status === 'valid') {
                             statusBadge = '<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 whitespace-nowrap">Valid</span>';
                           } else if (k.status === 'pending') {
-                            const config = this.dataService?.getConfig ? this.dataService.getConfig() : {};
-                            const defaultNormal = config.holdDaysNormal ?? 3;
-                            const defaultReferral = config.holdDaysReferral ?? 2;
-                            let holdDays = k.holdDurationDays || defaultNormal;
-                            if (!k.holdDurationDays && k.userId) {
-                              const allUsers = this.dataService?.getUsers ? this.dataService.getUsers() : [];
-                              const userObj = allUsers.find(u => u.id === k.userId || (k.userEmail && u.email === k.userEmail));
-                              if (userObj && (userObj.referredBy || userObj.referred_by)) {
-                                holdDays = defaultReferral;
-                              }
-                            }
-                            const holdTime = new Date(k.holdUntil || (new Date(k.createdAt).getTime() + holdDays * 24 * 60 * 60 * 1000)).getTime();
-                            const diffMs = holdTime - Date.now();
-                            const isReady = diffMs <= 0;
+                            const holdInfo = this.dataService?.getKeyHoldInfo ? this.dataService.getKeyHoldInfo(k) : null;
+                            const isReady = holdInfo ? holdInfo.isReady : false;
+                            const diffMs = holdInfo ? holdInfo.diffMs : 0;
+                            const isRefBonus = holdInfo ? (holdInfo.isReferred && holdInfo.defaultReferral < holdInfo.defaultNormal) : false;
                             let holdText = '';
                             if (isReady) {
                               holdText = '⚡ Siap Validasi';
@@ -465,11 +459,9 @@ export class ApiKeysView {
                               if (days > 0) timeStr = `${days}h ${hours}j`;
                               else if (hours > 0) timeStr = `${hours}j ${minutes}m`;
                               else timeStr = `${Math.max(1, minutes)}m`;
-                              const isRefBonus = holdDays === defaultReferral && defaultReferral < defaultNormal;
                               const refTag = isRefBonus ? ` (Ref)` : '';
                               holdText = `⏳ Sisa ${timeStr}${refTag}`;
                             }
-                            const isRefBonus = holdDays === defaultReferral && defaultReferral < defaultNormal;
                             statusBadge = `
                               <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border ${isReady ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/15 text-amber-300 border-amber-500/40'} inline-flex items-center gap-1 whitespace-nowrap" title="${isRefBonus ? `Masa pantau holding (Bonus Referral)` : `Masa pantau holding standar`} - Dipantau otomatis">
                                 <span class="w-1.5 h-1.5 rounded-full ${isReady ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse"></span>
@@ -555,21 +547,11 @@ export class ApiKeysView {
                               type="button"
                               data-action="auto-validate-key"
                               data-id="${k.id}"
-                              title="Validasi Otomatis: Cek Kie.ai aktif & kredit 80"
+                              title="Validasi Otomatis Sekarang: Cek ke Kie.ai (aktif & kredit 80)"
                               class="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 active:scale-95 text-amber-300 border border-amber-500/40 flex items-center gap-0.5 transition-all shadow-sm cursor-pointer shrink-0"
                             >
                               <span class="material-symbols-outlined text-xs">star</span>
                               <span>Auto</span>
-                            </button>
-                            <button
-                              type="button"
-                              data-action="approve-key"
-                              data-id="${k.id}"
-                              title="Setujui API Key & Cairkan ke Saldo Aktif"
-                              class="px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-emerald-300 border border-emerald-500/40 flex items-center gap-0.5 transition-all shadow-sm cursor-pointer shrink-0"
-                            >
-                              <span class="material-symbols-outlined text-xs">check</span>
-                              <span>Setujui</span>
                             </button>
                             <button
                               type="button"
@@ -634,10 +616,30 @@ export class ApiKeysView {
   }
 
   bindEvents(container, refreshCallback) {
-    // Sinkronkan data API Key otomatis saat pertama kali dibuka
+    // Sinkronkan data API Key otomatis saat pertama kali dibuka & jalankan validasi otomatis untuk kunci yang siap
     if (!this.hasSynced) {
       this.hasSynced = true;
       this.dataService.fetchApiKeysFromSupabase().then(() => {
+        if (typeof this.dataService.autoValidateReadyKeys === 'function') {
+          this.dataService.autoValidateReadyKeys().then((res) => {
+            if (res && res.validatedCount > 0) {
+              refreshCallback();
+            }
+          });
+        }
+        refreshCallback();
+      });
+    } else if (typeof this.dataService.autoValidateReadyKeys === 'function') {
+      this.dataService.autoValidateReadyKeys().then((res) => {
+        if (res && res.validatedCount > 0) {
+          refreshCallback();
+        }
+      });
+    }
+
+    // Dengarkan event auto-validasi di latar belakang agar tampilan Gudang API Key terupdate seketika
+    if (!this._unsubAutoValidated && typeof this.dataService.on === 'function') {
+      this._unsubAutoValidated = this.dataService.on('keys_auto_validated', () => {
         refreshCallback();
       });
     }
@@ -833,23 +835,6 @@ export class ApiKeysView {
           this.toast.warning(res.message || 'Key ditolak otomatis: Kie.ai tidak aktif atau kredit bukan 80.', 'Hasil Validasi');
         }
         refreshCallback();
-      });
-    });
-
-    // Approve Key (Verifikasi & Cairkan ke Saldo Aktif)
-    container.querySelectorAll('[data-action="approve-key"]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.getAttribute('data-id');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">progress_activity</span><span>Memproses...</span>';
-        const res = await this.dataService.approveApiKey(id);
-        if (res.success) {
-          this.toast.success(`API Key berhasil disetujui! Saldo Rp ${res.rewardAmount.toLocaleString('id-ID')} telah dicairkan ke Saldo Aktif.`, 'Key Terverifikasi');
-          refreshCallback();
-        } else {
-          this.toast.error(res.message || 'Gagal memverifikasi API Key', 'Gagal');
-          refreshCallback();
-        }
       });
     });
 
