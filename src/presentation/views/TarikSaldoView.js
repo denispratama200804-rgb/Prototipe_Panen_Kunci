@@ -919,39 +919,64 @@ export class TarikSaldoView extends IComponent {
         message: 'Periksa kembali rincian penarikan saldo Anda sebelum memproses:',
         html: `
           <div class="flex flex-col gap-2.5 text-left w-full my-1">
-            <div class="bg-surface-container-low rounded-2xl p-3.5 space-y-2 border border-surface-container">
-              <div class="flex justify-between items-center text-xs">
-                <span class="text-text-body font-medium">Nominal</span>
-                <span class="font-bold text-text-heading font-mono text-sm">Rp ${amount.toLocaleString('id-ID')}</span>
+            <div class="bg-surface-container-low rounded-2xl p-3.5 space-y-2.5 border border-surface-container">
+              <!-- Nominal Penarikan -->
+              <div class="flex justify-between items-center text-xs gap-2">
+                <span class="text-text-body font-medium">Nominal Penarikan</span>
+                <span class="font-bold text-text-heading font-mono text-sm whitespace-nowrap shrink-0 text-right">Rp ${amount.toLocaleString('id-ID')}</span>
               </div>
-              <div class="flex justify-between items-center text-xs">
-                <span class="text-text-body font-medium">Biaya Admin</span>
-                <span class="font-semibold text-error font-mono">${fee > 0 ? '-Rp ' + fee.toLocaleString('id-ID') : 'Gratis'}</span>
+
+              <!-- Biaya Admin -->
+              <div class="flex justify-between items-center text-xs gap-2">
+                <div class="flex items-center gap-1 min-w-0">
+                  <span class="text-text-body font-medium whitespace-nowrap">Biaya Admin</span>
+                  <span class="text-[10px] text-outline truncate">(${methodLabel})</span>
+                </div>
+                <span class="font-semibold ${fee > 0 ? 'text-amber-500' : 'text-slate-500'} font-mono whitespace-nowrap shrink-0 text-right">
+                  ${fee > 0 ? 'Rp ' + fee.toLocaleString('id-ID') : 'Gratis'}
+                </span>
               </div>
+
+              <!-- Potongan Referral -->
               ${(userReferredBy && refPercent > 0) ? `
-                <div class="flex justify-between items-center text-xs">
-                  <span class="text-text-body font-medium">Potongan Kode Referral (${userReferredBy} - ${refPercent}%)</span>
-                  <span class="font-semibold text-primary font-mono">-Rp ${referralCut.toLocaleString('id-ID')}</span>
+                <div class="flex justify-between items-center text-xs gap-2">
+                  <div class="flex items-center gap-1.5 min-w-0 pr-1">
+                    <span class="text-text-body font-medium whitespace-nowrap">Potongan Referral</span>
+                    <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0">
+                      ${userReferredBy} (${refPercent}%)
+                    </span>
+                  </div>
+                  <span class="font-semibold text-primary font-mono whitespace-nowrap shrink-0 text-right">
+                    -Rp ${referralCut.toLocaleString('id-ID')}
+                  </span>
                 </div>
               ` : ''}
-              <div class="h-[1px] w-full bg-outline-variant/30 my-1"></div>
-              <div class="flex justify-between items-center bg-primary/10 p-2.5 rounded-xl border border-primary/20">
-                <span class="text-xs text-primary font-bold">Total Diterima</span>
-                <span class="font-headline-md text-base font-extrabold text-primary font-mono">Rp ${totalReceive.toLocaleString('id-ID')}</span>
+
+              <!-- Garis Pembatas Putus-putus -->
+              <div class="h-[1px] w-full border-t border-dashed border-outline-variant/40 my-0.5"></div>
+
+              <!-- Total Diterima Highlight Box -->
+              <div class="flex justify-between items-center bg-primary/10 p-2.5 rounded-xl border border-primary/20 gap-2">
+                <span class="text-xs text-primary font-bold whitespace-nowrap">Total Diterima</span>
+                <span class="font-headline-md text-base font-extrabold text-primary font-mono whitespace-nowrap shrink-0 text-right">
+                  Rp ${totalReceive.toLocaleString('id-ID')}
+                </span>
               </div>
             </div>
 
+            <!-- Rekening Tujuan Pencairan -->
             <div class="bg-surface-container rounded-2xl p-3 flex items-center gap-3 border border-surface-container-high">
-              <div class="w-10 h-10 rounded-2xl overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
-                ${renderPaymentMethodIcon(resolved.label, 'w-10 h-10')}
+              <div class="w-10 h-10 rounded-2xl overflow-hidden shrink-0 shadow-xs flex items-center justify-center bg-surface-container-low">
+                ${renderPaymentMethodIcon(resolved.label, 'w-10 h-10', user?.bankName)}
               </div>
               <div class="flex flex-col min-w-0 text-left">
                 <span class="text-[10px] text-outline uppercase tracking-wider font-semibold">Tujuan Pencairan (Sesuai Profil)</span>
                 <span class="text-xs font-bold text-text-heading truncate font-mono">${methodLabel} - ${account}</span>
-                <span class="text-[10px] text-text-body mt-0.5">a.n. ${resolved.accountHolder || user?.name || '-'}</span>
+                <span class="text-[10px] text-text-body mt-0.5">a.n. <strong class="text-text-heading">${resolved.accountHolder || user?.name || '-'}</strong></span>
               </div>
             </div>
 
+            <!-- Catatan Peringatan -->
             <div class="bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 p-2.5 rounded-xl flex items-center gap-2 text-left">
               <span class="material-symbols-outlined text-[18px] shrink-0">info</span>
               <span class="text-[11px] leading-tight">Pastikan data di atas sudah benar sebelum melanjutkan.</span>
@@ -995,29 +1020,34 @@ export class TarikSaldoView extends IComponent {
               title: 'Permintaan Penarikan Berhasil Diajukan!',
               message: '<strong class="text-amber-500 font-bold">Menunggu persetujuan admin</strong>',
               html: `
-                <div class="bg-surface-container-low rounded-2xl p-3.5 flex flex-col gap-2 text-xs border border-surface-container mt-2 text-left">
-                  <div class="flex justify-between items-center">
+                <div class="bg-surface-container-low rounded-2xl p-3.5 flex flex-col gap-2.5 text-xs border border-surface-container mt-2 text-left">
+                  <div class="flex justify-between items-center gap-2">
                     <span class="text-text-body">ID Transaksi</span>
-                    <strong class="font-mono text-primary font-bold">#${res.transaction?.id || '-'}</strong>
+                    <strong class="font-mono text-primary font-bold whitespace-nowrap shrink-0">#${res.transaction?.id || '-'}</strong>
                   </div>
-                  <div class="flex justify-between items-center">
+                  <div class="flex justify-between items-center gap-2">
                     <span class="text-text-body">Nominal Penarikan</span>
-                    <strong class="font-mono font-bold">Rp ${amount.toLocaleString('id-ID')}</strong>
+                    <strong class="font-mono font-bold whitespace-nowrap shrink-0">Rp ${amount.toLocaleString('id-ID')}</strong>
                   </div>
-                  <div class="flex justify-between items-center">
+                  <div class="flex justify-between items-center gap-2">
                     <span class="text-text-body">Biaya Admin</span>
-                    <strong class="font-mono ${fee > 0 ? 'text-amber-500' : 'text-slate-500'}">Rp ${fee.toLocaleString('id-ID')}</strong>
+                    <strong class="font-mono ${fee > 0 ? 'text-amber-500' : 'text-slate-500'} whitespace-nowrap shrink-0">Rp ${fee.toLocaleString('id-ID')}</strong>
                   </div>
                   ${userReferredBy ? `
-                    <div class="flex justify-between items-center">
-                      <span class="text-text-body">Potongan Referral (${userReferredBy})</span>
-                      <strong class="font-mono text-primary font-bold">-Rp ${referralCut.toLocaleString('id-ID')}</strong>
+                    <div class="flex justify-between items-center gap-2">
+                      <div class="flex items-center gap-1.5 min-w-0 pr-1">
+                        <span class="text-text-body whitespace-nowrap">Potongan Referral</span>
+                        <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0">
+                          ${userReferredBy}
+                        </span>
+                      </div>
+                      <strong class="font-mono text-primary font-bold whitespace-nowrap shrink-0 text-right">-Rp ${referralCut.toLocaleString('id-ID')}</strong>
                     </div>
                   ` : ''}
                   <div class="h-[1px] bg-outline-variant/30 my-0.5"></div>
-                  <div class="flex justify-between items-center text-sm font-extrabold">
-                    <span class="text-text-heading">Total Dana Masuk</span>
-                    <strong class="text-secondary font-mono text-base">Rp ${totalReceive.toLocaleString('id-ID')}</strong>
+                  <div class="flex justify-between items-center text-sm font-extrabold gap-2">
+                    <span class="text-text-heading whitespace-nowrap">Total Dana Masuk</span>
+                    <strong class="text-secondary font-mono text-base whitespace-nowrap shrink-0 text-right">Rp ${totalReceive.toLocaleString('id-ID')}</strong>
                   </div>
                 </div>
               `,
