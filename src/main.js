@@ -34,6 +34,30 @@ if (!localStorage.getItem('panenkunci_wiped_v3')) {
   console.log('✅ Pembersihan selesai.');
 }
 
+// ONE-TIME MIGRATION TO NEW SUPABASE (Wipe legacy Supabase auth token)
+if (!localStorage.getItem('panenkunci_wiped_v4')) {
+  console.log('🧹 Menjalankan pembersihan sesi Supabase lama (V4)...');
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.includes('bmuthjyibkrcqyygjcxe') || k.startsWith('sb-bmuth'))) {
+        localStorage.removeItem(k);
+      }
+    }
+    localStorage.removeItem('sb-bmuthjyibkrcqyygjcxe-auth-token');
+    if ('caches' in window) {
+      caches.keys().then((keys) => {
+        keys.forEach((name) => {
+          if (name.includes('v1.2') || name.includes('v1.1')) {
+            caches.delete(name);
+          }
+        });
+      });
+    }
+  } catch (_) {}
+  localStorage.setItem('panenkunci_wiped_v4', 'true');
+}
+
 import './styles/style.css';
 
 // Pastikan aplikasi pengguna selalu menggunakan tema terang standar
@@ -111,6 +135,9 @@ if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((reg) => {
           console.log('[SW] Service Worker registered:', reg.scope);
+          if (reg && typeof reg.update === 'function') {
+            reg.update();
+          }
         })
         .catch((err) => {
           console.warn('[SW] Service Worker registration failed:', err);

@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient('https://bmuthjyibkrcqyygjcxe.supabase.co', 'sb_secret_EaaHPtnEX8nlzg_E0s4sSQ_nQMdeL1L');
+const supabaseUrl = process.env.SUPABASE_URL || 'https://wsbbdyrnnbjkjmfcplea.supabase.co';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function main() {
   const { data: txs, error: txErr } = await supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(5);

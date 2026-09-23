@@ -3,7 +3,7 @@
  * Mengaktifkan fitur offline, caching aset, dan install prompt Android
  */
 
-const CACHE_NAME = 'panen-kunci-v1.2.0';
+const CACHE_NAME = 'panen-kunci-v1.3.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

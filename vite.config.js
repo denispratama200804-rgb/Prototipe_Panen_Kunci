@@ -11,8 +11,12 @@ dns.setDefaultResultOrder('ipv4first');
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const SUPABASE_URL = env.VITE_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || 'https://wsbbdyrnnbjkjmfcplea.supabase.co';
-  const SUPABASE_SECRET_KEY = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SECRET_KEY || '';
+  let SUPABASE_URL = env.VITE_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || 'https://wsbbdyrnnbjkjmfcplea.supabase.co';
+  let SUPABASE_SECRET_KEY = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SECRET_KEY || '';
+
+  if (SUPABASE_URL.includes('bmuthjyibkrcqyygjcxe')) {
+    SUPABASE_URL = 'https://wsbbdyrnnbjkjmfcplea.supabase.co';
+  }
 
   // Inisialisasi client admin di sisi server Node.js jika secret key tersedia
   const adminSupabase = SUPABASE_SECRET_KEY

@@ -9,16 +9,30 @@ import { createClient } from '@supabase/supabase-js';
 
 const env = (typeof import.meta !== 'undefined' && import.meta && import.meta.env) ? import.meta.env : (typeof process !== 'undefined' && process.env ? process.env : {});
 
-const rawUrl = (env.VITE_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL || '').trim();
-const rawKey = (
+let rawUrl = (
+  env.VITE_SUPABASE_URL ||
+  env.NEXT_PUBLIC_SUPABASE_URL ||
+  env.SUPABASE_URL ||
+  'https://wsbbdyrnnbjkjmfcplea.supabase.co'
+).trim();
+
+let rawKey = (
   env.VITE_SUPABASE_ANON_KEY ||
   env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   env.SUPABASE_ANON_KEY ||
   env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   env.SUPABASE_PUBLISHABLE_KEY ||
-  ''
+  'sb_publishable_ghDJqet_7JXvy6KV0VOV9g_l1BobacI'
 ).trim();
+
+// Failsafe: Jika masih terbaca project Supabase lama, alihkan otomatis ke project terbaru
+if (rawUrl.includes('bmuthjyibkrcqyygjcxe')) {
+  rawUrl = 'https://wsbbdyrnnbjkjmfcplea.supabase.co';
+}
+if (!rawKey || rawKey.includes('f55Le0iO_SVa36YRE88xqg_98uf2U5V') || rawKey.includes('your-anon-key')) {
+  rawKey = 'sb_publishable_ghDJqet_7JXvy6KV0VOV9g_l1BobacI';
+}
 
 export const supabaseUrl = rawUrl;
 export const supabaseAnonKey = rawKey;

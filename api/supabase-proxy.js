@@ -4,9 +4,7 @@ import crypto from 'node:crypto';
 import { uploadBase64ToR2, isR2Configured } from './r2-uploader.js';
 
 // Kunci Supabase Role Service yang digunakan untuk operasi admin yang by-pass RLS (PENTING!)
-// Kunci ini TIDAK BOLEH dieskspos ke klien frontend!
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Kunci ini TIDAK BOLEH diekspos ke klien frontend!
 
 // Konfigurasi Pengiriman Email (Mendukung Brevo REST API v3 & Brevo SMTP Relay)
 async function sendEmailMessage({ to, subject, html, text }) {
@@ -150,8 +148,13 @@ async function sendEmailMessage({ to, subject, html, text }) {
   throw new Error(brevoError ? `Brevo error: ${brevoError}` : 'Sistem email belum dikonfigurasi. Harap tambahkan BREVO_USERNAME & BREVO_API_KEY di .env.');
 }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wsbbdyrnnbjkjmfcplea.supabase.co';
-const SUPABASE_SECRET_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
+let SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wsbbdyrnnbjkjmfcplea.supabase.co';
+let SUPABASE_SECRET_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
+
+// Failsafe: Jika environment variables server Vercel masih mengarah ke database lama, alihkan ke Supabase baru
+if (SUPABASE_URL.includes('bmuthjyibkrcqyygjcxe')) {
+  SUPABASE_URL = 'https://wsbbdyrnnbjkjmfcplea.supabase.co';
+}
 
 const adminSupabase = SUPABASE_SECRET_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
