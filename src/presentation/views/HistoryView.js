@@ -233,29 +233,55 @@ export class HistoryView extends IComponent {
       const isPending = !isSuccess && !isFailed;
 
       let stripeColor = 'bg-warning-amber';
-      let badgeHtml = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-warning-amber/15 text-warning-amber border border-warning-amber/30 inline-flex items-center gap-1 whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full bg-warning-amber animate-pulse"></span><span>Menunggu Verifikasi</span></span>';
+      let badgeHtml = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30 inline-flex items-center gap-1 whitespace-nowrap shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span><span>Menunggu Verifikasi</span></span>';
 
       if (isSuccess) {
         stripeColor = 'bg-secondary';
-        badgeHtml = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary inline-flex items-center gap-1 whitespace-nowrap"><span class="material-symbols-outlined text-[13px]" style="font-variation-settings: \'FILL\' 1;">check_circle</span><span>Ditransfer</span></span>';
+        badgeHtml = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/20 inline-flex items-center gap-1 whitespace-nowrap shadow-2xs"><span class="material-symbols-outlined text-[13px]" style="font-variation-settings: \'FILL\' 1;">check_circle</span><span>Ditransfer</span></span>';
       } else if (isFailed) {
         stripeColor = 'bg-error-ruby';
-        badgeHtml = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container inline-flex items-center gap-1 whitespace-nowrap"><span class="material-symbols-outlined text-[13px]">cancel</span><span>Ditolak</span></span>';
+        badgeHtml = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container border border-error/20 inline-flex items-center gap-1 whitespace-nowrap shadow-2xs"><span class="material-symbols-outlined text-[13px]">cancel</span><span>Ditolak</span></span>';
       }
 
+      // Ekstraksi data target rekening / e-wallet
+      let targetAccount = w.recipient || '';
+      if (!targetAccount && w.description) {
+        const m = w.description.match(/Penarikan ke\s+([^\s•]+)/i) || w.description.match(/(08\d{8,12}|\d{9,16})/);
+        if (m) targetAccount = m[1];
+      }
+
+      // Ekstraksi biaya admin
+      let fee = Number(w.fee || 0);
+      if (fee === 0 && w.description) {
+        const m = w.description.match(/Biaya Admin:\s*Rp\s*([\d\.]+)/i);
+        if (m) fee = Number(m[1].replace(/\./g, '')) || 0;
+      }
+
+      // Ekstraksi potongan referral
+      let referralCut = Number(w.referralDeduction || 0);
+      if (referralCut === 0 && w.description) {
+        const m = w.description.match(/Potongan Referral[^:]*:\s*Rp\s*([\d\.]+)/i);
+        if (m) referralCut = Number(m[1].replace(/\./g, '')) || 0;
+      }
+      const refCode = w.referralCode || (w.description?.match(/Potongan Referral \(([^)]+)\)/i)?.[1] || '');
+
       return `
-        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 sm:p-4 shadow-2xs relative overflow-hidden flex flex-col gap-2.5">
+        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 sm:p-4 shadow-2xs relative overflow-hidden flex flex-col gap-2.5 transition-all">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}"></div>
 
           <!-- Baris 1: Metode Penarikan & Status Badge -->
           <div class="flex items-center justify-between gap-2 pl-2">
-            <div class="flex items-center gap-2.5 min-w-0">
+            <div class="flex items-center gap-2 min-w-0">
               <div class="w-8 h-8 shrink-0 rounded-xl overflow-hidden shadow-2xs flex items-center justify-center bg-surface-container">
                 ${renderPaymentMethodIcon(w, 'w-8 h-8', currentUser?.bankName)}
               </div>
-              <div class="flex flex-col min-w-0">
+              <div class="flex items-center gap-1.5 min-w-0">
                 <span class="font-label-md text-xs font-bold text-text-heading truncate">${w.title}</span>
-                <span class="text-[10px] text-outline truncate">${w.description}</span>
+                ${targetAccount ? `
+                  <span class="font-mono text-[11px] font-semibold text-text-body bg-surface-container-low px-1.5 py-0.5 rounded border border-surface-container shrink-0">
+                    ${targetAccount}
+                  </span>
+                ` : ''}
               </div>
             </div>
             <div class="shrink-0">
@@ -263,19 +289,33 @@ export class HistoryView extends IComponent {
             </div>
           </div>
 
-          <!-- Baris 2: Waktu Penarikan & Nominal Penarikan -->
+          <!-- Baris 2: Waktu Penarikan, Rincian Biaya, & Nominal Penarikan -->
           <div class="flex items-end justify-between gap-2 pl-2 pt-0.5">
-            <div class="flex items-center gap-1 text-[11px] text-text-body">
-              <span class="material-symbols-outlined text-[13px] text-outline">schedule</span>
-              <span>${dateStr}</span>
+            <div class="flex flex-col min-w-0">
+              <div class="flex items-center gap-1 text-[11px] text-text-body">
+                <span class="material-symbols-outlined text-[13px] text-outline">schedule</span>
+                <span>${dateStr}</span>
+              </div>
+              <div class="flex items-center gap-1.5 mt-1 flex-wrap text-[10px]">
+                ${fee > 0 ? `
+                  <span class="bg-surface-container-low px-1.5 py-0.5 rounded border border-surface-container text-text-body font-mono">
+                    Admin: Rp ${fee.toLocaleString('id-ID')}
+                  </span>
+                ` : ''}
+                ${referralCut > 0 ? `
+                  <span class="bg-primary/8 text-primary px-1.5 py-0.5 rounded border border-primary/20 font-mono font-medium">
+                    Ref${refCode ? ` (${refCode})` : ''}: -Rp ${referralCut.toLocaleString('id-ID')}
+                  </span>
+                ` : ''}
+              </div>
             </div>
 
             <div class="flex flex-col items-end shrink-0">
               <span class="font-mono text-sm font-extrabold whitespace-nowrap ${isFailed ? 'text-text-body line-through' : 'text-error-ruby'}">
                 -Rp ${w.amount.toLocaleString('id-ID')}
               </span>
-              <span class="text-[10px] ${isSuccess ? 'text-secondary font-bold' : isPending ? 'text-warning-amber font-semibold' : 'text-text-body font-semibold'} whitespace-nowrap">
-                ${isSuccess ? 'Berhasil Ditransfer' : isPending ? 'Dalam Antrean' : 'Dikembalikan ke Saldo'}
+              <span class="text-[10px] ${isSuccess ? 'text-secondary font-bold' : isPending ? 'text-amber-600 font-semibold' : 'text-text-body font-semibold'} whitespace-nowrap">
+                ${isSuccess ? 'Berhasil Masuk' : isPending ? 'Dalam Antrean' : 'Dana Di-refund'}
               </span>
             </div>
           </div>
