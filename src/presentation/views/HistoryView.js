@@ -125,11 +125,49 @@ export class HistoryView extends IComponent {
         minute: '2-digit'
       });
 
+      const creditBgClass = isPending 
+        ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' 
+        : isValid 
+        ? 'bg-secondary/10 text-secondary border border-secondary/20' 
+        : 'bg-surface-container text-outline border border-surface-container-high';
+
+      const amountFormatted = (isPending || isValid) 
+        ? `+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}` 
+        : '+Rp 0';
+
+      const amountColorClass = isPending 
+        ? 'text-amber-500' 
+        : (isValid ? 'text-secondary' : 'text-outline line-through');
+
+      let statusBadgeHtml = '';
+      if (isPending) {
+        statusBadgeHtml = `
+          <div class="bg-amber-500/15 text-amber-600 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 border border-amber-500/30 whitespace-nowrap shadow-2xs shrink-0">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+            <span>Menunggu Verifikasi</span>
+          </div>
+        `;
+      } else if (isValid) {
+        statusBadgeHtml = `
+          <div class="bg-secondary-container text-on-secondary-container px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap shadow-2xs shrink-0">
+            <span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+            <span>Valid</span>
+          </div>
+        `;
+      } else {
+        statusBadgeHtml = `
+          <div class="bg-error-container text-on-error-container px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap shadow-2xs shrink-0">
+            <span class="material-symbols-outlined text-[13px]">cancel</span>
+            <span>Invalid</span>
+          </div>
+        `;
+      }
+
       return `
-        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 sm:p-4 shadow-2xs relative overflow-hidden flex flex-col gap-2.5 transition-all">
+        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 sm:p-4 shadow-2xs relative overflow-hidden flex flex-col gap-2 transition-all">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}"></div>
 
-          <!-- Baris 1: Identitas Key, Credit Badge, & Status Badge -->
+          <!-- Baris 1: Identitas Key, Credit Badge & Nominal Reward -->
           <div class="flex items-center justify-between gap-2 pl-2">
             <div class="flex items-center gap-1.5 min-w-0">
               <div class="flex items-center gap-1 bg-surface-container-low px-2 py-0.5 rounded-lg border border-surface-container/80 shrink-0">
@@ -138,57 +176,30 @@ export class HistoryView extends IComponent {
                   ${k.getMaskedKey()}
                 </span>
               </div>
-              <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${
-                isPending 
-                  ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' 
-                  : isValid 
-                  ? 'bg-secondary/10 text-secondary border border-secondary/20' 
-                  : 'bg-surface-container text-outline border border-surface-container-high'
-              } shrink-0">
+              <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${creditBgClass} shrink-0 whitespace-nowrap">
                 ${k.credits !== undefined ? k.credits : 80} cr
               </span>
             </div>
 
-            <!-- Status Badge: Selalu di kanan atas dengan single line -->
-            <div class="shrink-0">
-              ${isPending ? `
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30 inline-flex items-center gap-1 whitespace-nowrap shadow-2xs">
-                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                  <span>Menunggu Verifikasi</span>
-                </span>
-              ` : isValid ? `
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-secondary-container text-on-secondary-container inline-flex items-center gap-1 whitespace-nowrap shadow-2xs">
-                  <span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-                  <span>Valid</span>
-                </span>
-              ` : `
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container inline-flex items-center gap-1 whitespace-nowrap shadow-2xs">
-                  <span class="material-symbols-outlined text-[13px]">cancel</span>
-                  <span>Invalid</span>
-                </span>
-              `}
+            <!-- Nominal Saldo -->
+            <div class="flex items-center gap-1 shrink-0">
+              <span class="font-mono text-xs sm:text-sm font-extrabold whitespace-nowrap ${amountColorClass}">
+                ${amountFormatted}
+              </span>
+              ${isPending ? '<span class="text-[9px] font-bold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded whitespace-nowrap">Pasif</span>' : (isValid ? '<span class="text-[9px] font-bold text-secondary bg-secondary/10 border border-secondary/20 px-1.5 py-0.5 rounded whitespace-nowrap">Aktif</span>' : '')}
             </div>
           </div>
 
-          <!-- Baris 2: Tanggal & Nominal Reward -->
-          <div class="flex items-end justify-between gap-2 pl-2 pt-0.5">
-            <div class="flex flex-col min-w-0">
-              <span class="text-[11px] text-text-body flex items-center gap-1">
-                <span class="material-symbols-outlined text-[13px] text-outline">schedule</span>
-                <span>${dateStr}</span>
-              </span>
-              <span class="text-[10px] font-medium mt-0.5 truncate ${isPending ? 'text-amber-600' : isValid ? 'text-outline' : 'text-outline'}">
-                ${isPending ? '⏳ Menunggu persetujuan admin' : isValid ? '✓ Saldo langsung terkreditkan' : '✕ Tidak memenuhi syarat minimal'}
-              </span>
+          <!-- Baris 2: Tanggal Penyerahan & Status Badge -->
+          <div class="flex items-center justify-between gap-2 pl-2 pt-0.5">
+            <div class="flex items-center gap-1 text-[11px] text-text-body whitespace-nowrap min-w-0">
+              <span class="material-symbols-outlined text-[13px] text-outline shrink-0">schedule</span>
+              <span>${dateStr}</span>
             </div>
 
-            <div class="flex flex-col items-end shrink-0">
-              <span class="font-mono text-sm font-extrabold whitespace-nowrap ${isPending ? 'text-amber-500' : (isValid ? 'text-secondary' : 'text-outline line-through')}">
-                ${(isPending || isValid) ? `+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}` : '+Rp 0'}
-              </span>
-              <span class="text-[10px] font-bold ${isPending ? 'text-amber-600' : (isValid ? 'text-secondary' : 'text-outline')} whitespace-nowrap">
-                ${isPending ? 'Saldo Pasif' : isValid ? 'Saldo Aktif' : 'Gagal'}
-              </span>
+            <!-- Status Badge: 1 baris utuh di kanan bawah -->
+            <div class="shrink-0">
+              ${statusBadgeHtml}
             </div>
           </div>
 

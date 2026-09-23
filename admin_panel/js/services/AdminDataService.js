@@ -2002,6 +2002,40 @@ export class AdminDataService {
         return { success: false, message: `Gagal sinkronisasi ke server: ${err.message}` };
       }
 
+      // Kurangi saldo pengguna yang menarik dana secara authoritative
+      const withdrawAmount = Number(tx.amount || 0);
+
+      // 1. Kurangi wallet_balance_${targetUserId}
+      const targetBalKey = `wallet_balance_${targetUserId}`;
+      const curStoredBal = Number(this._get(targetBalKey, 0));
+      const newStoredBal = Math.max(0, curStoredBal - withdrawAmount);
+      this._set(targetBalKey, newStoredBal);
+
+      // 2. Jika user yang login di tab ini adalah target user, kurangi juga wallet_balance global
+      const activeUser = this._get('current_user', {});
+      if (activeUser && (activeUser.id === targetUserId || (activeUser.email && tx.userEmail && activeUser.email.toLowerCase() === tx.userEmail.toLowerCase()))) {
+        const curActive = Number(this._get('wallet_balance', 0));
+        this._set('wallet_balance', Math.max(0, curActive - withdrawAmount));
+      }
+
+      // 3. Perbarui dan kurangi saldo di all_users
+      const allUsers = this._get('all_users', []);
+      if (Array.isArray(allUsers)) {
+        const uIdx = allUsers.findIndex(u => u.id === targetUserId || (tx.userEmail && u.email && u.email.toLowerCase() === tx.userEmail.toLowerCase()));
+        if (uIdx !== -1) {
+          const userBal = Number(allUsers[uIdx].balance || 0);
+          const updatedBal = Math.max(0, userBal - withdrawAmount);
+          allUsers[uIdx].balance = updatedBal;
+          if (allUsers[uIdx].customBalance !== undefined) {
+            allUsers[uIdx].customBalance = updatedBal;
+          }
+          if (allUsers[uIdx].manualBalance !== undefined) {
+            allUsers[uIdx].manualBalance = Math.max(0, Number(allUsers[uIdx].manualBalance) - withdrawAmount);
+          }
+          this._set('all_users', allUsers);
+        }
+      }
+
       // Siarkan ke user tab via BroadcastChannel
       this._broadcastSync({
         type: 'WITHDRAWAL_APPROVED',
@@ -2009,8 +2043,14 @@ export class AdminDataService {
         userId: targetUserId,
         status: 'success',
         amount: Number(tx.amount || 0),
+        newBalance: newStoredBal,
         proofImage: proofImage || '',
         proofNotes: notes || ''
+      });
+      this._broadcastSync({
+        type: 'BALANCE_UPDATED',
+        userId: targetUserId,
+        balance: newStoredBal
       });
 
       // Proses Bagi Hasil / Komisi Kode Referral jika penarikan memiliki potongan referral
@@ -2340,6 +2380,18 @@ export class AdminDataService {
       notifs.unshift(newNotif);
       this._set(notifsKey, notifs);
 
+      // Perbarui juga saldo di all_users
+      const allUsers = this._get('all_users', []);
+      if (Array.isArray(allUsers)) {
+        const uIdx = allUsers.findIndex(u => u.id === tx.userId || (tx.userEmail && u.email && u.email.toLowerCase() === tx.userEmail.toLowerCase()));
+        if (uIdx !== -1) {
+          allUsers[uIdx].balance = Number(allUsers[uIdx].balance || 0) + refundAmount;
+          if (allUsers[uIdx].customBalance !== undefined) allUsers[uIdx].customBalance = allUsers[uIdx].balance;
+          if (allUsers[uIdx].manualBalance !== undefined) allUsers[uIdx].manualBalance = Number(allUsers[uIdx].manualBalance) + refundAmount;
+          this._set('all_users', allUsers);
+        }
+      }
+
       // Cadangkan ke notifikasi global
       const globalNotifs = this._get('notifications', []);
       globalNotifs.unshift(newNotif);
@@ -2374,6 +2426,11 @@ export class AdminDataService {
       status: 'failed',
       reason,
       refundAmount
+    });
+    this._broadcastSync({
+      type: 'BALANCE_UPDATED',
+      userId: tx.userId,
+      balance: newBalance
     });
 
     return { success: true, refundAmount, newBalance, transaction: tx };
@@ -2529,7 +2586,10 @@ export class AdminDataService {
 
     const enriched = users.map(u => {
       const userKeys = apiKeys.filter(k => k.userId === u.id || (u.email && k.userEmail === u.email));
-      const userWithdrawals = transactions.filter(t => (t.userId === u.id || (u.email && t.userEmail === u.email)) && t.type === 'withdrawal' && ['success', 'valid', 'approved', 'completed', 'berhasil'].includes(t.status));
+      
+      // Sertakan seluruh penarikan aktif yang mengurangi saldo (pending, success, valid, approved, completed, berhasil)
+      const isWdActive = (s) => ['success', 'valid', 'approved', 'completed', 'berhasil', 'pending'].includes(String(s || '').trim().toLowerCase());
+      const userWithdrawals = transactions.filter(t => (t.userId === u.id || (u.email && t.userEmail === u.email)) && t.type === 'withdrawal' && isWdActive(t.status));
       const totalWithdrawn = userWithdrawals.reduce((sum, t) => sum + Number(t.amount || 0), 0);
       
       const validUserKeys = userKeys.filter(k => k.status === 'valid');
@@ -2544,33 +2604,22 @@ export class AdminDataService {
       const totalCommissions = userCommissions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
       const calculatedBalance = Math.max(0, keysEarnings + totalCommissions - totalWithdrawn);
 
-      // Ambil saldo dari local storage user spesifik jika ada
-      const userBalKey = `wallet_balance_${u.id}`;
-      const storedUserBal = this._get(userBalKey, null);
-      const currUser = this._get('current_user', {});
-      const isCurrUser = currUser.id === u.id || (currUser.email && u.email && currUser.email === u.email);
-      const storedActiveBal = isCurrUser ? this._get('wallet_balance', null) : null;
-
       let balance = calculatedBalance;
-      if (storedUserBal !== null && !isNaN(Number(storedUserBal))) {
-        balance = Number(storedUserBal);
-      } else if (storedActiveBal !== null && !isNaN(Number(storedActiveBal))) {
-        balance = Number(storedActiveBal);
-      }
 
-      // Jika ada manual balance dari admin (Atur Saldo)
+      // Jika ada penyesuaian manual dari admin (Atur Saldo), kurangi juga dengan penarikan pending yang belum terpotong
       if (u.manualBalance !== undefined && !isNaN(Number(u.manualBalance))) {
-        balance = Number(u.manualBalance);
-      } else if (u.customBalance !== undefined && !isNaN(Number(u.customBalance))) {
-        if (Number(u.customBalance) > balance) {
-          balance = Number(u.customBalance);
+        const pendingWdAmount = userWithdrawals
+          .filter(t => String(t.status || '').trim().toLowerCase() === 'pending')
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        const effectiveManual = Math.max(0, Number(u.manualBalance) - pendingWdAmount);
+        if (effectiveManual > balance) {
+          balance = effectiveManual;
         }
       }
 
-      // Pastikan saldo tidak pernah tertinggal dari hasil valid keys aktual dikurangi penarikan
-      if (balance < calculatedBalance) {
-        balance = calculatedBalance;
-      }
+      // Pastikan cache saldo per-user selalu tersinkron
+      const userBalKey = `wallet_balance_${u.id}`;
+      this._set(userBalKey, balance);
 
       return {
         ...u,

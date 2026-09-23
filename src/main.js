@@ -48,7 +48,7 @@ if (!localStorage.getItem('panenkunci_wiped_v4')) {
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((name) => {
-          if (name.includes('v1.2') || name.includes('v1.1')) {
+          if (name.includes('v1.2') || name.includes('v1.1') || name.includes('v1.3.0') || name.includes('v1.3.1')) {
             caches.delete(name);
           }
         });

@@ -105,7 +105,7 @@ export class WalletService {
               if (Array.isArray(this._transactions)) {
                 const matchTx = this._transactions.find(t => 
                   t.id === data.transactionId || 
-                  (t.type === 'withdrawal' && String(t.status || '').toLowerCase() === 'pending' && Number(t.amount) === Number(data.amount))
+                  (t.type === 'withdrawal' && ['pending', 'valid'].includes(String(t.status || '').toLowerCase()) && Number(t.amount) === Number(data.amount))
                 );
                 if (matchTx) {
                   matchTx.id = data.transactionId || matchTx.id;
@@ -114,6 +114,10 @@ export class WalletService {
                   if (data.proofNotes) matchTx.proofNotes = data.proofNotes;
                   this._persist();
                 }
+              }
+              if (data.newBalance !== undefined && !isNaN(Number(data.newBalance))) {
+                this._balance = Number(data.newBalance);
+                this._persist();
               }
               this._loadWallet();
               await this._syncFromRemote();
@@ -520,10 +524,10 @@ export class WalletService {
       .filter(t => (t.method === 'referral_commission' || t.title?.includes('Referral') || t.description?.includes('Referral')) && t.status === 'success')
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-    // Hitung total penarikan aktif (termasuk status valid, success, approved, completed, pending)
+    // Hitung total penarikan aktif (termasuk status valid, success, approved, completed, pending, berhasil)
     const isWdStatusActive = (s) => {
       const raw = String(s || '').trim().toLowerCase();
-      return raw === 'success' || raw === 'valid' || raw === 'approved' || raw === 'completed' || raw === 'pending';
+      return raw === 'success' || raw === 'valid' || raw === 'approved' || raw === 'completed' || raw === 'pending' || raw === 'berhasil';
     };
 
     const totalWithdrawals = loadedTxs
@@ -537,12 +541,9 @@ export class WalletService {
       this._transactions = [];
       this._persist();
     } else {
-      // Saldo aktif adalah akumulasi deposit valid + komisi referral dikurangi penarikan
+      // Saldo aktif adalah akumulasi deposit valid + komisi referral dikurangi seluruh penarikan aktif
       const calculatedActive = Math.max(0, expectedActiveDeposit + totalReferralCommissions - totalWithdrawals);
-      const finalActive = (rawSavedBal !== null && rawSavedBal > calculatedActive)
-        ? rawSavedBal
-        : calculatedActive;
-      this._balance = finalActive;
+      this._balance = calculatedActive;
 
       // Saldo pasif SELALU bersumber secara authoritative dari total reward API key yang berstatus pending
       this._passiveBalance = expectedPassiveDeposit;
@@ -744,6 +745,20 @@ export class WalletService {
           }
         });
 
+        // Pertahankan penarikan pending lokal yang belum selesai tersinkron ke Supabase
+        const currentLocalTxs = Array.isArray(this._transactions) ? this._transactions : (this._storage.get(`transactions_${userId}`) || []);
+        currentLocalTxs.forEach(localTx => {
+          if (localTx.type === 'withdrawal' && String(localTx.status || '').toLowerCase() === 'pending') {
+            const existsInRemote = deduplicatedTxs.some(dt => 
+              dt.id === localTx.id || 
+              (dt.type === 'withdrawal' && Number(dt.amount) === Number(localTx.amount) && Math.abs(new Date(dt.createdAt || dt.created_at || 0) - new Date(localTx.createdAt || 0)) < 300000)
+            );
+            if (!existsInRemote) {
+              deduplicatedTxs.unshift(localTx);
+            }
+          }
+        });
+
         // Hapus transaksi duplikat dari Supabase secara otomatis di background
         const orphanIdsToDelete = [];
         const reconciledTxs = [];
@@ -829,7 +844,7 @@ export class WalletService {
             }
           } else if (tx.type === 'withdrawal') {
             const rawStatus = String(tx.status || '').trim().toLowerCase();
-            if (rawStatus === 'success' || rawStatus === 'valid' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'pending') {
+            if (['success', 'valid', 'approved', 'completed', 'pending', 'berhasil'].includes(rawStatus)) {
               calculatedWithdrawals += amt;
             }
           }
@@ -854,7 +869,7 @@ export class WalletService {
           .filter(t => {
             if (t.type !== 'withdrawal') return false;
             const rawStatus = String(t.status || '').trim().toLowerCase();
-            return rawStatus === 'success' || rawStatus === 'valid' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'pending';
+            return ['success', 'valid', 'approved', 'completed', 'pending', 'berhasil'].includes(rawStatus);
           })
           .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
