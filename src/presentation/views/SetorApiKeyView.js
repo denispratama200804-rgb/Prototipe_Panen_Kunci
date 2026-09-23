@@ -269,36 +269,82 @@ export class SetorApiKeyView extends IComponent {
         }
       }
 
+      const maskedKey = typeof k.getMaskedKey === 'function' ? k.getMaskedKey() : (k.keyString ? (k.keyString.length <= 12 ? k.keyString : `${k.keyString.slice(0, 9)}...${k.keyString.slice(-4)}`) : '');
+
       return `
-        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 flex items-center justify-between shadow-sm relative overflow-hidden">
-          <div class="absolute left-0 top-0 bottom-0 w-1 ${borderClass}"></div>
-          <div class="flex flex-col gap-0.5 pl-2">
-            <div class="flex items-center gap-1.5">
-              <span class="font-mono text-xs font-semibold text-text-heading">${typeof k.getMaskedKey === 'function' ? k.getMaskedKey() : (k.keyString ? (k.keyString.length <= 12 ? k.keyString : `${k.keyString.slice(0, 9)}...${k.keyString.slice(-4)}`) : '')}</span>
-              <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-600 border border-sky-500/20">${k.credits !== undefined ? k.credits : 80} cr</span>
+        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 sm:p-4 shadow-2xs relative overflow-hidden flex flex-col gap-2.5 transition-all">
+          <div class="absolute left-0 top-0 bottom-0 w-1.5 ${borderClass}"></div>
+
+          <!-- Baris 1: Identitas Key, Credit Badge, & Status Badge -->
+          <div class="flex items-center justify-between gap-2 pl-2">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <div class="flex items-center gap-1 bg-surface-container-low px-2 py-0.5 rounded-lg border border-surface-container/80 shrink-0">
+                <span class="material-symbols-outlined text-outline text-[13px]">vpn_key</span>
+                <span class="font-mono text-xs font-bold text-text-heading tracking-tight">
+                  ${maskedKey}
+                </span>
+              </div>
+              <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${
+                isPending 
+                  ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' 
+                  : isValid 
+                  ? 'bg-secondary/10 text-secondary border border-secondary/20' 
+                  : 'bg-surface-container text-outline border border-surface-container-high'
+              } shrink-0 whitespace-nowrap">
+                ${k.credits !== undefined ? k.credits : 80} cr
+              </span>
             </div>
-            <div class="text-[11px] text-text-body">${dateStr}</div>
+
+            <!-- Status Badge: Selalu di kanan atas, 1 baris utuh -->
+            <div class="shrink-0">
+              ${isPending ? `
+                <div class="bg-amber-500/15 text-amber-600 px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 border border-amber-500/30 whitespace-nowrap shadow-2xs">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  <span>${holdInfo.isReady ? '⚡ Siap Validasi' : `⏳ Pantau: ${holdInfo.text}`}</span>
+                </div>
+              ` : isValid ? `
+                <div class="bg-secondary-container text-on-secondary-container px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 whitespace-nowrap shadow-2xs">
+                  <span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                  <span>Valid</span>
+                </div>
+              ` : `
+                <div class="bg-error-container text-on-error-container px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 whitespace-nowrap shadow-2xs">
+                  <span class="material-symbols-outlined text-[13px]">cancel</span>
+                  <span>Invalid</span>
+                </div>
+              `}
+            </div>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
-            ${isPending ? `
-              <span class="text-xs font-extrabold text-amber-500 whitespace-nowrap">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
-              <div class="bg-amber-500/15 text-amber-600 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-amber-500/30 whitespace-nowrap">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                <span>${holdInfo.isReady ? '⚡ Siap Validasi' : `⏳ Pantau: ${holdInfo.text}`}</span>
-              </div>
-            ` : isValid ? `
-              <span class="text-xs font-extrabold text-secondary whitespace-nowrap">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
-              <div class="bg-secondary-container text-on-secondary-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 whitespace-nowrap">
-                <span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-                <span>Valid</span>
-              </div>
-            ` : `
-              <div class="bg-error-container text-on-error-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 whitespace-nowrap">
-                <span class="material-symbols-outlined text-[12px]">cancel</span>
-                <span>Invalid</span>
-              </div>
-            `}
+
+          <!-- Baris 2: Tanggal & Nominal Reward -->
+          <div class="flex items-end justify-between gap-2 pl-2 pt-0.5">
+            <div class="flex flex-col min-w-0">
+              <span class="text-[11px] text-text-body flex items-center gap-1">
+                <span class="material-symbols-outlined text-[13px] text-outline">schedule</span>
+                <span>${dateStr}</span>
+              </span>
+              <span class="text-[10px] font-medium mt-0.5 truncate ${isPending ? 'text-amber-600' : isValid ? 'text-outline' : 'text-outline'}">
+                ${isPending ? '⏳ Saldo pasif dalam pemantauan' : isValid ? '✓ Saldo aktif terkreditkan' : '✕ Tidak memenuhi syarat'}
+              </span>
+            </div>
+
+            <div class="flex flex-col items-end shrink-0">
+              <span class="font-mono text-sm font-extrabold whitespace-nowrap ${isPending ? 'text-amber-500' : (isValid ? 'text-secondary' : 'text-outline line-through')}">
+                ${(isPending || isValid) ? `+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}` : '+Rp 0'}
+              </span>
+              <span class="text-[10px] font-bold ${isPending ? 'text-amber-600' : (isValid ? 'text-secondary' : 'text-outline')} whitespace-nowrap">
+                ${isPending ? 'Saldo Pasif' : isValid ? 'Saldo Aktif' : 'Gagal'}
+              </span>
+            </div>
           </div>
+
+          <!-- Baris 3 (Opsional): Alert Alasan Invalid jika ada -->
+          ${k.errorMessage ? `
+            <div class="ml-2 mt-0.5 bg-rose-500/8 border border-rose-500/20 rounded-xl px-2.5 py-1.5 flex items-start gap-1.5 text-[11px] text-rose-500 font-medium">
+              <span class="material-symbols-outlined text-[14px] shrink-0 text-rose-500 mt-0.5">error</span>
+              <span class="leading-tight">${k.errorMessage}</span>
+            </div>
+          ` : ''}
         </div>
       `;
     }).join('');
