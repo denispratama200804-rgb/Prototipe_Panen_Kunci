@@ -449,91 +449,120 @@ export class TarikSaldoView extends IComponent {
             </div>
 
             <!-- Live Transaction Breakdown Section -->
-            <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-3" id="breakdownCard">
-              <h3 class="text-xs font-bold uppercase tracking-wider text-text-heading flex items-center gap-1.5">
-                <span class="material-symbols-outlined text-[18px] text-primary">receipt_long</span>
-                <span>Rincian Biaya Penarikan</span>
-              </h3>
-              <div class="flex flex-col gap-2 text-xs">
-                <div class="flex justify-between items-center text-text-body">
-                  <span>Nominal Penarikan</span>
-                  <span class="font-bold font-mono text-text-heading" id="summaryAmount">Rp ${(isLocked ? 0 : minWithdrawal).toLocaleString('id-ID')}</span>
+            <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-3.5" id="breakdownCard">
+              <div class="flex items-center justify-between pb-2.5 border-b border-surface-container/60">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <span class="material-symbols-outlined text-[17px]">receipt_long</span>
+                  </div>
+                  <h3 class="text-xs font-bold uppercase tracking-wider text-text-heading">Rincian Biaya Penarikan</h3>
                 </div>
+                <span class="text-[10px] font-bold text-outline uppercase tracking-wider bg-surface-container-low px-2 py-0.5 rounded-md border border-surface-container/60 flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                  Otomatis
+                </span>
+              </div>
+
+              <!-- Baris Item Biaya -->
+              <div class="flex flex-col gap-2.5 text-xs">
                 <div class="flex justify-between items-center text-text-body">
-                  <span>Biaya Admin</span>
-                  <span class="font-bold font-mono text-amber-500" id="summaryFee">Rp ${currentFee.toLocaleString('id-ID')}</span>
+                  <span class="font-medium">Nominal Penarikan</span>
+                  <span class="font-bold font-mono text-text-heading whitespace-nowrap shrink-0 text-right" id="summaryAmount">
+                    Rp ${(isLocked ? 0 : minWithdrawal).toLocaleString('id-ID')}
+                  </span>
                 </div>
-                <!-- Potongan Kode Referral -->
-                <div class="flex justify-between items-center text-text-body" id="summaryReferralRow">
+
+                <div class="flex justify-between items-center text-text-body">
                   <div class="flex items-center gap-1.5">
-                    <span>Potongan Kode Referral</span>
-                    <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold ${userReferredBy ? '' : 'hidden'}" id="summaryReferralBadge">
+                    <span class="font-medium">Biaya Admin</span>
+                    <span class="text-[10px] text-outline font-normal">(${resolved.label})</span>
+                  </div>
+                  <span class="font-bold font-mono text-amber-500 whitespace-nowrap shrink-0 text-right" id="summaryFee">
+                    Rp ${currentFee.toLocaleString('id-ID')}
+                  </span>
+                </div>
+
+                <!-- Potongan Kode Referral -->
+                <div class="flex justify-between items-center text-text-body gap-2" id="summaryReferralRow">
+                  <div class="flex items-center gap-1.5 min-w-0 pr-1">
+                    <span class="font-medium whitespace-nowrap">Potongan Referral</span>
+                    <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0 ${userReferredBy ? '' : 'hidden'}" id="summaryReferralBadge">
                       ${userReferredBy ? `${userReferredBy} (${refPercent}%)` : ''}
                     </span>
-                    <span class="text-[10px] text-outline italic ${userReferredBy ? 'hidden' : ''}" id="summaryReferralUnlinkedBadge">
-                      (Belum ditautkan)
+                    <span class="text-[10px] text-outline italic whitespace-nowrap ${userReferredBy ? 'hidden' : ''}" id="summaryReferralUnlinkedBadge">
+                      (Belum ada)
                     </span>
                   </div>
-                  <span class="font-bold font-mono ${userReferredBy ? 'text-primary' : 'text-outline'}" id="summaryReferralCut">
+                  <span class="font-bold font-mono whitespace-nowrap shrink-0 text-right ${userReferredBy ? 'text-primary' : 'text-outline'}" id="summaryReferralCut">
                     ${userReferredBy ? `-Rp ${initialReferralCut.toLocaleString('id-ID')}` : 'Rp 0'}
                   </span>
                 </div>
-                <div class="w-full h-px bg-surface-container my-0.5"></div>
-                <div class="flex justify-between items-center text-sm font-extrabold text-text-heading">
-                  <span>Total Diterima</span>
-                  <span class="${isLocked ? 'text-rose-500 font-sans text-xs' : 'text-secondary font-mono text-base'} font-bold flex items-center gap-1" id="summaryTotalReceive">
-                    ${
-                      isLocked
-                        ? `<span class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2.5 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1">
-                            <span class="material-symbols-outlined text-[14px]">cancel</span>
-                            Tidak Valid
-                           </span>`
-                        : `Rp ${currentReceive.toLocaleString('id-ID')}`
-                    }
-                  </span>
-                </div>
-                <div class="flex justify-between items-center text-[11px] text-text-body pt-1 border-t border-surface-container/50">
-                  <span class="text-outline">Total Potong Saldo</span>
-                  <span class="font-bold ${isLocked ? 'text-rose-500' : 'text-primary'} font-mono" id="summaryTotalDeduction">Rp ${(isLocked ? 0 : minWithdrawal).toLocaleString('id-ID')}</span>
-                </div>
               </div>
 
-              <!-- Status Keterikatan Kode Referral -->
-              ${userReferredBy ? `
-                <div class="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-2xl p-2.5 px-3.5 text-xs">
-                  <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-primary text-[18px]">verified</span>
-                    <p class="text-[11px] text-text-body">
-                      Akun terikat ke kode: <strong class="text-primary font-mono font-bold">${userReferredBy}</strong> (Potongan ${refPercent}%)
-                    </p>
+              <!-- Kotak Total Diterima (Highlighted Summary Box) -->
+              <div class="pt-2 border-t border-dashed border-surface-container flex flex-col gap-2.5">
+                <div class="bg-surface-container-low/80 dark:bg-surface-container-high/40 rounded-2xl p-3.5 border border-surface-container/80 flex items-center justify-between gap-3">
+                  <div class="flex flex-col min-w-0">
+                    <span class="text-xs font-bold text-text-heading">Total Diterima</span>
+                    <span class="text-[11px] text-outline mt-0.5 flex items-center gap-1 truncate">
+                      <span>Potong Saldo:</span>
+                      <strong class="font-mono ${isLocked ? 'text-rose-500' : 'text-text-body'} font-bold whitespace-nowrap" id="summaryTotalDeduction">
+                        Rp ${(isLocked ? 0 : minWithdrawal).toLocaleString('id-ID')}
+                      </strong>
+                    </span>
                   </div>
-                  <span class="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Aktif</span>
+                  <div class="text-right shrink-0">
+                    <span class="${isLocked ? 'text-rose-500 font-sans text-xs' : 'text-secondary font-mono text-lg font-extrabold'} flex items-center justify-end gap-1 whitespace-nowrap tracking-tight" id="summaryTotalReceive">
+                      ${
+                        isLocked
+                          ? `<span class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2.5 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1">
+                              <span class="material-symbols-outlined text-[14px]">cancel</span>
+                              Tidak Valid
+                             </span>`
+                          : `Rp ${currentReceive.toLocaleString('id-ID')}`
+                      }
+                    </span>
+                  </div>
                 </div>
-              ` : `
-                <div class="flex items-center justify-between bg-surface-container-low border border-surface-container rounded-2xl p-2.5 px-3.5 text-xs">
-                  <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-outline text-[18px]">link</span>
-                    <p class="text-[11px] text-text-body">
-                      Belum menautkan kode referral pengundang?
-                    </p>
+
+                <!-- Status Keterikatan Kode Referral -->
+                ${userReferredBy ? `
+                  <div class="flex items-center justify-between bg-primary/5 border border-primary/15 rounded-xl px-3 py-2 text-xs">
+                    <div class="flex items-center gap-1.5 min-w-0 pr-2">
+                      <span class="material-symbols-outlined text-primary text-[16px] shrink-0">verified</span>
+                      <p class="text-[11px] text-text-body truncate">
+                        Akun terikat kode <strong class="text-primary font-mono font-bold">${userReferredBy}</strong> (Potongan ${refPercent}%)
+                      </p>
+                    </div>
+                    <span class="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">Aktif</span>
                   </div>
-                  <a href="#/profil" class="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5">
-                    <span>Tautkan di Profil</span>
-                    <span class="material-symbols-outlined text-[13px]">arrow_forward</span>
-                  </a>
+                ` : `
+                  <div class="flex items-center justify-between bg-surface-container-low/70 border border-surface-container rounded-xl px-3 py-2 text-xs">
+                    <div class="flex items-center gap-1.5 min-w-0 pr-2">
+                      <span class="material-symbols-outlined text-outline text-[16px] shrink-0">link</span>
+                      <p class="text-[11px] text-text-body truncate">
+                        Belum menautkan kode referral pengundang?
+                      </p>
+                    </div>
+                    <a href="#/profil" class="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5 shrink-0">
+                      <span>Tautkan</span>
+                      <span class="material-symbols-outlined text-[13px]">arrow_forward</span>
+                    </a>
+                  </div>
+                `}
+
+                <div id="breakdownAlertContainer" class="${isLocked ? '' : 'hidden'}">
+                  ${
+                    isLocked
+                      ? `
+                    <div class="text-[11px] text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl p-2.5 flex items-start gap-1.5 font-medium">
+                      <span class="material-symbols-outlined text-[16px] shrink-0 text-rose-500 mt-0.5">error</span>
+                      <span>Saldo belum mencapai batas minimal penarikan Rp ${minWithdrawal.toLocaleString('id-ID')}. Total diterima tidak valid karena saldo tidak mencukupi.</span>
+                    </div>
+                  `
+                      : ''
+                  }
                 </div>
-              `}
-              <div id="breakdownAlertContainer" class="${isLocked ? '' : 'hidden'}">
-                ${
-                  isLocked
-                    ? `
-                  <div class="text-[11px] text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl p-2.5 flex items-start gap-1.5 font-medium">
-                    <span class="material-symbols-outlined text-[16px] shrink-0 text-rose-500 mt-0.5">error</span>
-                    <span>Saldo belum mencapai batas minimal penarikan Rp ${minWithdrawal.toLocaleString('id-ID')}. Total diterima tidak valid karena saldo tidak mencukupi.</span>
-                  </div>
-                `
-                    : ''
-                }
               </div>
             </div>
 
@@ -645,7 +674,7 @@ export class TarikSaldoView extends IComponent {
         }
         if (summaryReferralCut) {
           summaryReferralCut.textContent = `-Rp ${referralCut.toLocaleString('id-ID')}`;
-          summaryReferralCut.className = 'font-bold font-mono text-primary';
+          summaryReferralCut.className = 'font-bold font-mono text-primary whitespace-nowrap shrink-0 text-right';
         }
       } else {
         if (summaryReferralBadge) {
@@ -656,7 +685,7 @@ export class TarikSaldoView extends IComponent {
         }
         if (summaryReferralCut) {
           summaryReferralCut.textContent = 'Rp 0';
-          summaryReferralCut.className = 'font-bold font-mono text-outline';
+          summaryReferralCut.className = 'font-bold font-mono text-outline whitespace-nowrap shrink-0 text-right';
         }
       }
 
@@ -669,9 +698,9 @@ export class TarikSaldoView extends IComponent {
       if (isInvalid) {
         // Tampilkan status "Tidak Valid" pada Total Diterima
         if (summaryNet) {
-          summaryNet.className = 'font-bold flex items-center gap-1';
+          summaryNet.className = 'font-bold flex items-center justify-end';
           summaryNet.innerHTML = `
-            <span class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+            <span class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2.5 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1 whitespace-nowrap">
               <span class="material-symbols-outlined text-[14px]">cancel</span>
               Tidak Valid
             </span>
@@ -679,7 +708,7 @@ export class TarikSaldoView extends IComponent {
         }
 
         if (summaryTotal) {
-          summaryTotal.className = 'font-bold text-rose-500 font-mono flex items-center gap-1';
+          summaryTotal.className = 'font-bold text-rose-500 font-mono whitespace-nowrap';
           summaryTotal.innerHTML = `<span class="line-through opacity-70">Rp ${amount.toLocaleString('id-ID')}</span> <span class="text-[10px] font-sans font-semibold">(Saldo Kurang)</span>`;
         }
 
@@ -715,12 +744,12 @@ export class TarikSaldoView extends IComponent {
       } else {
         // Saldo valid dan sesuai
         if (summaryNet) {
-          summaryNet.className = 'text-secondary font-mono text-base font-bold flex items-center gap-1';
+          summaryNet.className = 'text-secondary font-mono text-lg font-extrabold flex items-center justify-end gap-1 whitespace-nowrap tracking-tight';
           summaryNet.textContent = `Rp ${totalReceive.toLocaleString('id-ID')}`;
         }
 
         if (summaryTotal) {
-          summaryTotal.className = 'font-bold text-primary font-mono';
+          summaryTotal.className = 'font-bold text-text-body font-mono whitespace-nowrap';
           summaryTotal.textContent = `Rp ${amount.toLocaleString('id-ID')}`;
         }
 
