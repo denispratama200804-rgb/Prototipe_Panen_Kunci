@@ -1016,38 +1016,65 @@ export class TarikSaldoView extends IComponent {
           close();
 
           if (res.success) {
+            const rawTxId = String(res.transaction?.id || '-');
+            const shortTxId = rawTxId.length > 18 ? `${rawTxId.slice(0, 8)}...${rawTxId.slice(-6)}` : rawTxId;
+
             this._notification.showModal({
               title: 'Permintaan Penarikan Berhasil Diajukan!',
               message: '<strong class="text-amber-500 font-bold">Menunggu persetujuan admin</strong>',
               html: `
                 <div class="bg-surface-container-low rounded-2xl p-3.5 flex flex-col gap-2.5 text-xs border border-surface-container mt-2 text-left">
+                  <!-- ID Transaksi -->
                   <div class="flex justify-between items-center gap-2">
-                    <span class="text-text-body">ID Transaksi</span>
-                    <strong class="font-mono text-primary font-bold whitespace-nowrap shrink-0">#${res.transaction?.id || '-'}</strong>
+                    <span class="text-text-body font-medium whitespace-nowrap">ID Transaksi</span>
+                    <span class="font-mono text-primary font-bold text-xs bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/20 whitespace-nowrap shrink-0" title="${rawTxId}">
+                      #${shortTxId}
+                    </span>
                   </div>
+
+                  <!-- Nominal Penarikan -->
                   <div class="flex justify-between items-center gap-2">
-                    <span class="text-text-body">Nominal Penarikan</span>
-                    <strong class="font-mono font-bold whitespace-nowrap shrink-0">Rp ${amount.toLocaleString('id-ID')}</strong>
+                    <span class="text-text-body font-medium whitespace-nowrap">Nominal Penarikan</span>
+                    <strong class="font-mono font-bold text-text-heading whitespace-nowrap shrink-0 text-right">Rp ${amount.toLocaleString('id-ID')}</strong>
                   </div>
+
+                  <!-- Biaya Admin -->
                   <div class="flex justify-between items-center gap-2">
-                    <span class="text-text-body">Biaya Admin</span>
-                    <strong class="font-mono ${fee > 0 ? 'text-amber-500' : 'text-slate-500'} whitespace-nowrap shrink-0">Rp ${fee.toLocaleString('id-ID')}</strong>
+                    <div class="flex items-center gap-1 min-w-0">
+                      <span class="text-text-body font-medium whitespace-nowrap">Biaya Admin</span>
+                      <span class="text-[10px] text-outline truncate">(${methodLabel})</span>
+                    </div>
+                    <strong class="font-mono ${fee > 0 ? 'text-amber-500' : 'text-slate-500'} whitespace-nowrap shrink-0 text-right">
+                      ${fee > 0 ? 'Rp ' + fee.toLocaleString('id-ID') : 'Gratis'}
+                    </strong>
                   </div>
+
+                  <!-- Potongan Referral -->
                   ${userReferredBy ? `
                     <div class="flex justify-between items-center gap-2">
                       <div class="flex items-center gap-1.5 min-w-0 pr-1">
-                        <span class="text-text-body whitespace-nowrap">Potongan Referral</span>
+                        <span class="text-text-body font-medium whitespace-nowrap">Potongan Referral</span>
                         <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0">
-                          ${userReferredBy}
+                          ${userReferredBy} (${refPercent}%)
                         </span>
                       </div>
                       <strong class="font-mono text-primary font-bold whitespace-nowrap shrink-0 text-right">-Rp ${referralCut.toLocaleString('id-ID')}</strong>
                     </div>
                   ` : ''}
-                  <div class="h-[1px] bg-outline-variant/30 my-0.5"></div>
-                  <div class="flex justify-between items-center text-sm font-extrabold gap-2">
-                    <span class="text-text-heading whitespace-nowrap">Total Dana Masuk</span>
-                    <strong class="text-secondary font-mono text-base whitespace-nowrap shrink-0 text-right">Rp ${totalReceive.toLocaleString('id-ID')}</strong>
+
+                  <!-- Pembatas Garis Putus-putus -->
+                  <div class="h-[1px] w-full border-t border-dashed border-outline-variant/40 my-0.5"></div>
+
+                  <!-- Total Dana Masuk Highlight Box -->
+                  <div class="flex justify-between items-center bg-secondary/10 p-2.5 rounded-xl border border-secondary/20 gap-2">
+                    <span class="text-xs text-secondary font-bold whitespace-nowrap">Total Dana Masuk</span>
+                    <strong class="text-secondary font-mono text-base font-extrabold whitespace-nowrap shrink-0 text-right">Rp ${totalReceive.toLocaleString('id-ID')}</strong>
+                  </div>
+
+                  <!-- Info Rekening Penerima -->
+                  <div class="flex justify-between items-center gap-2 text-[11px] text-outline pt-0.5">
+                    <span class="whitespace-nowrap">Tujuan Pencairan</span>
+                    <span class="font-medium text-text-heading truncate text-right font-mono">${methodLabel} - ${account}</span>
                   </div>
                 </div>
               `,
