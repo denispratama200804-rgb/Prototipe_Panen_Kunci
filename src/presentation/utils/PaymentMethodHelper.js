@@ -144,11 +144,20 @@ export const PAYMENT_METHODS = {
 
 /**
  * Mendapatkan metadata lengkap berdasarkan nama bank atau e-wallet
- * @param {string} rawInput - Contoh: 'DANA', 'GoPay', 'BCA', 'Bank Transfer (BCA)', dll
+ * @param {string|Object} rawInput - Contoh: 'DANA', 'GoPay', 'BCA', 'Bank Transfer (BCA)', objek transaksi, dll
  * @returns {typeof PAYMENT_METHODS[keyof typeof PAYMENT_METHODS]}
  */
 export function getPaymentMethodMetadata(rawInput = '') {
-  const query = String(rawInput || '').toLowerCase().trim();
+  let query = '';
+  if (typeof rawInput === 'object' && rawInput !== null) {
+    if (rawInput.id && typeof rawInput.id === 'string' && PAYMENT_METHODS[rawInput.id.toUpperCase()]) {
+      return PAYMENT_METHODS[rawInput.id.toUpperCase()];
+    }
+    // Ekstrak informasi dari properti transaksi
+    query = [rawInput.method, rawInput.bankName, rawInput.title, rawInput.name].filter(Boolean).join(' ').toLowerCase();
+  } else {
+    query = String(rawInput || '').toLowerCase().trim();
+  }
 
   if (query.includes('dana')) return PAYMENT_METHODS.DANA;
   if (query.includes('gopay') || query.includes('go-pay') || query.includes('go pay')) return PAYMENT_METHODS.GOPAY;
@@ -291,16 +300,181 @@ export function getPaymentMethodSvg(meta, sizeClass = 'w-full h-full') {
 }
 
 /**
+ * Menentukan apakah teks mengandung kata kunci e-wallet.
+ * Menghindari salah deteksi pada frasa "penarikan dana" atau "pencairan dana"
+ * di mana kata "dana" adalah bahasa Indonesia untuk saldo/uang, bukan dompet digital DANA.
+ * @param {string} rawText
+ * @returns {boolean}
+ */
+export function isEwalletKeyword(rawText = '') {
+  if (!rawText) return false;
+  const cleaned = String(rawText)
+    .toLowerCase()
+    .replace(/penarikan\s+dana/g, ' ')
+    .replace(/pencairan\s+dana/g, ' ')
+    .replace(/tarik\s+dana/g, ' ')
+    .replace(/sumber\s+dana/g, ' ');
+
+  if (
+    cleaned.includes('gopay') ||
+    cleaned.includes('go-pay') ||
+    cleaned.includes('go pay') ||
+    cleaned.includes('ovo') ||
+    cleaned.includes('shopee') ||
+    cleaned.includes('spay') ||
+    cleaned.includes('linkaja') ||
+    cleaned.includes('link aja') ||
+    cleaned.includes('ewallet') ||
+    cleaned.includes('e-wallet') ||
+    cleaned.includes('wallet') ||
+    cleaned.includes('dompet digital') ||
+    cleaned.includes('qris')
+  ) {
+    return true;
+  }
+
+  // Cek kata DANA sebagai merk e-wallet (standalone word)
+  if (/\bdana\b/.test(cleaned)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Menentukan apakah teks mengandung kata kunci perbankan.
+ * @param {string} rawText
+ * @returns {boolean}
+ */
+export function isBankKeyword(rawText = '') {
+  if (!rawText) return false;
+  const str = String(rawText).toLowerCase();
+  const BANK_KEYS = [
+    'bank', 'transfer', 'bca', 'bri', 'mandiri', 'bni', 'seabank', 'sea bank',
+    'bsi', 'syariah', 'cimb', 'niaga', 'btn', 'danamon', 'permata', 'panin',
+    'ocbc', 'nisp', 'bjb', 'jago', 'jenius', 'btpn', 'rekening'
+  ];
+  return BANK_KEYS.some(k => str.includes(k));
+}
+
+/**
+ * Mengidentifikasi secara akurat apakah suatu transaksi atau metode pembayaran adalah E-Wallet atau Bank.
+ * Prinsip:
+ * 1. Prioritaskan data dari transaksi itu sendiri (method, title, bankName, description).
+ * 2. Hanya gunakan fallbackBank (dari profil user) jika data transaksi kosong/tidak spesifik.
+ *
+ * @param {Object|string} txOrInput - Objek transaksi (w/tx) atau string nama bank/metode
+ * @param {string} [fallbackBank=''] - Rekening bank / e-wallet profil pengguna saat ini (opsional cadangan)
+ * @returns {{
+ *   isEwallet: boolean,
+ *   isBank: boolean,
+ *   type: 'ewallet'|'bank',
+ *   iconSrc: string,
+ *   iconAlt: string,
+ *   name: string
+ * }}
+ */
+export function identifyPaymentType(txOrInput, fallbackBank = '') {
+  let txMethod = '';
+  let txTitle = '';
+  let txBankName = '';
+  let txDesc = '';
+
+  if (typeof txOrInput === 'object' && txOrInput !== null) {
+    // Objek metadata dari PAYMENT_METHODS
+    if (txOrInput.type === 'ewallet') {
+      return { isEwallet: true, isBank: false, type: 'ewallet', iconSrc: '/images/icon-ewallet.png', iconAlt: 'E-Wallet', name: txOrInput.name || 'E-Wallet' };
+    }
+    if (txOrInput.type === 'bank') {
+      return { isEwallet: false, isBank: true, type: 'bank', iconSrc: '/images/icon-bank.png', iconAlt: 'Bank Transfer', name: txOrInput.name || 'Bank Transfer' };
+    }
+
+    txMethod = String(txOrInput.method || '').toLowerCase().trim();
+    txTitle = String(txOrInput.title || '').toLowerCase().trim();
+    txBankName = String(txOrInput.bankName || txOrInput.name || '').toLowerCase().trim();
+    txDesc = String(txOrInput.description || '').toLowerCase().trim();
+  } else {
+    const str = String(txOrInput || '').toLowerCase().trim();
+    txTitle = str;
+    txMethod = str;
+  }
+
+  // 1. Cek dari method transaksi eksplisit
+  if (txMethod) {
+    if (isEwalletKeyword(txMethod)) {
+      return { isEwallet: true, isBank: false, type: 'ewallet', iconSrc: '/images/icon-ewallet.png', iconAlt: 'E-Wallet', name: 'E-Wallet' };
+    }
+    if (isBankKeyword(txMethod)) {
+      return { isEwallet: false, isBank: true, type: 'bank', iconSrc: '/images/icon-bank.png', iconAlt: 'Bank Transfer', name: 'Bank Transfer' };
+    }
+  }
+
+  // 2. Cek dari title dan bankName transaksi
+  const primaryText = `${txTitle} ${txBankName}`.trim();
+  if (primaryText) {
+    const hasBank = isBankKeyword(primaryText);
+    const hasEwallet = isEwalletKeyword(primaryText);
+
+    if (hasEwallet && !hasBank) {
+      return { isEwallet: true, isBank: false, type: 'ewallet', iconSrc: '/images/icon-ewallet.png', iconAlt: 'E-Wallet', name: 'E-Wallet' };
+    }
+    if (hasBank && !hasEwallet) {
+      return { isEwallet: false, isBank: true, type: 'bank', iconSrc: '/images/icon-bank.png', iconAlt: 'Bank Transfer', name: 'Bank Transfer' };
+    }
+    if (hasBank) {
+      return { isEwallet: false, isBank: true, type: 'bank', iconSrc: '/images/icon-bank.png', iconAlt: 'Bank Transfer', name: 'Bank Transfer' };
+    }
+    if (hasEwallet) {
+      return { isEwallet: true, isBank: false, type: 'ewallet', iconSrc: '/images/icon-ewallet.png', iconAlt: 'E-Wallet', name: 'E-Wallet' };
+    }
+  }
+
+  // 3. Cek dari deskripsi transaksi
+  if (txDesc) {
+    const hasBank = isBankKeyword(txDesc);
+    const hasEwallet = isEwalletKeyword(txDesc);
+
+    if (hasEwallet && !hasBank) {
+      return { isEwallet: true, isBank: false, type: 'ewallet', iconSrc: '/images/icon-ewallet.png', iconAlt: 'E-Wallet', name: 'E-Wallet' };
+    }
+    if (hasBank && !hasEwallet) {
+      return { isEwallet: false, isBank: true, type: 'bank', iconSrc: '/images/icon-bank.png', iconAlt: 'Bank Transfer', name: 'Bank Transfer' };
+    }
+  }
+
+  // 4. Cadangan terakhir: periksa fallbackBank dari profil pengguna (hanya jika data transaksi kosong)
+  const fb = String(fallbackBank || '').toLowerCase().trim();
+  if (fb) {
+    if (isEwalletKeyword(fb)) {
+      return { isEwallet: true, isBank: false, type: 'ewallet', iconSrc: '/images/icon-ewallet.png', iconAlt: 'E-Wallet', name: 'E-Wallet' };
+    }
+    if (isBankKeyword(fb)) {
+      return { isEwallet: false, isBank: true, type: 'bank', iconSrc: '/images/icon-bank.png', iconAlt: 'Bank Transfer', name: 'Bank Transfer' };
+    }
+  }
+
+  // 5. Default standar jika tidak teridentifikasi: Bank Transfer
+  return {
+    isEwallet: false,
+    isBank: true,
+    type: 'bank',
+    iconSrc: '/images/icon-bank.png',
+    iconAlt: 'Bank Transfer',
+    name: 'Bank Transfer'
+  };
+}
+
+/**
  * Menghasilkan HTML Icon gambar resmi (e-wallet / bank PNG)
- * @param {string|Object} rawInput - Nama bank / e-wallet
+ * @param {string|Object} rawInput - Objek transaksi atau nama bank / e-wallet
  * @param {string} [customSizeClass='w-10 h-10'] - Ukuran kotak icon
+ * @param {string} [fallbackBank=''] - Rekening bank / e-wallet profil user (opsional)
  * @returns {string} HTML string
  */
-export function renderPaymentMethodIcon(rawInput = '', customSizeClass = 'w-10 h-10') {
-  const meta = typeof rawInput === 'object' && rawInput?.id ? rawInput : getPaymentMethodMetadata(rawInput);
-  const iconSrc = meta.type === 'ewallet' ? '/images/icon-ewallet.png' : '/images/icon-bank.png';
+export function renderPaymentMethodIcon(rawInput = '', customSizeClass = 'w-10 h-10', fallbackBank = '') {
+  const result = identifyPaymentType(rawInput, fallbackBank);
   return `
-    <img src="${iconSrc}" alt="${meta.name}" class="${customSizeClass} object-cover" title="${meta.name}" />
+    <img src="${result.iconSrc}" alt="${result.iconAlt}" class="${customSizeClass} object-cover" title="${result.iconAlt}" />
   `;
 }
 
@@ -308,26 +482,27 @@ export function renderPaymentMethodIcon(rawInput = '', customSizeClass = 'w-10 h
  * Helper alias untuk merender icon metode pembayaran
  * @param {string|Object} rawInput
  * @param {string} [customSizeClass='w-10 h-10']
+ * @param {string} [fallbackBank='']
  * @returns {string}
  */
-export function renderPaymentMethodSvg(rawInput = '', customSizeClass = 'w-10 h-10') {
-  return renderPaymentMethodIcon(rawInput, customSizeClass);
+export function renderPaymentMethodSvg(rawInput = '', customSizeClass = 'w-10 h-10', fallbackBank = '') {
+  return renderPaymentMethodIcon(rawInput, customSizeClass, fallbackBank);
 }
 
 /**
  * Menghasilkan pill / chip badge dengan gambar resmi e-wallet / bank
- * @param {string|Object} rawInput - Nama bank / e-wallet
+ * @param {string|Object} rawInput - Nama bank / e-wallet atau objek transaksi
  * @param {string} [label] - Label teks alternatif jika ingin meng-override
+ * @param {string} [fallbackBank='']
  * @returns {string} HTML string
  */
-export function renderPaymentMethodPill(rawInput = '', label = null) {
-  const meta = typeof rawInput === 'object' && rawInput?.id ? rawInput : getPaymentMethodMetadata(rawInput);
-  const displayLabel = label || meta.name;
-  const iconSrc = meta.type === 'ewallet' ? '/images/icon-ewallet.png' : '/images/icon-bank.png';
+export function renderPaymentMethodPill(rawInput = '', label = null, fallbackBank = '') {
+  const result = identifyPaymentType(rawInput, fallbackBank);
+  const displayLabel = label || (typeof rawInput === 'string' && rawInput ? rawInput : result.name);
   return `
     <div class="inline-flex items-center gap-2 bg-surface-card border border-surface-container px-3 py-1.5 rounded-full shadow-xs text-xs font-bold text-text-heading">
       <div class="w-5 h-5 shrink-0 rounded-md overflow-hidden flex items-center justify-center">
-        <img src="${iconSrc}" alt="${displayLabel}" class="w-full h-full object-cover" />
+        <img src="${result.iconSrc}" alt="${displayLabel}" class="w-full h-full object-cover" />
       </div>
       <span>${displayLabel}</span>
     </div>

@@ -211,7 +211,7 @@ export class HistoryView extends IComponent {
 
           <div class="flex items-center gap-3 pl-2">
             <div class="w-9 h-9 shrink-0 rounded-xl overflow-hidden shadow-2xs flex items-center justify-center bg-surface-container">
-              ${renderPaymentMethodIcon(w.title + ' ' + (w.description || '') + ' ' + (w.method || '') + ' ' + (currentUser?.bankName || ''), 'w-9 h-9')}
+              ${renderPaymentMethodIcon(w, 'w-9 h-9', currentUser?.bankName)}
             </div>
             <div class="flex flex-col gap-1">
               <div class="flex items-center gap-2">

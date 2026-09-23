@@ -1,5 +1,5 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
-import { getPaymentMethodMetadata } from '../utils/PaymentMethodHelper.js';
+import { getPaymentMethodMetadata, identifyPaymentType } from '../utils/PaymentMethodHelper.js';
 import { User } from '../../domain/models/User.js';
 
 /**
@@ -348,7 +348,7 @@ export class ProfileView extends IComponent {
               <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3">
                   <div class="w-10 h-10 rounded-2xl overflow-hidden shadow-xs flex items-center justify-center shrink-0">
-                    <img src="${(getPaymentMethodMetadata(user.bankName).type === 'ewallet') ? '/images/icon-ewallet.png' : '/images/icon-bank.png'}" alt="${user.bankName || 'Payment'}" class="w-full h-full object-cover" />
+                    <img src="${identifyPaymentType(user.bankName).iconSrc}" alt="${user.bankName || 'Payment'}" class="w-full h-full object-cover" />
                   </div>
                   <div>
                     <h4 class="font-headline-md text-sm text-text-heading font-bold" id="profileBankName">

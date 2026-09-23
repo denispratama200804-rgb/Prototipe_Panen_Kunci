@@ -1,6 +1,6 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { AppEvents } from '../../core/events/EventBus.js';
-import { renderPaymentMethodSvg, getPaymentMethodMetadata } from '../utils/PaymentMethodHelper.js';
+import { renderPaymentMethodSvg, getPaymentMethodMetadata, identifyPaymentType } from '../utils/PaymentMethodHelper.js';
 
 /**
  * SaldoDetailView
@@ -178,20 +178,11 @@ export class SaldoDetailView extends IComponent {
 
       // Cek apakah metode penarikan bertipe e-wallet atau bank
       // Prioritas 1: Dari data transaksi penarikan itu sendiri (w.method, w.bankName, w.title, w.description)
-      // Prioritas 2: Dari rekening yang dipilih user saat verifikasi akun (verifiedBank)
-      const methodQuery = [
-        w.method,
-        w.bankName,
-        w.title,
-        w.description,
-        w.recipient,
-        verifiedBank
-      ].filter(Boolean).join(' ');
-
-      const methodMeta = getPaymentMethodMetadata(methodQuery);
-      const isEwallet = methodMeta.type === 'ewallet' || ['dana', 'gopay', 'ovo', 'shopeepay', 'wallet', 'ewallet', 'e-wallet'].some(x => methodQuery.toLowerCase().includes(x));
-      const iconSrc = isEwallet ? '/images/icon-ewallet.png' : '/images/icon-bank.png';
-      const iconAlt = isEwallet ? 'E-Wallet' : 'Bank Transfer';
+      // Prioritas 2: Dari rekening yang dipilih user saat verifikasi akun (verifiedBank) jika data transaksi kosong
+      const paymentInfo = identifyPaymentType(w, verifiedBank);
+      const isEwallet = paymentInfo.isEwallet;
+      const iconSrc = paymentInfo.iconSrc;
+      const iconAlt = paymentInfo.iconAlt;
       const displayTitle = w.title || `Penarikan (${isEwallet ? 'E-Wallet' : 'Bank'})`;
 
       return `

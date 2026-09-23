@@ -323,7 +323,7 @@ export class DashboardView extends IComponent {
           <div class="flex items-center gap-3 min-w-0">
             ${(!isDeposit && !isReferralCommission) ? `
               <div class="w-10 h-10 rounded-2xl overflow-hidden shadow-xs flex items-center justify-center shrink-0 bg-surface-container">
-                ${renderPaymentMethodSvg((tx.method || '') + ' ' + (tx.title || '') + ' ' + (tx.description || '') + ' ' + (user?.bankName || ''), 'w-full h-full')}
+                ${renderPaymentMethodSvg(tx, 'w-full h-full', user?.bankName)}
               </div>
             ` : `
               <div class="w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0">

@@ -953,6 +953,7 @@ export class TarikSaldoView extends IComponent {
             userEmail: currentUser ? currentUser.email : '',
             userPhone: currentUser ? currentUser.phone : account,
             accountHolder: resolved.accountHolder || (currentUser ? currentUser.name : ''),
+            bankName: resolved.rawBank || (resolved.isBank ? 'Bank Transfer' : resolved.label),
             referredBy: userReferredBy,
             referralDeduction: referralCut
           });
