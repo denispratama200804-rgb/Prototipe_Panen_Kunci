@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   account_number  TEXT          DEFAULT '',
   account_holder  TEXT          DEFAULT '',
   role            TEXT          NOT NULL DEFAULT 'user'
-                                  CHECK (role IN ('user', 'admin')),
+                                  CHECK (role IN ('user', 'admin', 'system_config')),
   is_verified     BOOLEAN       NOT NULL DEFAULT FALSE,
   avatar          TEXT          DEFAULT '',
   nickname_updated_at TIMESTAMPTZ,
@@ -38,7 +38,9 @@ CREATE TABLE IF NOT EXISTS public.users (
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
--- Query migrasi jika tabel users sudah ada sebelumnya (menjamin seluruh kolom tersedia):
+-- Query migrasi jika tabel users sudah ada sebelumnya (menjamin seluruh kolom & role tersedia):
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE public.users ADD CONSTRAINT users_role_check CHECK (role IN ('user', 'admin', 'system_config'));
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password TEXT DEFAULT '';
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user';
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT '';
@@ -100,14 +102,14 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID          NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   type            TEXT          NOT NULL
-                                  CHECK (type IN ('deposit', 'withdrawal')),
+                                  CHECK (type IN ('deposit', 'withdrawal', 'referral_deduction', 'referral_commission')),
   amount          INTEGER       NOT NULL CHECK (amount > 0),
   fee             INTEGER       NOT NULL DEFAULT 0,
-  net_payout      INTEGER       GENERATED ALWAYS AS (amount - fee) STORED,
+  net_payout      INTEGER       DEFAULT 0,
   title           TEXT          NOT NULL,
   description     TEXT          DEFAULT '',
   status          TEXT          NOT NULL DEFAULT 'pending'
-                                  CHECK (status IN ('pending', 'success', 'failed')),
+                                  CHECK (status IN ('pending', 'success', 'failed', 'valid', 'invalid', 'approved', 'rejected', 'completed', 'ditolak', 'berhasil')),
   method          TEXT          DEFAULT '',
   recipient       TEXT          DEFAULT '',
   proof_image     TEXT          DEFAULT '',
@@ -117,6 +119,10 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 );
 
 -- Query migrasi jika tabel transactions sudah dibuat sebelumnya:
+ALTER TABLE public.transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
+ALTER TABLE public.transactions ADD CONSTRAINT transactions_type_check CHECK (type IN ('deposit', 'withdrawal', 'referral_deduction', 'referral_commission'));
+ALTER TABLE public.transactions DROP CONSTRAINT IF EXISTS transactions_status_check;
+ALTER TABLE public.transactions ADD CONSTRAINT transactions_status_check CHECK (status IN ('pending', 'success', 'failed', 'valid', 'invalid', 'approved', 'rejected', 'completed', 'ditolak', 'berhasil'));
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS proof_image TEXT DEFAULT '';
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS proof_notes TEXT DEFAULT '';
 

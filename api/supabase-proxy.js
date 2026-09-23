@@ -150,7 +150,7 @@ async function sendEmailMessage({ to, subject, html, text }) {
   throw new Error(brevoError ? `Brevo error: ${brevoError}` : 'Sistem email belum dikonfigurasi. Harap tambahkan BREVO_USERNAME & BREVO_API_KEY di .env.');
 }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bmuthjyibkrcqyygjcxe.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wsbbdyrnnbjkjmfcplea.supabase.co';
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
 
 const adminSupabase = SUPABASE_SECRET_KEY
