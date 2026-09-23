@@ -59,23 +59,23 @@ export class HistoryView extends IComponent {
             <button
               type="button"
               id="tabBtnSetoran"
-              class="flex-1 py-2.5 px-2 rounded-xl font-label-md text-xs font-bold transition-all duration-200 text-center ${this._activeTab === 'setoran' ? 'bg-surface-card text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}"
+              class="flex-1 py-2 px-1.5 rounded-xl font-label-md text-[11px] sm:text-xs font-bold transition-all duration-200 text-center truncate ${this._activeTab === 'setoran' ? 'bg-surface-card text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}"
             >
-              Setoran API Key (<span id="countSetoran">${keys.length}</span>)
+              Setoran Key (<span id="countSetoran">${keys.length}</span>)
             </button>
             <button
               type="button"
               id="tabBtnPenarikan"
-              class="flex-1 py-2.5 px-2 rounded-xl font-label-md text-xs font-bold transition-all duration-200 text-center ${this._activeTab === 'penarikan' ? 'bg-surface-card text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}"
+              class="flex-1 py-2 px-1.5 rounded-xl font-label-md text-[11px] sm:text-xs font-bold transition-all duration-200 text-center truncate ${this._activeTab === 'penarikan' ? 'bg-surface-card text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}"
             >
-              Penarikan Dana (<span id="countPenarikan">${withdrawals.length}</span>)
+              Penarikan (<span id="countPenarikan">${withdrawals.length}</span>)
             </button>
             <button
               type="button"
               id="tabBtnReferral"
-              class="flex-1 py-2.5 px-2 rounded-xl font-label-md text-xs font-bold transition-all duration-200 text-center ${this._activeTab === 'referral' ? 'bg-surface-card text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}"
+              class="flex-1 py-2 px-1.5 rounded-xl font-label-md text-[11px] sm:text-xs font-bold transition-all duration-200 text-center truncate ${this._activeTab === 'referral' ? 'bg-surface-card text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}"
             >
-              Kode Referral (<span id="countReferral">${referrals.length}</span>)
+              Referral (<span id="countReferral">${referrals.length}</span>)
             </button>
           </div>
 
@@ -126,41 +126,79 @@ export class HistoryView extends IComponent {
       });
 
       return `
-        <div class="bg-surface-card border border-surface-container rounded-2xl p-4 shadow-sm flex items-center justify-between relative overflow-hidden group">
+        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 sm:p-4 shadow-2xs relative overflow-hidden flex flex-col gap-2.5 transition-all">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}"></div>
-          
-          <div class="flex flex-col gap-1 pl-2">
-            <div class="flex items-center gap-2">
-              <span class="font-mono text-xs font-bold text-text-heading bg-surface-container-low px-2 py-0.5 rounded-md border border-surface-container">
-                ${k.getMaskedKey()}
+
+          <!-- Baris 1: Identitas Key, Credit Badge, & Status Badge -->
+          <div class="flex items-center justify-between gap-2 pl-2">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <div class="flex items-center gap-1 bg-surface-container-low px-2 py-0.5 rounded-lg border border-surface-container/80 shrink-0">
+                <span class="material-symbols-outlined text-outline text-[13px]">vpn_key</span>
+                <span class="font-mono text-xs font-bold text-text-heading tracking-tight">
+                  ${k.getMaskedKey()}
+                </span>
+              </div>
+              <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${
+                isPending 
+                  ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' 
+                  : isValid 
+                  ? 'bg-secondary/10 text-secondary border border-secondary/20' 
+                  : 'bg-surface-container text-outline border border-surface-container-high'
+              } shrink-0">
+                ${k.credits !== undefined ? k.credits : 80} cr
               </span>
+            </div>
+
+            <!-- Status Badge: Selalu di kanan atas dengan single line -->
+            <div class="shrink-0">
               ${isPending ? `
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30 inline-flex items-center gap-1">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30 inline-flex items-center gap-1 whitespace-nowrap shadow-2xs">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
                   <span>Menunggu Verifikasi</span>
                 </span>
               ` : isValid ? `
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary-container text-on-secondary-container">
-                  Valid
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-secondary-container text-on-secondary-container inline-flex items-center gap-1 whitespace-nowrap shadow-2xs">
+                  <span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                  <span>Valid</span>
                 </span>
               ` : `
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container">
-                  Invalid
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container inline-flex items-center gap-1 whitespace-nowrap shadow-2xs">
+                  <span class="material-symbols-outlined text-[13px]">cancel</span>
+                  <span>Invalid</span>
                 </span>
               `}
             </div>
-            <span class="text-[11px] text-text-body">${dateStr}</span>
-            ${k.errorMessage ? `<span class="text-[11px] text-error-ruby">${k.errorMessage}</span>` : ''}
           </div>
 
-          <div class="flex flex-col items-end shrink-0">
-            <span class="font-headline-md text-sm font-extrabold ${isPending ? 'text-amber-500' : (isValid ? 'text-secondary' : 'text-outline')}">
-              ${(isPending || isValid) ? `+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}` : '+Rp 0'}
-            </span>
-            <span class="text-[10px] ${isPending ? 'text-amber-500 font-semibold' : 'text-outline font-semibold'}">
-              ${isPending ? `Saldo Pasif (${k.credits !== undefined ? k.credits : 80} cr)` : `Kie.ai ${k.credits !== undefined ? k.credits : 80} Kredit`}
-            </span>
+          <!-- Baris 2: Tanggal & Nominal Reward -->
+          <div class="flex items-end justify-between gap-2 pl-2 pt-0.5">
+            <div class="flex flex-col min-w-0">
+              <span class="text-[11px] text-text-body flex items-center gap-1">
+                <span class="material-symbols-outlined text-[13px] text-outline">schedule</span>
+                <span>${dateStr}</span>
+              </span>
+              <span class="text-[10px] font-medium mt-0.5 truncate ${isPending ? 'text-amber-600' : isValid ? 'text-outline' : 'text-outline'}">
+                ${isPending ? '⏳ Menunggu persetujuan admin' : isValid ? '✓ Saldo langsung terkreditkan' : '✕ Tidak memenuhi syarat minimal'}
+              </span>
+            </div>
+
+            <div class="flex flex-col items-end shrink-0">
+              <span class="font-mono text-sm font-extrabold whitespace-nowrap ${isPending ? 'text-amber-500' : (isValid ? 'text-secondary' : 'text-outline line-through')}">
+                ${(isPending || isValid) ? `+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}` : '+Rp 0'}
+              </span>
+              <span class="text-[10px] font-bold ${isPending ? 'text-amber-600' : (isValid ? 'text-secondary' : 'text-outline')} whitespace-nowrap">
+                ${isPending ? 'Saldo Pasif' : isValid ? 'Saldo Aktif' : 'Gagal'}
+              </span>
+            </div>
           </div>
+
+          <!-- Baris 3 (Opsional): Kotak Alasan Penolakan / Invalid -->
+          ${k.errorMessage ? `
+            <div class="ml-2 mt-0.5 bg-rose-500/8 border border-rose-500/20 rounded-xl px-2.5 py-1.5 flex items-start gap-1.5 text-[11px] text-rose-500 font-medium">
+              <span class="material-symbols-outlined text-[15px] shrink-0 text-rose-500 mt-0.5">error</span>
+              <span class="leading-tight">${k.errorMessage}</span>
+            </div>
+          ` : ''}
         </div>
       `;
     }).join('');
@@ -195,60 +233,77 @@ export class HistoryView extends IComponent {
       const isPending = !isSuccess && !isFailed;
 
       let stripeColor = 'bg-warning-amber';
-      let badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-amber/15 text-warning-amber border border-warning-amber/30 animate-pulse">Menunggu Persetujuan Admin</span>';
+      let badgeHtml = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-warning-amber/15 text-warning-amber border border-warning-amber/30 inline-flex items-center gap-1 whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full bg-warning-amber animate-pulse"></span><span>Menunggu Verifikasi</span></span>';
 
       if (isSuccess) {
         stripeColor = 'bg-secondary';
-        badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary">Berhasil Ditransfer</span>';
+        badgeHtml = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary inline-flex items-center gap-1 whitespace-nowrap"><span class="material-symbols-outlined text-[13px]" style="font-variation-settings: \'FILL\' 1;">check_circle</span><span>Ditransfer</span></span>';
       } else if (isFailed) {
         stripeColor = 'bg-error-ruby';
-        badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container">Ditolak (Dana Di-refund)</span>';
+        badgeHtml = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container inline-flex items-center gap-1 whitespace-nowrap"><span class="material-symbols-outlined text-[13px]">cancel</span><span>Ditolak</span></span>';
       }
 
       return `
-        <div class="bg-surface-card border border-surface-container rounded-2xl p-4 shadow-sm flex items-center justify-between relative overflow-hidden">
+        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 sm:p-4 shadow-2xs relative overflow-hidden flex flex-col gap-2.5">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}"></div>
 
-          <div class="flex items-center gap-3 pl-2">
-            <div class="w-9 h-9 shrink-0 rounded-xl overflow-hidden shadow-2xs flex items-center justify-center bg-surface-container">
-              ${renderPaymentMethodIcon(w, 'w-9 h-9', currentUser?.bankName)}
-            </div>
-            <div class="flex flex-col gap-1">
-              <div class="flex items-center gap-2">
-                <span class="font-label-md text-xs font-bold text-text-heading">${w.title}</span>
-                ${badgeHtml}
+          <!-- Baris 1: Metode Penarikan & Status Badge -->
+          <div class="flex items-center justify-between gap-2 pl-2">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-8 h-8 shrink-0 rounded-xl overflow-hidden shadow-2xs flex items-center justify-center bg-surface-container">
+                ${renderPaymentMethodIcon(w, 'w-8 h-8', currentUser?.bankName)}
               </div>
-            <span class="text-[11px] text-text-body">${w.description} • ${dateStr}</span>
-            ${isSuccess ? `
+              <div class="flex flex-col min-w-0">
+                <span class="font-label-md text-xs font-bold text-text-heading truncate">${w.title}</span>
+                <span class="text-[10px] text-outline truncate">${w.description}</span>
+              </div>
+            </div>
+            <div class="shrink-0">
+              ${badgeHtml}
+            </div>
+          </div>
+
+          <!-- Baris 2: Waktu Penarikan & Nominal Penarikan -->
+          <div class="flex items-end justify-between gap-2 pl-2 pt-0.5">
+            <div class="flex items-center gap-1 text-[11px] text-text-body">
+              <span class="material-symbols-outlined text-[13px] text-outline">schedule</span>
+              <span>${dateStr}</span>
+            </div>
+
+            <div class="flex flex-col items-end shrink-0">
+              <span class="font-mono text-sm font-extrabold whitespace-nowrap ${isFailed ? 'text-text-body line-through' : 'text-error-ruby'}">
+                -Rp ${w.amount.toLocaleString('id-ID')}
+              </span>
+              <span class="text-[10px] ${isSuccess ? 'text-secondary font-bold' : isPending ? 'text-warning-amber font-semibold' : 'text-text-body font-semibold'} whitespace-nowrap">
+                ${isSuccess ? 'Berhasil Ditransfer' : isPending ? 'Dalam Antrean' : 'Dikembalikan ke Saldo'}
+              </span>
+            </div>
+          </div>
+
+          <!-- Baris 3: Tombol Aksi Detail / Bukti Transfer -->
+          ${isSuccess ? `
+            <div class="pl-2 pt-1 border-t border-surface-container/60">
               <button
                 type="button"
                 data-proof-history="${w.id}"
-                class="mt-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 w-fit cursor-pointer"
+                class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span class="material-symbols-outlined text-[15px]">receipt_long</span>
                 <span>Lihat Bukti Transfer & Rincian</span>
               </button>
-            ` : isFailed ? `
+            </div>
+          ` : isFailed ? `
+            <div class="pl-2 pt-1 border-t border-surface-container/60">
               <button
                 type="button"
                 data-reject-history="${w.id}"
-                class="mt-1.5 text-[11px] font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 w-fit cursor-pointer"
+                class="text-[11px] font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span class="material-symbols-outlined text-[15px]">info</span>
                 <span>Lihat Rincian Penolakan</span>
               </button>
-            ` : ''}
             </div>
-          </div>
-
-          <div class="flex flex-col items-end shrink-0">
-            <span class="font-headline-md text-sm font-extrabold ${isFailed ? 'text-text-body line-through' : 'text-error-ruby'}">
-              -Rp ${w.amount.toLocaleString('id-ID')}
-            </span>
-            <span class="text-[10px] ${isSuccess ? 'text-secondary' : isPending ? 'text-warning-amber' : 'text-text-body'} font-semibold">
-              ${isSuccess ? 'Ditransfer' : isPending ? 'Dalam Antrean' : 'Dikembalikan ke Saldo'}
-            </span>
-          </div>
+          ` : ''}
         </div>
       `;
     }).join('');
@@ -323,70 +378,91 @@ export class HistoryView extends IComponent {
 
       let stripeColor = 'bg-primary';
       let statusBadge = `
-        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/30">
-          Potongan ${ref.deductionPercent ?? this._walletService.referralCutPercent}%
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/30 inline-flex items-center gap-1 whitespace-nowrap">
+          <span>Potongan ${ref.deductionPercent ?? this._walletService.referralCutPercent}%</span>
         </span>
       `;
 
       if (isSuccess) {
         stripeColor = 'bg-secondary';
         statusBadge = `
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary">
-            Tercairkan
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary inline-flex items-center gap-1 whitespace-nowrap">
+            <span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+            <span>Tercairkan</span>
           </span>
         `;
       } else if (isPending) {
         stripeColor = 'bg-warning-amber';
         statusBadge = `
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-amber/15 text-warning-amber border border-warning-amber/30 animate-pulse">
-            Menunggu Persetujuan
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-warning-amber/15 text-warning-amber border border-warning-amber/30 inline-flex items-center gap-1 whitespace-nowrap">
+            <span class="w-1.5 h-1.5 rounded-full bg-warning-amber animate-pulse"></span>
+            <span>Menunggu</span>
           </span>
         `;
       } else if (isFailed) {
         stripeColor = 'bg-error-ruby';
         statusBadge = `
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container">
-            Batal
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-on-error-container inline-flex items-center gap-1 whitespace-nowrap">
+            <span class="material-symbols-outlined text-[13px]">cancel</span>
+            <span>Batal</span>
           </span>
         `;
       }
 
       return `
-        <div class="bg-surface-card border border-surface-container rounded-2xl p-4 shadow-sm flex items-center justify-between relative overflow-hidden group">
+        <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 sm:p-4 shadow-2xs relative overflow-hidden flex flex-col gap-2.5">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}"></div>
 
-          <div class="flex items-center gap-3 pl-2 min-w-0">
-            <div class="w-9 h-9 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center shadow-2xs">
-              <span class="material-symbols-outlined text-[20px]">loyalty</span>
+          <!-- Baris 1: Info Kode & Status Badge -->
+          <div class="flex items-center justify-between gap-2 pl-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-7 h-7 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <span class="material-symbols-outlined text-[16px]">loyalty</span>
+              </div>
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/20 shrink-0">
+                  ${ref.referralCode}
+                </span>
+                <span class="text-[11px] font-bold text-text-heading truncate">Potongan Referral</span>
+              </div>
             </div>
-            <div class="flex flex-col gap-1 min-w-0">
-              <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="font-label-md text-xs font-bold text-text-heading truncate">Potongan Kode Referral</span>
-                ${statusBadge}
-              </div>
-              <div class="text-[11px] text-text-body flex items-center gap-1.5 flex-wrap">
-                <span class="font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.2 rounded text-[10px]">${ref.referralCode}</span>
-                <span>• Penarikan Rp ${(ref.withdrawalAmount || 0).toLocaleString('id-ID')}</span>
-                <span>• ${dateStr}</span>
-              </div>
-              <button
-                type="button"
-                data-referral-detail="${ref.id}"
-                class="mt-1 text-[11px] font-bold text-primary hover:underline flex items-center gap-1 w-fit cursor-pointer"
-              >
-                <span class="material-symbols-outlined text-[15px]">info</span>
-                <span>Lihat Rincian Potongan</span>
-              </button>
+            <div class="shrink-0">
+              ${statusBadge}
             </div>
           </div>
 
-          <div class="flex flex-col items-end shrink-0 pl-2">
-            <span class="font-headline-md text-sm font-extrabold ${isFailed ? 'text-text-body line-through' : 'text-primary'} font-mono">
-              -Rp ${(ref.deductionAmount || 0).toLocaleString('id-ID')}
-            </span>
-            <span class="text-[10px] text-outline font-semibold">
-              Potongan ${ref.deductionPercent || 5}%
-            </span>
+          <!-- Baris 2: Waktu Penarikan & Nominal Potongan -->
+          <div class="flex items-end justify-between gap-2 pl-2 pt-0.5">
+            <div class="flex flex-col min-w-0">
+              <span class="text-[11px] text-text-body flex items-center gap-1">
+                <span class="material-symbols-outlined text-[13px] text-outline">schedule</span>
+                <span>${dateStr}</span>
+              </span>
+              <span class="text-[10px] text-outline mt-0.5 truncate">
+                Penarikan Rp ${(ref.withdrawalAmount || 0).toLocaleString('id-ID')} (${ref.deductionPercent || 5}%)
+              </span>
+            </div>
+
+            <div class="flex flex-col items-end shrink-0">
+              <span class="font-mono text-sm font-extrabold whitespace-nowrap ${isFailed ? 'text-text-body line-through' : 'text-primary'}">
+                -Rp ${(ref.deductionAmount || 0).toLocaleString('id-ID')}
+              </span>
+              <span class="text-[10px] text-outline font-semibold whitespace-nowrap">
+                Potongan ${ref.deductionPercent || 5}%
+              </span>
+            </div>
+          </div>
+
+          <!-- Baris 3: Tombol Rincian -->
+          <div class="pl-2 pt-1 border-t border-surface-container/60">
+            <button
+              type="button"
+              data-referral-detail="${ref.id}"
+              class="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-[15px]">info</span>
+              <span>Lihat Rincian Potongan</span>
+            </button>
           </div>
         </div>
       `;
@@ -421,7 +497,7 @@ export class HistoryView extends IComponent {
       }
     }
     if (contentPenarikan) {
-      const newPenarikanHtml = this._renderPenarikanTabHtml(withdrawals);
+      const newPenarikanHtml = this._renderPenarikanTabHtml(withdrawals, currentUser);
       if (contentPenarikan.innerHTML !== newPenarikanHtml) {
         contentPenarikan.innerHTML = newPenarikanHtml;
         this._bindProofLightbox(container);

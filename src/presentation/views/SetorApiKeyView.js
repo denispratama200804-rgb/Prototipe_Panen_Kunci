@@ -279,21 +279,21 @@ export class SetorApiKeyView extends IComponent {
             </div>
             <div class="text-[11px] text-text-body">${dateStr}</div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 shrink-0">
             ${isPending ? `
-              <span class="text-xs font-extrabold text-amber-500">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
-              <div class="bg-amber-500/15 text-amber-600 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-amber-500/30">
+              <span class="text-xs font-extrabold text-amber-500 whitespace-nowrap">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
+              <div class="bg-amber-500/15 text-amber-600 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-amber-500/30 whitespace-nowrap">
                 <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
                 <span>${holdInfo.isReady ? '⚡ Siap Validasi' : `⏳ Pantau: ${holdInfo.text}`}</span>
               </div>
             ` : isValid ? `
-              <span class="text-xs font-extrabold text-secondary">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
-              <div class="bg-secondary-container text-on-secondary-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
+              <span class="text-xs font-extrabold text-secondary whitespace-nowrap">+Rp ${(k.rewardAmount || 3000).toLocaleString('id-ID')}</span>
+              <div class="bg-secondary-container text-on-secondary-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 whitespace-nowrap">
                 <span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
                 <span>Valid</span>
               </div>
             ` : `
-              <div class="bg-error-container text-on-error-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
+              <div class="bg-error-container text-on-error-container px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 whitespace-nowrap">
                 <span class="material-symbols-outlined text-[12px]">cancel</span>
                 <span>Invalid</span>
               </div>
