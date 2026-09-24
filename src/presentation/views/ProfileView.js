@@ -1,6 +1,7 @@
 import { IComponent } from '../../core/interfaces/IComponent.js';
 import { getPaymentMethodMetadata, identifyPaymentType } from '../utils/PaymentMethodHelper.js';
 import { User } from '../../domain/models/User.js';
+import { AppEvents } from '../../core/events/EventBus.js';
 
 /**
  * ProfileView
@@ -19,6 +20,8 @@ export class ProfileView extends IComponent {
     this._walletService = container.resolve('WalletService');
     this._apiKeyService = container.resolve('ApiKeyService');
     this._storageService = container.has('StorageService') ? container.resolve('StorageService') : null;
+    this._eventBus = container.has('EventBus') ? container.resolve('EventBus') : null;
+    this._unsubUserUpdated = null;
   }
 
   render() {
@@ -525,13 +528,21 @@ export class ProfileView extends IComponent {
       this._unsubUserUpdated = null;
     }
 
-    this._unsubUserUpdated = this._eventBus.on(AppEvents.USER_UPDATED, () => {
-      const currentHash = (window.location.hash || '').replace(/^#\/?/, '/');
-      if (currentHash.startsWith('profil') || currentHash.startsWith('/profil')) {
-        container.innerHTML = this.render();
-        this.mount(container);
-      }
-    });
+    if (this._eventBus) {
+      this._unsubUserUpdated = this._eventBus.on(AppEvents.USER_UPDATED, () => {
+        const currentHash = (window.location.hash || '').replace(/^#\/?/, '/');
+        if (currentHash.startsWith('profil') || currentHash.startsWith('/profil')) {
+          if (this._unsubUserUpdated) {
+            this._unsubUserUpdated();
+            this._unsubUserUpdated = null;
+          }
+          if (container && document.body.contains(container)) {
+            container.innerHTML = this.render();
+            this.mount(container);
+          }
+        }
+      });
+    }
 
     // Sinkronkan status kelayakan ganti nickname di background jika belum ada data lokal
     const currentUser = this._authService.getCurrentUser();
@@ -1573,6 +1584,10 @@ export class ProfileView extends IComponent {
       reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
       reader.readAsDataURL(file);
     });
+  }
+
+  unmount() {
+    this.destroy();
   }
 
   destroy() {

@@ -907,6 +907,10 @@ export class DashboardView extends IComponent {
     });
   }
 
+  unmount() {
+    this.destroy();
+  }
+
   destroy() {
     if (this._unsubBalance) {
       this._unsubBalance();
