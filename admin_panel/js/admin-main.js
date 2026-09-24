@@ -49,6 +49,7 @@ import { ApiKeysView } from './views/ApiKeysView.js';
 import { WithdrawalsView } from './views/WithdrawalsView.js';
 import { UsersView } from './views/UsersView.js';
 import { SettingsView } from './views/SettingsView.js';
+import { ConfigurationView } from './views/ConfigurationView.js';
 import { LiveChatAdminView } from './views/LiveChatAdminView.js';
 import { chatService } from '../../src/infrastructure/services/ChatService.js';
 import { supabase, isSupabaseConfigured } from '../../src/infrastructure/supabase/supabaseClient.js';
@@ -93,13 +94,15 @@ class AdminApp {
       withdrawals: new WithdrawalsView(adminDataService, toast),
       users: new UsersView(adminDataService, toast),
       settings: new SettingsView(adminDataService, toast),
+      configuration: new ConfigurationView(adminDataService, toast),
+      telegram: new ConfigurationView(adminDataService, toast),
       chat: new LiveChatAdminView(adminDataService, toast)
     };
   }
 
   _getInitialTab() {
     const hash = window.location.hash.replace('#', '');
-    const validTabs = ['dashboard', 'chat', 'apikeys', 'withdrawals', 'users', 'settings'];
+    const validTabs = ['dashboard', 'chat', 'apikeys', 'withdrawals', 'users', 'settings', 'configuration', 'telegram'];
     return validTabs.includes(hash) ? hash : 'dashboard';
   }
 
@@ -275,6 +278,9 @@ class AdminApp {
         return 'Kelola Pengguna & KYC';
       case 'settings':
         return 'Pengaturan Tarif & Sistem';
+      case 'configuration':
+      case 'telegram':
+        return 'Konfigurasi Bot Telegram';
       case 'chat':
         return 'Live Chat & Bantuan Pengguna';
       default:

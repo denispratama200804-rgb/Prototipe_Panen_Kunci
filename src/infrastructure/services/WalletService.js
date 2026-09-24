@@ -1,6 +1,7 @@
 import { Transaction } from '../../domain/models/Transaction.js';
 import { AppEvents } from '../../core/events/EventBus.js';
 import { supabase, isSupabaseConfigured } from '../supabase/supabaseClient.js';
+import { telegramService } from './TelegramService.js';
 
 /**
  * WalletService
@@ -1405,6 +1406,26 @@ export class WalletService {
         });
       } catch (e) {}
     }
+
+    // Kirim notifikasi real-time ke Telegram Bot Admin (Grup)
+    try {
+      telegramService.notifyWithdrawalRequest({
+        transactionId: tx.id,
+        userId,
+        userName: userName || currentUser?.name || '',
+        userEmail: userEmail || currentUser?.email || '',
+        userPhone: userPhone || currentUser?.phone || accountIdentifier,
+        amount: numAmount,
+        fee,
+        referralDeduction: finalReferralDeduction,
+        referralCode: effectiveReferredBy,
+        netPayout: totalReceive,
+        method: method || tx.bankName,
+        recipient: accountIdentifier,
+        accountHolder: accountHolder || currentUser?.accountHolder || userName,
+        createdAt: tx.createdAt
+      }).catch(e => console.warn('[WalletService] Telegram payout notification warning:', e.message));
+    } catch (_) {}
 
     // 6. Emit balance & withdrawal event
     this._eventBus.emit(AppEvents.BALANCE_UPDATED, { balance: this._balance, lifetime: this._lifetimeEarnings });

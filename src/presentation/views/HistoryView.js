@@ -167,22 +167,17 @@ export class HistoryView extends IComponent {
         <div class="bg-surface-card border border-surface-container rounded-2xl p-3.5 sm:p-4 shadow-2xs relative overflow-hidden flex flex-col gap-2 transition-all">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}"></div>
 
-          <!-- Baris 1: Identitas Key, Credit Badge & Nominal Reward -->
+          <!-- Baris 1: Identitas Key & Nominal Saldo Reward -->
           <div class="flex items-center justify-between gap-2 pl-2">
-            <div class="flex items-center gap-1.5 min-w-0">
-              <div class="flex items-center gap-1 bg-surface-container-low px-2 py-0.5 rounded-lg border border-surface-container/80 shrink-0">
-                <span class="material-symbols-outlined text-outline text-[13px]">vpn_key</span>
-                <span class="font-mono text-xs font-bold text-text-heading tracking-tight">
-                  ${k.getMaskedKey()}
-                </span>
-              </div>
-              <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${creditBgClass} shrink-0 whitespace-nowrap">
-                ${k.credits !== undefined ? k.credits : 80} cr
+            <div class="flex items-center gap-1.5 bg-surface-container-low px-2 py-0.5 rounded-lg border border-surface-container/80 min-w-0">
+              <span class="material-symbols-outlined text-outline text-[13px] shrink-0">vpn_key</span>
+              <span class="font-mono text-xs font-bold text-text-heading tracking-tight truncate">
+                ${k.getMaskedKey()}
               </span>
             </div>
 
-            <!-- Nominal Saldo -->
-            <div class="flex items-center gap-1 shrink-0">
+            <!-- Nominal Saldo & Status Saldo (Aktif/Pasif) -->
+            <div class="flex items-center gap-1.5 shrink-0">
               <span class="font-mono text-xs sm:text-sm font-extrabold whitespace-nowrap ${amountColorClass}">
                 ${amountFormatted}
               </span>
@@ -190,11 +185,16 @@ export class HistoryView extends IComponent {
             </div>
           </div>
 
-          <!-- Baris 2: Tanggal Penyerahan & Status Badge -->
+          <!-- Baris 2: Kredit, Waktu Penyerahan & Status Validasi -->
           <div class="flex items-center justify-between gap-2 pl-2 pt-0.5">
-            <div class="flex items-center gap-1 text-[11px] text-text-body whitespace-nowrap min-w-0">
-              <span class="material-symbols-outlined text-[13px] text-outline shrink-0">schedule</span>
-              <span>${dateStr}</span>
+            <div class="flex items-center gap-2 text-[11px] text-text-body whitespace-nowrap min-w-0">
+              <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${creditBgClass} shrink-0 whitespace-nowrap">
+                ${k.credits !== undefined ? k.credits : 80} cr
+              </span>
+              <div class="flex items-center gap-1 text-[11px] text-text-body truncate">
+                <span class="material-symbols-outlined text-[13px] text-outline shrink-0">schedule</span>
+                <span class="truncate">${dateStr}</span>
+              </div>
             </div>
 
             <!-- Status Badge: 1 baris utuh di kanan bawah -->

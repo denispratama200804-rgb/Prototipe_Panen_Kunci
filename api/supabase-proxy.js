@@ -339,6 +339,257 @@ async function markLiveChatsReadInSupabase(userId, reader = 'user') {
   return true;
 }
 
+// ── Integrasi Telegram Bot Realtime (Admin Group Notification) ──
+
+async function getSystemConfigInternal() {
+  if (!adminSupabase) return null;
+  try {
+    const { data: cfgRow } = await adminSupabase
+      .from('users')
+      .select('avatar')
+      .eq('id', '00000000-0000-0000-0000-000000000001')
+      .maybeSingle();
+
+    if (cfgRow && cfgRow.avatar) {
+      return typeof cfgRow.avatar === 'string' ? JSON.parse(cfgRow.avatar) : cfgRow.avatar;
+    }
+  } catch (_) {}
+  return null;
+}
+
+async function sendTelegramMessage({ token, chatId, text, parseMode = 'HTML', photoUrl = null }) {
+  const cleanToken = (token || process.env.TELEGRAM_BOT_TOKEN || '').replace(/["']/g, '').trim();
+  const cleanChatId = (chatId || process.env.TELEGRAM_CHAT_ID || '').replace(/["']/g, '').trim();
+
+  if (!cleanToken || !cleanChatId) {
+    throw new Error('Telegram Bot Token dan Group Chat ID belum dikonfigurasi!');
+  }
+
+  // Jika ada photoUrl (misal bukti transfer), gunakan endpoint sendPhoto
+  if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('http')) {
+    try {
+      const photoRes = await fetch(`https://api.telegram.org/bot${cleanToken}/sendPhoto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: cleanChatId,
+          photo: photoUrl,
+          caption: text,
+          parse_mode: parseMode
+        })
+      });
+      const photoData = await photoRes.json();
+      if (photoData.ok) {
+        return { success: true, result: photoData.result, type: 'photo' };
+      }
+      console.warn('[TelegramBot] sendPhoto gagal, fallback sendMessage:', photoData.description);
+    } catch (pErr) {
+      console.warn('[TelegramBot] sendPhoto network error:', pErr.message);
+    }
+  }
+
+  // Fallback / Pesan teks standar
+  const res = await fetch(`https://api.telegram.org/bot${cleanToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: cleanChatId,
+      text: text,
+      parse_mode: parseMode,
+      disable_web_page_preview: true
+    })
+  });
+
+  const data = await res.json();
+  if (!data.ok) {
+    throw new Error(data.description || 'Gagal mengirim pesan ke Telegram');
+  }
+  return { success: true, result: data.result, type: 'message' };
+}
+
+async function testTelegramBot({ token, chatId }) {
+  const cleanToken = (token || process.env.TELEGRAM_BOT_TOKEN || '').replace(/["']/g, '').trim();
+  const cleanChatId = (chatId || process.env.TELEGRAM_CHAT_ID || '').replace(/["']/g, '').trim();
+
+  if (!cleanToken) throw new Error('Token bot Telegram wajib diisi!');
+  if (!cleanChatId) throw new Error('Telegram Group Chat ID wajib diisi!');
+
+  const meRes = await fetch(`https://api.telegram.org/bot${cleanToken}/getMe`);
+  const meData = await meRes.json();
+  if (!meData.ok) {
+    throw new Error(`Token Bot Tidak Valid: ${meData.description || 'Unauthorized'}`);
+  }
+
+  const bot = meData.result;
+  const nowStr = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
+  const testText = `🤖 <b>TES KONEKSI BOT TELEGRAM PANEN KUNCI</b>\n\n` +
+    `✅ <b>Koneksi Bot Berhasil Terhubung!</b>\n` +
+    `• <b>Nama Bot:</b> @${bot.username || bot.first_name}\n` +
+    `• <b>Chat ID Tujuan:</b> <code>${cleanChatId}</code>\n` +
+    `• <b>Waktu Uji Coba:</b> ${nowStr}\n` +
+    `• <b>Status Sistem:</b> Aktif & Siap Menerima Notifikasi Payout Real-Time!\n\n` +
+    `<i>Pesan ini dikirimkan otomatis melalui tombol uji coba Admin Panel.</i>`;
+
+  const sendRes = await fetch(`https://api.telegram.org/bot${cleanToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: cleanChatId,
+      text: testText,
+      parse_mode: 'HTML'
+    })
+  });
+
+  const sendData = await sendRes.json();
+  if (!sendData.ok) {
+    let errMsg = sendData.description || 'Gagal mengirim pesan ke grup';
+    if (errMsg.includes('chat not found')) {
+      errMsg = 'Group Chat ID tidak ditemukan! Pastikan ID benar (diawali -100) dan Bot sudah di-add ke grup Telegram sebagai Admin.';
+    }
+    throw new Error(errMsg);
+  }
+
+  return {
+    success: true,
+    bot: {
+      username: bot.username,
+      firstName: bot.first_name,
+      id: bot.id
+    },
+    message: `Koneksi berhasil! Pesan tes terkirim ke Telegram grup (@${bot.username || bot.first_name}).`
+  };
+}
+
+async function notifyTelegramPayout({ tx, user = null }) {
+  try {
+    const cfg = await getSystemConfigInternal();
+    if (cfg && cfg.telegramEnabled === false) return;
+    if (cfg && cfg.telegramNotifyPayment === false && cfg.telegramNotifyWithdrawal === false) return;
+
+    const token = cfg?.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = cfg?.telegramChatId || process.env.TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+
+    const numAmount = Number(tx.amount || 0);
+    const numFee = Number(tx.fee || 0);
+    const numRef = Number(tx.referralDeduction || tx.referral_deduction || 0);
+    const net = Number(tx.netPayout || tx.net_payout) || Math.max(0, numAmount - numFee - numRef);
+
+    const userName = user?.name || tx.userName || tx.user_name || 'Pengguna';
+    const userEmail = user?.email || tx.userEmail || tx.user_email || '-';
+    const userPhone = user?.phone || tx.userPhone || tx.user_phone || user?.account_number || '-';
+    const method = (tx.method || tx.bankName || 'E-Wallet').toUpperCase();
+    const recipient = tx.recipient || user?.account_number || '-';
+    const accountHolder = tx.accountHolder || tx.account_holder || user?.account_holder || userName;
+    const txId = tx.id || '-';
+    const nowStr = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
+
+    let refLine = '';
+    const refCode = tx.referralCode || tx.referredBy || '';
+    if (numRef > 0) {
+      refLine = `• <b>Potongan Komisi (${refCode || 'Referral'}):</b> Rp ${numRef.toLocaleString('id-ID')}\n`;
+    }
+
+    const text = `🔔 <b>PERMOHONAN PENARIKAN SALDO (PAYOUT) BARU!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>Data Pengguna:</b>\n` +
+      `• <b>Nama:</b> ${userName}\n` +
+      `• <b>Email:</b> ${userEmail}\n` +
+      `• <b>No. HP:</b> ${userPhone}\n\n` +
+      `💰 <b>Rincian Pencairan Dana:</b>\n` +
+      `• <b>Nominal Penarikan:</b> <b>Rp ${numAmount.toLocaleString('id-ID')}</b>\n` +
+      `• <b>Biaya Admin:</b> Rp ${numFee.toLocaleString('id-ID')}\n` +
+      refLine +
+      `• <b>Diterima Bersih:</b> <b>Rp ${net.toLocaleString('id-ID')}</b>\n\n` +
+      `🏦 <b>Tujuan Transfer:</b>\n` +
+      `• <b>Metode:</b> ${method}\n` +
+      `• <b>No. Rekening / E-Wallet:</b> <code>${recipient}</code>\n` +
+      `• <b>Atas Nama (A/N):</b> <b>${accountHolder}</b>\n\n` +
+      `📋 <b>Status & Referensi:</b>\n` +
+      `• <b>ID Transaksi:</b> <code>${txId}</code>\n` +
+      `• <b>Waktu Pengajuan:</b> ${nowStr}\n` +
+      `• <b>Status:</b> ⏳ <b>Menunggu Persetujuan Admin</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `⚡ <i>Silakan login ke Admin Panel untuk memeriksa rekening & mengunggah bukti transfer.</i>`;
+
+    await sendTelegramMessage({ token, chatId, text });
+  } catch (e) {
+    console.warn('[TelegramBot] notifyTelegramPayout error:', e.message);
+  }
+}
+
+async function notifyTelegramPayoutApproved({ txId, amount, netPayout, method, recipient, accountHolder, userName, userEmail, proofImage, notes }) {
+  try {
+    const cfg = await getSystemConfigInternal();
+    if (cfg && cfg.telegramEnabled === false) return;
+    if (cfg && cfg.telegramNotifyPayment === false && cfg.telegramNotifyWithdrawal === false) return;
+
+    const token = cfg?.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = cfg?.telegramChatId || process.env.TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+
+    const numAmount = Number(amount || 0);
+    const finalNet = Number(netPayout || numAmount);
+    const safeMethod = (method || 'TRANSFER').toUpperCase();
+    const safeRecipient = recipient || '-';
+    const safeHolder = accountHolder || userName || '-';
+    const safeNotes = notes || 'Transfer pencairan dana berhasil diproses oleh Admin';
+    const nowStr = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
+
+    const text = `✅ <b>PENARIKAN SALDO (PAYOUT) DISETUJUI & SELESAI!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>Penerima:</b> ${userName || 'Pengguna'} (${userEmail || '-'})\n` +
+      `💰 <b>Nominal Ditransfer:</b> <b>Rp ${finalNet.toLocaleString('id-ID')}</b> (Total: Rp ${numAmount.toLocaleString('id-ID')})\n` +
+      `🏦 <b>Tujuan:</b> ${safeMethod} - <code>${safeRecipient}</code>\n` +
+      `🏷️ <b>Atas Nama (A/N):</b> <b>${safeHolder}</b>\n` +
+      `📄 <b>ID Transaksi:</b> <code>${txId || '-'}</code>\n` +
+      `📝 <b>Catatan Admin:</b> <i>${safeNotes}</i>\n` +
+      `🕒 <b>Waktu Proses:</b> ${nowStr}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🎉 <i>Dana berhasil dicairkan ke rekening pengguna. Bukti transfer telah tersimpan.</i>`;
+
+    await sendTelegramMessage({
+      token,
+      chatId,
+      text,
+      photoUrl: (proofImage && String(proofImage).startsWith('http')) ? proofImage : null
+    });
+  } catch (e) {
+    console.warn('[TelegramBot] notifyTelegramPayoutApproved error:', e.message);
+  }
+}
+
+async function notifyTelegramSupportMessage(chatMessage) {
+  try {
+    if (!chatMessage || chatMessage.sender !== 'user') return;
+    const cfg = await getSystemConfigInternal();
+    if (cfg && cfg.telegramEnabled === false) return;
+    if (cfg && cfg.telegramNotifySupport === false) return;
+
+    const token = cfg?.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = cfg?.telegramChatId || process.env.TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+
+    const userName = chatMessage.userName || chatMessage.user_name || 'Pengguna';
+    const userEmail = chatMessage.userEmail || chatMessage.user_email || '-';
+    const msgText = chatMessage.text || '';
+    const nowStr = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
+
+    const text = `💬 <b>TIKET BANTUAN / LIVE CHAT USER BARU</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>Dari Pengguna:</b> ${userName} (${userEmail})\n` +
+      `🕒 <b>Waktu:</b> ${nowStr}\n\n` +
+      `📨 <b>Isi Pesan:</b>\n` +
+      `<i>"${msgText}"</i>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `⚡ <i>Buka menu Live Chat di Admin Panel untuk membalas pengguna secara langsung.</i>`;
+
+    await sendTelegramMessage({ token, chatId, text });
+  } catch (e) {
+    console.warn('[TelegramBot] notifyTelegramSupportMessage error:', e.message);
+  }
+}
+
 async function getOnlineUserIdsFromSupabase() {
   if (!adminSupabase) return [];
   try {
@@ -572,6 +823,7 @@ export default async function handler(req, res) {
 
     if (action === 'send_live_chat' && body.message) {
       const saved = await saveLiveChatToSupabase(body.message);
+      notifyTelegramSupportMessage(body.message).catch(() => {});
       return res.status(200).json({ success: true, data: saved });
     }
 
@@ -623,6 +875,66 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ success: true, data: saved });
+    }
+
+    // 1c. Actions Telegram Bot (Test Koneksi & Kirim Notifikasi Manual)
+    if (action === 'test_telegram_bot') {
+      try {
+        let token = body.token;
+        let chatId = body.chatId;
+
+        if (!token || !chatId) {
+          const cfg = await getSystemConfigInternal();
+          token = token || cfg?.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN;
+          chatId = chatId || cfg?.telegramChatId || process.env.TELEGRAM_CHAT_ID;
+        }
+
+        const testResult = await testTelegramBot({ token, chatId });
+        return res.status(200).json(testResult);
+      } catch (err) {
+        return res.status(400).json({ success: false, error: err.message });
+      }
+    }
+
+    if (action === 'send_telegram_notification') {
+      try {
+        let token = body.token;
+        let chatId = body.chatId;
+        const cfg = await getSystemConfigInternal();
+
+        // Cek toggle master
+        const isMasterEnabled = cfg?.telegramEnabled !== false;
+        if (!isMasterEnabled && !body.force) {
+          return res.status(200).json({ success: true, skipped: true, reason: 'Telegram disabled by admin' });
+        }
+
+        token = token || cfg?.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN;
+        chatId = chatId || cfg?.telegramChatId || process.env.TELEGRAM_CHAT_ID;
+
+        if (!token || !chatId) {
+          return res.status(200).json({ success: true, skipped: true, reason: 'Telegram bot not configured' });
+        }
+
+        const sendRes = await sendTelegramMessage({
+          token,
+          chatId,
+          text: body.text,
+          parseMode: body.parseMode || 'HTML',
+          photoUrl: body.photoUrl || null
+        });
+        return res.status(200).json(sendRes);
+      } catch (err) {
+        return res.status(400).json({ success: false, error: err.message });
+      }
+    }
+
+    if (action === 'notify_withdrawal') {
+      try {
+        await notifyTelegramPayout({ tx: body.tx || body.transaction || body, user: body.user || null });
+        return res.status(200).json({ success: true });
+      } catch (err) {
+        return res.status(400).json({ success: false, error: err.message });
+      }
     }
 
     // 2. Ambil data seluruh pengguna (Kelola Pengguna Admin Panel)
@@ -1720,6 +2032,15 @@ export default async function handler(req, res) {
       if (error) {
         return res.status(400).json({ success: false, error: error.message });
       }
+
+      // Notifikasi real-time Telegram Bot untuk penarikan dana / payout baru
+      if (txPayload.type === 'withdrawal') {
+        notifyTelegramPayout({
+          tx: inserted || txPayload,
+          user: inserted?.users || null
+        }).catch(err => console.warn('[TelegramProxy] Gagal notif withdrawal:', err.message));
+      }
+
       return res.status(200).json({ success: true, data: inserted });
     }
 
@@ -2032,6 +2353,26 @@ export default async function handler(req, res) {
       if (error) {
         return res.status(400).json({ success: false, error: error.message });
       }
+
+      // Notifikasi Telegram jika penarikan dana disetujui / status berubah
+      if (updated && (updated.type === 'withdrawal' || data.type === 'withdrawal')) {
+        const upStatus = (updated.status || data.status || '').toLowerCase();
+        if (['success', 'approved', 'valid'].includes(upStatus)) {
+          notifyTelegramPayoutApproved({
+            txId: updated.id || id,
+            amount: updated.amount || data.amount,
+            netPayout: updated.net_payout || updated.netPayout || data.net_payout || data.netPayout,
+            method: updated.method || data.method,
+            recipient: updated.recipient || data.recipient,
+            accountHolder: updated.account_holder || data.account_holder || data.accountHolder,
+            userName: updated.user_name || data.user_name || data.userName,
+            userEmail: updated.user_email || data.user_email || data.userEmail,
+            proofImage: updated.proof_image || data.proof_image || data.proofImage,
+            notes: updated.proof_notes || data.proof_notes || data.proofNotes
+          }).catch(e => console.warn('[TelegramProxy] Gagal notif approved:', e.message));
+        }
+      }
+
       return res.status(200).json({ success: true, data: updated });
     }
 

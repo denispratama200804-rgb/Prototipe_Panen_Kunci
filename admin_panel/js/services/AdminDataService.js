@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../../../src/infrastructure/supabase/supabaseClient.js';
 import { User } from '../../../src/domain/models/User.js';
+import { telegramService } from './TelegramAdminService.js';
 
 /**
  * AdminDataService
@@ -2266,6 +2267,23 @@ export class AdminDataService {
         }
       }
 
+      // Kirim notifikasi Telegram real-time
+      try {
+        telegramService.notifyWithdrawalApproved({
+          transactionId: tx.id,
+          userName: tx.userName || targetUserId,
+          userEmail: tx.userEmail || '',
+          amount: Number(tx.amount || 0),
+          netPayout: netPayout || Number(tx.amount || 0),
+          method: tx.method || '',
+          recipient: tx.recipient || '',
+          accountHolder: tx.accountHolder || tx.account_holder || '',
+          proofImage: proofImage || '',
+          notes: notes || '',
+          processedAt: tx.processedAt
+        }).catch(e => console.warn('[AdminDataService] Telegram approved notify warning:', e.message));
+      } catch (_) {}
+
       return { success: true, transaction: tx, notification: newNotif };
     }
     return { success: false, message: 'Transaksi tidak ditemukan' };
@@ -2432,6 +2450,20 @@ export class AdminDataService {
       userId: tx.userId,
       balance: newBalance
     });
+
+    // Kirim notifikasi Telegram real-time penolakan payout
+    try {
+      telegramService.notifyWithdrawalRejected({
+        transactionId: tx.id,
+        userName: tx.userName || tx.userId,
+        userEmail: tx.userEmail || '',
+        amount: Number(tx.amount || 0),
+        method: tx.method || '',
+        recipient: tx.recipient || '',
+        reason: reason || '',
+        rejectedAt: tx.processedAt
+      }).catch(e => console.warn('[AdminDataService] Telegram rejected notify warning:', e.message));
+    } catch (_) {}
 
     return { success: true, refundAmount, newBalance, transaction: tx };
   }
@@ -2777,7 +2809,13 @@ export class AdminDataService {
       holdValueReferral: 2,
       holdUnitReferral: 'days',
       validationMode: 'simulation',
-      autoApproveThreshold: 0
+      autoApproveThreshold: 0,
+      telegramEnabled: true,
+      telegramNotifyPayment: true,
+      telegramNotifyWithdrawal: true,
+      telegramNotifySupport: true,
+      telegramBotToken: '',
+      telegramChatId: ''
     });
   }
 

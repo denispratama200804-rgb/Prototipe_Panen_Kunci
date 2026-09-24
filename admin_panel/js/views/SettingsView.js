@@ -22,6 +22,24 @@ export class SettingsView {
     return `
       <div class="w-full max-w-5xl mx-auto space-y-6 sm:space-y-8 view-fade-enter">
 
+        <!-- Banner Quick Access ke Konfigurasi Bot Telegram -->
+        <a href="#configuration" data-nav="configuration" class="flex items-center justify-between p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 hover:border-emerald-400/60 transition-all group cursor-pointer shadow-lg text-decoration-none">
+          <div class="flex items-center gap-3.5">
+            <span class="text-2xl sm:text-3xl select-none group-hover:scale-110 transition-transform">🤖</span>
+            <div>
+              <div class="flex items-center gap-2">
+                <h4 class="text-sm sm:text-base font-bold text-white group-hover:text-emerald-300 transition-colors">Notifikasi Telegram Bot Admin (Grup)</h4>
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Siap Digunakan</span>
+              </div>
+              <p class="text-xs text-slate-400">Atur Token @BotFather, ID Grup Telegram, dan uji kirim notifikasi penarikan saldo instan.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 text-xs font-bold text-emerald-400 shrink-0">
+            <span class="hidden sm:inline">Buka Konfigurasi Bot</span>
+            <span class="material-symbols-outlined text-base group-hover:translate-x-1 transition-transform">chevron_right</span>
+          </div>
+        </a>
+
         <!-- Form Konfigurasi Tarif -->
         <div class="admin-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-7 shadow-xl">
           

@@ -48,6 +48,15 @@ export class HubDashboardView {
         badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30'
       },
       {
+        id: 'configuration',
+        title: 'Bot Telegram',
+        desc: 'Konfigurasi bot Telegram admin, notifikasi instan payout, bukti transfer, dan support.',
+        icon: 'smart_toy',
+        squircleClass: 'squircle-emerald',
+        badge: 'Notifikasi Bot',
+        badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+      },
+      {
         id: 'settings',
         title: 'Pengaturan Tarif',
         desc: 'Atur harga beli per kunci, minimum payout, dan konfigurasi persentase fee penarikan.',
@@ -71,8 +80,8 @@ export class HubDashboardView {
           </p>
         </div>
 
-        <!-- Unified Card Grid (4 Cards: 4 Cols on Desktop, 2 on Mobile/Tablet) -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+        <!-- Unified Card Grid (5 Cards: 5 Cols on Desktop, 3 on Tablet, 2 on Mobile) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-5">
           ${cards.map((card) => `
             <div
               data-hub-target="${card.id}"
