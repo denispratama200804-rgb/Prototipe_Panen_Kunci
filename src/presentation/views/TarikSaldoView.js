@@ -483,17 +483,19 @@ export class TarikSaldoView extends IComponent {
                 </div>
 
                 <!-- Potongan Kode Referral -->
-                <div class="flex justify-between items-center text-text-body gap-2" id="summaryReferralRow">
-                  <div class="flex items-center gap-1.5 min-w-0 pr-1">
-                    <span class="font-medium whitespace-nowrap">Potongan Referral</span>
-                    <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0 ${userReferredBy ? '' : 'hidden'}" id="summaryReferralBadge">
-                      ${userReferredBy ? `${userReferredBy} (${refPercent}%)` : ''}
-                    </span>
-                    <span class="text-[10px] text-outline italic whitespace-nowrap ${userReferredBy ? 'hidden' : ''}" id="summaryReferralUnlinkedBadge">
-                      (Belum ada)
-                    </span>
+                <div class="flex justify-between items-start text-text-body gap-2" id="summaryReferralRow">
+                  <div class="flex flex-col min-w-0 pr-1">
+                    <span class="font-medium">Potongan Referral</span>
+                    <div class="mt-0.5">
+                      <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold inline-block ${userReferredBy ? '' : 'hidden'}" id="summaryReferralBadge">
+                        ${userReferredBy ? `${userReferredBy} (${refPercent}%)` : ''}
+                      </span>
+                      <span class="text-[10px] text-outline italic ${userReferredBy ? 'hidden' : ''}" id="summaryReferralUnlinkedBadge">
+                        (Belum ada)
+                      </span>
+                    </div>
                   </div>
-                  <span class="font-bold font-mono whitespace-nowrap shrink-0 text-right ${userReferredBy ? 'text-primary' : 'text-outline'}" id="summaryReferralCut">
+                  <span class="font-bold font-mono whitespace-nowrap shrink-0 text-right pt-0.5 ${userReferredBy ? 'text-primary' : 'text-outline'}" id="summaryReferralCut">
                     ${userReferredBy ? `-Rp ${initialReferralCut.toLocaleString('id-ID')}` : 'Rp 0'}
                   </span>
                 </div>
@@ -674,7 +676,7 @@ export class TarikSaldoView extends IComponent {
         }
         if (summaryReferralCut) {
           summaryReferralCut.textContent = `-Rp ${referralCut.toLocaleString('id-ID')}`;
-          summaryReferralCut.className = 'font-bold font-mono text-primary whitespace-nowrap shrink-0 text-right';
+          summaryReferralCut.className = 'font-bold font-mono text-primary whitespace-nowrap shrink-0 text-right pt-0.5';
         }
       } else {
         if (summaryReferralBadge) {
@@ -685,7 +687,7 @@ export class TarikSaldoView extends IComponent {
         }
         if (summaryReferralCut) {
           summaryReferralCut.textContent = 'Rp 0';
-          summaryReferralCut.className = 'font-bold font-mono text-outline whitespace-nowrap shrink-0 text-right';
+          summaryReferralCut.className = 'font-bold font-mono text-outline whitespace-nowrap shrink-0 text-right pt-0.5';
         }
       }
 
@@ -939,14 +941,16 @@ export class TarikSaldoView extends IComponent {
 
               <!-- Potongan Referral -->
               ${(userReferredBy && refPercent > 0) ? `
-                <div class="flex justify-between items-center text-xs gap-2">
-                  <div class="flex items-center gap-1.5 min-w-0 pr-1">
-                    <span class="text-text-body font-medium whitespace-nowrap">Potongan Referral</span>
-                    <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0">
-                      ${userReferredBy} (${refPercent}%)
-                    </span>
+                <div class="flex justify-between items-start text-xs gap-2">
+                  <div class="flex flex-col min-w-0 pr-1">
+                    <span class="text-text-body font-medium">Potongan Referral</span>
+                    <div class="mt-0.5">
+                      <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold inline-block">
+                        ${userReferredBy} (${refPercent}%)
+                      </span>
+                    </div>
                   </div>
-                  <span class="font-semibold text-primary font-mono whitespace-nowrap shrink-0 text-right">
+                  <span class="font-semibold text-primary font-mono whitespace-nowrap shrink-0 text-right pt-0.5">
                     -Rp ${referralCut.toLocaleString('id-ID')}
                   </span>
                 </div>
@@ -1051,14 +1055,16 @@ export class TarikSaldoView extends IComponent {
 
                   <!-- Potongan Referral -->
                   ${userReferredBy ? `
-                    <div class="flex justify-between items-center gap-2">
-                      <div class="flex items-center gap-1.5 min-w-0 pr-1">
-                        <span class="text-text-body font-medium whitespace-nowrap">Potongan Referral</span>
-                        <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0">
-                          ${userReferredBy} (${refPercent}%)
-                        </span>
+                    <div class="flex justify-between items-start gap-2 text-xs">
+                      <div class="flex flex-col min-w-0 pr-1">
+                        <span class="text-text-body font-medium">Potongan Referral</span>
+                        <div class="mt-0.5">
+                          <span class="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-bold inline-block">
+                            ${userReferredBy} (${refPercent}%)
+                          </span>
+                        </div>
                       </div>
-                      <strong class="font-mono text-primary font-bold whitespace-nowrap shrink-0 text-right">-Rp ${referralCut.toLocaleString('id-ID')}</strong>
+                      <strong class="font-mono text-primary font-bold whitespace-nowrap shrink-0 text-right pt-0.5">-Rp ${referralCut.toLocaleString('id-ID')}</strong>
                     </div>
                   ` : ''}
 

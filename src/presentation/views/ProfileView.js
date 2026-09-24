@@ -211,46 +211,51 @@ export class ProfileView extends IComponent {
                 <span class="material-symbols-outlined text-[16px] text-primary">loyalty</span>
                 <span>Kode Referral Saya</span>
               </h3>
-              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30">
                 <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
                 <span>Aktif &amp; Unik</span>
               </span>
             </div>
 
-            <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-4 relative overflow-hidden">
+            <div class="bg-surface-card rounded-3xl p-4 sm:p-5 shadow-sm border border-surface-container flex flex-col gap-4 relative overflow-hidden">
               <!-- Decorative background glow -->
-              <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none"></div>
+              <div class="absolute -right-10 -bottom-10 w-36 h-36 bg-primary/5 rounded-full blur-2xl pointer-events-none"></div>
 
-              <!-- Referral Code Box -->
-              <div class="bg-gradient-to-br from-primary/10 via-surface-container-low to-secondary/5 rounded-2xl p-4 border border-primary/20 flex flex-col gap-3 shadow-xs">
+              <!-- Referral Code Box (Voucher Style) -->
+              <div class="bg-gradient-to-br from-primary/10 via-surface-container-low to-secondary/5 rounded-2xl p-3.5 sm:p-4 border border-primary/20 flex flex-col gap-3 shadow-xs">
                 <div class="flex items-center justify-between">
                   <span class="text-[11px] font-bold uppercase tracking-wider text-text-body">Kode Rujukan Akun Anda</span>
-                  <span class="px-2.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-extrabold uppercase tracking-wide">Permanen</span>
+                  <span class="px-2.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-extrabold uppercase tracking-wide border border-primary/25">Permanen</span>
                 </div>
 
-                <!-- Code Display Box (Ticket Style) -->
-                <div class="bg-surface-card/90 backdrop-blur-xs rounded-xl border border-primary/25 px-4 py-3 flex items-center justify-between shadow-xs cursor-pointer hover:border-primary/50 transition-colors" id="boxReferralCodeContainer" title="Klik untuk menyalin kode">
-                  <div class="flex items-center gap-2.5 overflow-hidden">
-                    <span class="material-symbols-outlined text-primary text-[22px] shrink-0">vpn_key</span>
-                    <span class="font-mono text-2xl font-black tracking-widest text-primary selection:bg-primary/20 whitespace-nowrap" id="profileReferralCodeDisplay">${referralCode}</span>
+                <!-- Code Display Box (Interactive Ticket) -->
+                <div class="bg-surface-card rounded-2xl border-2 border-primary/25 p-3.5 flex items-center justify-between shadow-xs hover:border-primary/50 transition-all cursor-pointer group" id="boxReferralCodeContainer" title="Klik untuk menyalin kode">
+                  <div class="flex items-center gap-3 overflow-hidden">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary to-primary-container text-white flex items-center justify-center shadow-xs shadow-primary/25 shrink-0 group-hover:scale-105 transition-transform">
+                      <span class="material-symbols-outlined text-[20px]">key</span>
+                    </div>
+                    <div class="flex flex-col min-w-0">
+                      <span class="text-[10px] font-semibold text-outline uppercase tracking-wider">Kode Rujukan</span>
+                      <span class="font-mono text-xl sm:text-2xl font-black tracking-widest text-primary truncate select-all" id="profileReferralCodeDisplay">${referralCode}</span>
+                    </div>
                   </div>
                   <button
                     type="button"
                     id="btnQuickCopyCode"
-                    class="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors cursor-pointer shrink-0"
+                    class="p-2.5 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-white transition-all cursor-pointer shrink-0 border border-primary/20 group-hover:scale-105"
                     title="Klik untuk salin kode"
                     aria-label="Salin Kode"
                   >
-                    <span class="material-symbols-outlined text-[18px]">content_copy</span>
+                    <span class="material-symbols-outlined text-[18px]" id="iconQuickCopyCode">content_copy</span>
                   </button>
                 </div>
 
                 <!-- Action Buttons: 2 Equal Columns -->
-                <div class="grid grid-cols-2 gap-2 w-full pt-0.5">
+                <div class="grid grid-cols-2 gap-2.5 w-full pt-0.5">
                   <button
                     type="button"
                     id="btnCopyReferralCode"
-                    class="w-full py-2.5 px-3 rounded-xl bg-primary text-white font-label-md text-xs font-bold shadow-sm hover:bg-primary-container active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    class="w-full py-2.5 sm:py-3 px-3 rounded-xl bg-primary text-white font-label-md text-xs font-bold shadow-md shadow-primary/20 hover:bg-primary-container active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     title="Salin Kode Referral"
                   >
                     <span class="material-symbols-outlined text-[16px]" id="iconCopyReferralCode">content_copy</span>
@@ -260,7 +265,7 @@ export class ProfileView extends IComponent {
                   <button
                     type="button"
                     id="btnShareReferralLink"
-                    class="w-full py-2.5 px-3 rounded-xl bg-surface-card hover:bg-surface-container text-text-heading border border-surface-container font-label-md text-xs font-bold shadow-xs active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    class="w-full py-2.5 sm:py-3 px-3 rounded-xl bg-surface-card hover:bg-surface-container text-text-heading border border-surface-container-high hover:border-primary/40 font-label-md text-xs font-bold shadow-xs active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     title="Bagikan Link Referral"
                   >
                     <span class="material-symbols-outlined text-[16px] text-primary">share</span>
@@ -270,73 +275,87 @@ export class ProfileView extends IComponent {
               </div>
 
               <!-- Status Akun Terikat Kode Referral -->
-              <div class="bg-surface-container-low rounded-2xl p-3.5 border border-surface-container/80 flex flex-col gap-2.5" id="boxAccountReferralStatus">
-                <div class="flex items-center justify-between">
-                  <span class="text-[11px] font-bold uppercase tracking-wider text-text-heading flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-[16px] text-primary">link</span>
-                    <span>Status Keterikatan Akun</span>
-                  </span>
+              <div class="bg-surface-container-low rounded-2xl p-3.5 sm:p-4 border border-surface-container/80 flex flex-col gap-3" id="boxAccountReferralStatus">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <span class="material-symbols-outlined text-[16px]">link</span>
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-text-heading truncate">Status Keterikatan</span>
+                  </div>
                   ${user.referredBy ? `
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30 flex items-center gap-1">
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30 whitespace-nowrap shrink-0 flex items-center gap-1.5">
                       <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
                       <span>Terikat Permanen</span>
                     </span>
                   ` : `
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-container-high text-outline">
-                      Belum Terikat
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25 whitespace-nowrap shrink-0 flex items-center gap-1.5">
+                      <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                      <span>Belum Terikat</span>
                     </span>
                   `}
                 </div>
 
                 ${user.referredBy ? `
-                  <div class="flex items-center justify-between bg-surface-card p-3 rounded-xl border border-surface-container shadow-xs">
+                  <div class="flex items-center justify-between bg-surface-card p-3.5 rounded-2xl border border-surface-container shadow-xs">
                     <div class="flex flex-col">
                       <span class="text-[10px] text-text-body">Terikat ke Kode Pengundang:</span>
-                      <span class="font-mono text-sm font-black text-primary">${user.referredBy}</span>
+                      <span class="font-mono text-base font-black text-primary tracking-wide">${user.referredBy}</span>
                     </div>
-                    <span class="text-[10px] font-bold text-secondary bg-secondary/10 px-2.5 py-1 rounded-lg border border-secondary/20 flex items-center gap-1">
-                      <span class="material-symbols-outlined text-[13px]">check_circle</span>
+                    <span class="text-[10px] font-bold text-secondary bg-secondary/10 px-3 py-1.5 rounded-xl border border-secondary/20 flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[14px]">check_circle</span>
                       <span>Terkunci</span>
                     </span>
                   </div>
-                  <p class="text-[10px] text-text-body leading-relaxed">
+                  <p class="text-[10px] text-text-body leading-relaxed px-1">
                     <span class="font-bold text-text-heading">Ketentuan:</span> Akun Anda telah terikat secara permanen pada kode referral ini dan tidak dapat diubah kembali. Riwayat bonus potongan referral saat penarikan dapat dipantau di <a href="#/riwayat?tab=referral" class="text-primary font-bold hover:underline">Riwayat Transaksi</a>.
                   </p>
                 ` : `
                   <p class="text-[11px] text-text-body leading-relaxed">
                     Belum menautkan kode rujukan pengundang saat pendaftaran? Masukkan kode referral teman Anda di bawah ini:
                   </p>
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center bg-surface-card rounded-2xl border border-surface-container focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15 transition-all p-1 shadow-xs">
+                    <div class="pl-2.5 pr-1 text-outline flex items-center pointer-events-none">
+                      <span class="material-symbols-outlined text-[17px] text-primary/70">tag</span>
+                    </div>
                     <input
                       type="text"
                       id="inputBindReferralCode"
-                      placeholder="CONTOH: PK-78A9B2"
+                      placeholder="Contoh: PK-78A9B2"
                       maxlength="12"
-                      class="flex-1 uppercase font-mono text-xs font-bold px-3 py-2 rounded-xl bg-surface-card border border-surface-container focus:border-primary focus:outline-none"
+                      autocomplete="off"
+                      spellcheck="false"
+                      class="flex-1 uppercase font-mono text-xs font-bold py-2 bg-transparent text-text-heading placeholder:font-sans placeholder:normal-case placeholder:text-outline/50 focus:outline-none min-w-0"
                     />
                     <button
                       type="button"
                       id="btnBindReferralCode"
-                      class="px-3.5 py-2 bg-primary text-white rounded-xl text-xs font-bold shadow-xs hover:bg-primary-container active:scale-95 transition-all cursor-pointer whitespace-nowrap flex items-center gap-1"
+                      class="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold shadow-xs hover:bg-primary-container active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0"
                     >
                       <span class="material-symbols-outlined text-[15px]">link</span>
                       <span>Tautkan</span>
                     </button>
                   </div>
-                  <p class="text-[10px] text-outline italic">
-                    * Catatan: Penautan kode pengundang hanya dapat dilakukan 1 kali dan tidak dapat diubah.
-                  </p>
+                  <div class="flex items-center gap-1.5 text-[10px] text-outline px-1">
+                    <span class="material-symbols-outlined text-[14px] text-amber-500 shrink-0">info</span>
+                    <span>Penautan kode pengundang hanya dapat dilakukan 1 kali dan tidak dapat diubah.</span>
+                  </div>
                 `}
               </div>
 
               <!-- Benefit Highlights -->
-              <div class="bg-surface-container-low rounded-2xl p-3.5 border border-surface-container/60 flex items-start gap-3">
-                <div class="w-8 h-8 rounded-xl bg-secondary/15 text-secondary flex items-center justify-center shrink-0 mt-0.5">
-                  <span class="material-symbols-outlined text-[18px]">featured_seasonal_and_gifts</span>
+              <div class="bg-gradient-to-br from-secondary/10 via-surface-container-low to-primary/5 rounded-2xl p-3.5 sm:p-4 border border-secondary/20 flex items-start gap-3 shadow-xs">
+                <div class="w-9 h-9 rounded-xl bg-secondary/15 text-secondary flex items-center justify-center shrink-0 shadow-xs border border-secondary/25 mt-0.5">
+                  <span class="material-symbols-outlined text-[20px]">redeem</span>
                 </div>
-                <div class="flex flex-col text-[11px] leading-relaxed text-text-body">
-                  <span class="font-bold text-text-heading text-xs">Keuntungan Program Referral:</span>
-                  <span class="mt-0.5">Ajak teman bergabung dengan kode rujukan Anda. Dapatkan komisi saldo pasif dari setiap setoran API key rekan Anda yang berhasil disetujui!</span>
+                <div class="flex flex-col text-[11px] leading-relaxed text-text-body min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold text-text-heading text-xs">Keuntungan Program Referral</span>
+                    <span class="text-[9px] bg-secondary/20 text-secondary font-extrabold px-1.5 py-0.2 rounded-md uppercase tracking-wider">Bonus Pasif</span>
+                  </div>
+                  <p class="mt-1 text-text-body/90 leading-snug">
+                    Ajak rekan Anda bergabung dengan kode rujukan Anda. Dapatkan komisi saldo pasif otomatis dari setiap setoran API key rekan Anda yang berhasil disetujui!
+                  </p>
                 </div>
               </div>
             </div>
@@ -706,20 +725,26 @@ export class ProfileView extends IComponent {
       if (!code) return;
 
       const ok = await copyTextToClipboard(code, `Kode referral ${code} berhasil disalin!`);
-      if (ok && iconCopyReferralCode && textCopyReferralCode) {
-        const originalIcon = iconCopyReferralCode.textContent;
-        const originalText = textCopyReferralCode.textContent;
-        iconCopyReferralCode.textContent = 'check';
-        textCopyReferralCode.textContent = 'Tersalin!';
-        btnCopyReferralCode?.classList.add('bg-secondary');
-        btnCopyReferralCode?.classList.remove('bg-primary');
+      if (ok) {
+        const iconQuickCopyCode = container.querySelector('#iconQuickCopyCode');
+        if (iconQuickCopyCode) iconQuickCopyCode.textContent = 'check';
 
-        setTimeout(() => {
-          iconCopyReferralCode.textContent = originalIcon;
-          textCopyReferralCode.textContent = originalText;
-          btnCopyReferralCode?.classList.remove('bg-secondary');
-          btnCopyReferralCode?.classList.add('bg-primary');
-        }, 2000);
+        if (iconCopyReferralCode && textCopyReferralCode) {
+          const originalIcon = iconCopyReferralCode.textContent;
+          const originalText = textCopyReferralCode.textContent;
+          iconCopyReferralCode.textContent = 'check';
+          textCopyReferralCode.textContent = 'Tersalin!';
+          btnCopyReferralCode?.classList.add('bg-secondary');
+          btnCopyReferralCode?.classList.remove('bg-primary');
+
+          setTimeout(() => {
+            iconCopyReferralCode.textContent = originalIcon;
+            textCopyReferralCode.textContent = originalText;
+            btnCopyReferralCode?.classList.remove('bg-secondary');
+            btnCopyReferralCode?.classList.add('bg-primary');
+            if (iconQuickCopyCode) iconQuickCopyCode.textContent = 'content_copy';
+          }, 2000);
+        }
       }
     };
 
@@ -784,27 +809,29 @@ export class ProfileView extends IComponent {
         // Langsung transformasikan UI tanpa menunggu reload: form hilang & hanya menampilkan kode rujukan terkunci
         if (boxAccountReferralStatus) {
           boxAccountReferralStatus.innerHTML = `
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] font-bold uppercase tracking-wider text-text-heading flex items-center gap-1.5">
-                <span class="material-symbols-outlined text-[16px] text-primary">link</span>
-                <span>Status Keterikatan Akun</span>
-              </span>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30 flex items-center gap-1">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-[16px]">link</span>
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider text-text-heading truncate">Status Keterikatan</span>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30 whitespace-nowrap shrink-0 flex items-center gap-1.5">
                 <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
                 <span>Terikat Permanen</span>
               </span>
             </div>
-            <div class="flex items-center justify-between bg-surface-card p-3 rounded-xl border border-surface-container shadow-xs animate-in fade-in duration-300">
+            <div class="flex items-center justify-between bg-surface-card p-3.5 rounded-2xl border border-surface-container shadow-xs animate-in fade-in duration-300">
               <div class="flex flex-col">
                 <span class="text-[10px] text-text-body">Terikat ke Kode Pengundang:</span>
-                <span class="font-mono text-sm font-black text-primary">${code}</span>
+                <span class="font-mono text-base font-black text-primary tracking-wide">${code}</span>
               </div>
-              <span class="text-[10px] font-bold text-secondary bg-secondary/10 px-2.5 py-1 rounded-lg border border-secondary/20 flex items-center gap-1">
-                <span class="material-symbols-outlined text-[13px]">check_circle</span>
+              <span class="text-[10px] font-bold text-secondary bg-secondary/10 px-3 py-1.5 rounded-xl border border-secondary/20 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[14px]">check_circle</span>
                 <span>Terkunci</span>
               </span>
             </div>
-            <p class="text-[10px] text-text-body leading-relaxed">
+            <p class="text-[10px] text-text-body leading-relaxed px-1">
               <span class="font-bold text-text-heading">Ketentuan:</span> Akun Anda telah terikat secara permanen pada kode referral ini dan tidak dapat diubah kembali. Riwayat bonus potongan referral saat penarikan dapat dipantau di <a href="#/riwayat?tab=referral" class="text-primary font-bold hover:underline">Riwayat Transaksi</a>.
             </p>
           `;

@@ -54,7 +54,7 @@ export class ModalComponent {
     } = options;
 
     const modalWrapper = document.createElement('div');
-    modalWrapper.className = 'fixed inset-0 z-[100] flex items-center justify-center p-4 transition-all duration-300 opacity-0';
+    modalWrapper.className = 'fixed inset-0 z-[100] flex items-center justify-center p-3.5 sm:p-4 transition-all duration-300 opacity-0';
     modalWrapper.id = 'app-modal-root';
 
     const iconMap = {
@@ -87,7 +87,7 @@ export class ModalComponent {
       <div class="modal-backdrop absolute inset-0 bg-on-surface/50 backdrop-blur-sm transition-opacity duration-300"></div>
 
       <!-- Modal Card -->
-      <div class="modal-card relative bg-surface-card w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center gap-4 transform scale-95 transition-transform duration-300 z-10 border border-surface-container">
+      <div class="modal-card relative bg-surface-card w-full max-w-sm rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col items-center text-center gap-4 transform scale-95 transition-transform duration-300 z-10 border border-surface-container">
         <!-- Close Button -->
         <button type="button" class="modal-close-btn absolute right-4 top-4 text-outline hover:text-on-surface p-1.5 rounded-full hover:bg-surface-container transition-colors" aria-label="Tutup">
           <span class="material-symbols-outlined text-[20px]">close</span>
