@@ -484,8 +484,34 @@ export class WalletService {
     // Ambil daftar key pengguna sebagai referensi nilai riil
     const savedUserKeys = this._storage.get(userKeysKey) || [];
     const globalKeys = (this._storage.get('api_keys') || []).filter(k => k.userId === userId);
-    const combinedKeys = savedUserKeys.length > 0 ? savedUserKeys : globalKeys;
 
+    // Gabungkan dan rekonsiliasi status terbaru jika ada key yang sudah valid di global list
+    const keyMap = new Map();
+    const keyStringMap = new Map();
+
+    const baseList = Array.isArray(savedUserKeys) && savedUserKeys.length > 0 ? savedUserKeys : globalKeys;
+    baseList.forEach(k => {
+      const kObj = { ...k };
+      if (kObj.id) keyMap.set(kObj.id, kObj);
+      if (kObj.keyString) keyStringMap.set(kObj.keyString.trim(), kObj);
+    });
+
+    globalKeys.forEach(gk => {
+      const gkStr = (gk.keyString || '').trim();
+      const existing = (gk.id && keyMap.get(gk.id)) || (gkStr && keyStringMap.get(gkStr));
+      if (existing) {
+        if (gk.status === 'valid' && existing.status !== 'valid') {
+          existing.status = 'valid';
+          delete existing.errorMessage;
+        }
+      } else {
+        const newObj = { ...gk };
+        if (newObj.id) keyMap.set(newObj.id, newObj);
+        if (gkStr) keyStringMap.set(gkStr, newObj);
+      }
+    });
+
+    const combinedKeys = Array.from(keyMap.values());
     const validKeys = combinedKeys.filter(k => k.status === 'valid');
     const pendingKeys = combinedKeys.filter(k => k.status === 'pending');
 
@@ -671,9 +697,27 @@ export class WalletService {
     const userId = this._getUserId();
     if (!this._transactionRepository || !userId) return;
 
-    // Concurrency lock: cegah request sinkronisasi ganda yang berjalan bersamaan
-    if (this._isSyncing) return;
+    // Concurrency queueing: jika proses sinkronisasi sedang berjalan, tandai request pending
+    // agar siklus sinkronisasi berikutnya otomatis berjalan segera setelah sinkronisasi aktif tuntas
+    if (this._isSyncing) {
+      this._hasPendingSync = true;
+      return;
+    }
     this._isSyncing = true;
+
+    try {
+      do {
+        this._hasPendingSync = false;
+        await this._doSyncFromRemote();
+      } while (this._hasPendingSync);
+    } finally {
+      this._isSyncing = false;
+    }
+  }
+
+  async _doSyncFromRemote() {
+    const userId = this._getUserId();
+    if (!this._transactionRepository || !userId) return;
 
     try {
       const prevBalance = this._balance;
@@ -697,17 +741,24 @@ export class WalletService {
           if (Array.isArray(remoteKeys)) {
             if (remoteKeys.length > 0) {
               const keyMap = new Map();
+              const keyStringMap = new Map();
+
               remoteKeys.forEach(rk => {
-                const id = rk.id || rk.keyString;
-                keyMap.set(id, rk);
+                const kObj = (rk instanceof ApiKey) ? rk : new ApiKey(rk);
+                if (kObj.id) keyMap.set(kObj.id, kObj);
+                if (kObj.keyString) keyStringMap.set(kObj.keyString.trim(), kObj);
               });
+
               // Pertahankan key lokal baru (< 60 detik) jika belum sempat tersinkron ke remote
               combinedKeys.forEach(k => {
-                const id = k.id || k.keyString;
-                if (!keyMap.has(id)) {
+                const kStr = (k.keyString || '').trim();
+                const matchedRemote = (k.id && keyMap.get(k.id)) || (kStr && keyStringMap.get(kStr));
+                if (!matchedRemote) {
                   const age = Date.now() - new Date(k.createdAt || 0).getTime();
                   if (age < 60000) {
-                    keyMap.set(id, k);
+                    const newK = (k instanceof ApiKey) ? k : new ApiKey(k);
+                    if (k.id) keyMap.set(k.id, newK);
+                    if (kStr) keyStringMap.set(kStr, newK);
                   }
                 }
               });
@@ -719,7 +770,7 @@ export class WalletService {
                 return age < 15000;
               });
             }
-            this._storage.set(userKeysKey, combinedKeys);
+            this._storage.set(userKeysKey, combinedKeys.map(k => (typeof k?.toJSON === 'function' ? k.toJSON() : k)));
           }
         } catch (e) {}
       }
@@ -744,15 +795,17 @@ export class WalletService {
       }
 
       if (Array.isArray(remoteTxs) && remoteTxs.length > 0) {
-        // Deduplikasi transaksi: untuk setiap key unik (berdasarkan 4 karakter terakhir di deskripsi), pertahankan 1 transaksi terbaik
+        // Deduplikasi transaksi: untuk setiap key unik, pertahankan 1 transaksi terbaik
         const deduplicatedTxs = [];
         const seenDepositKeys = new Map();
         const duplicateIdsToDelete = [];
 
         remoteTxs.forEach(tx => {
           if (tx.type === 'deposit') {
-            const match = tx.description?.match(/([a-zA-Z0-9]{4})$/);
-            const keyIdentifier = match ? match[1] : tx.id;
+            const maskedMatch = tx.description?.match(/([a-zA-Z0-9_-]{4,}\.\.\.[a-zA-Z0-9_-]{4,})/);
+            const fullKeyMatch = tx.description?.match(/([a-zA-Z0-9_-]{16,})/);
+            const suffixMatch = tx.description?.match(/([a-zA-Z0-9]{4})$/);
+            const keyIdentifier = maskedMatch ? maskedMatch[1] : (fullKeyMatch ? fullKeyMatch[1] : (suffixMatch ? suffixMatch[1] : tx.id));
 
             if (seenDepositKeys.has(keyIdentifier)) {
               const existingIdx = seenDepositKeys.get(keyIdentifier);
@@ -785,13 +838,12 @@ export class WalletService {
           }
         });
 
-        // Hapus transaksi duplikat dari Supabase secara otomatis di background
-        const orphanIdsToDelete = [];
+        // Hapus HANYA transaksi duplikat identik dari Supabase
         const reconciledTxs = [];
 
         deduplicatedTxs.forEach(tx => {
           if (tx.type === 'deposit') {
-            // JANGAN hapus jika transaksi berupa komisi referral!
+            // Transaksi komisi referral selalu sah
             if (tx.method === 'referral_commission' || tx.title?.includes('Referral') || tx.description?.includes('Referral')) {
               reconciledTxs.push(tx);
               return;
@@ -812,7 +864,8 @@ export class WalletService {
             });
 
             if (!matchingKey) {
-              if (tx.id) orphanIdsToDelete.push(tx.id);
+              // Pertahankan transaksi deposit yang ada, jangan dihapus sembarangan
+              reconciledTxs.push(tx);
               return;
             }
 
@@ -839,9 +892,8 @@ export class WalletService {
           reconciledTxs.push(tx);
         });
 
-        const allIdsToDelete = [...duplicateIdsToDelete, ...orphanIdsToDelete];
-        if (allIdsToDelete.length > 0 && typeof fetch !== 'undefined') {
-          allIdsToDelete.forEach(delId => {
+        if (duplicateIdsToDelete.length > 0 && typeof fetch !== 'undefined') {
+          duplicateIdsToDelete.forEach(delId => {
             if (delId && delId.includes('-')) {
               fetch('/api/supabase-proxy', {
                 method: 'POST',
@@ -932,8 +984,6 @@ export class WalletService {
       }
     } catch (err) {
       console.warn('[WalletService] Remote tx sync fallback to local cache:', err.message);
-    } finally {
-      this._isSyncing = false;
     }
   }
 
@@ -943,7 +993,7 @@ export class WalletService {
       this._storage.set(`wallet_balance_${userId}`, this._balance);
       this._storage.set(`wallet_passive_balance_${userId}`, this._passiveBalance);
       this._storage.set(`lifetime_earnings_${userId}`, this._lifetimeEarnings);
-      this._storage.set(`transactions_${userId}`, this._transactions.map(t => t.toJSON()));
+      this._storage.set(`transactions_${userId}`, this._transactions.map(t => (typeof t?.toJSON === 'function' ? t.toJSON() : t)));
     }
     // Hanya simpan ke storage global jika user yang sedang aktif di session adalah pemilik data ini
     const currentUser = this._authService ? this._authService.getCurrentUser() : null;
@@ -951,7 +1001,7 @@ export class WalletService {
       this._storage.set('wallet_balance', this._balance);
       this._storage.set('wallet_passive_balance', this._passiveBalance);
       this._storage.set('lifetime_earnings', this._lifetimeEarnings);
-      this._storage.set('transactions', this._transactions.map(t => t.toJSON()));
+      this._storage.set('transactions', this._transactions.map(t => (typeof t?.toJSON === 'function' ? t.toJSON() : t)));
     }
   }
 
