@@ -282,7 +282,12 @@ export class ConfigurationView {
       const isPayment = togglePayment ? togglePayment.checked : true;
       const isSupport = toggleSupport ? toggleSupport.checked : true;
       const token = (inputToken ? inputToken.value : '').trim();
-      const chatId = (inputChatId ? inputChatId.value : '').trim();
+      let rawChatId = (inputChatId ? inputChatId.value : '').trim();
+      if (/^100\d{7,}$/.test(rawChatId)) {
+        rawChatId = '-' + rawChatId;
+        if (inputChatId) inputChatId.value = rawChatId;
+      }
+      const chatId = rawChatId;
 
       const curConfig = this.dataService.getConfig();
       const newConfig = {

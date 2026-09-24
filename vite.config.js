@@ -199,9 +199,20 @@ export default defineConfig(({ mode }) => {
     return null;
   }
 
+  function formatTelegramChatId(chatId) {
+    if (!chatId) return '';
+    let id = String(chatId).replace(/["']/g, '').trim();
+    // Auto-prefix '-' jika user memasukkan ID supergroup/channel tanpa tanda minus (cth: 1003971650678 -> -1003971650678)
+    if (/^100\d{7,}$/.test(id)) {
+      id = '-' + id;
+    }
+    return id;
+  }
+
   async function sendTelegramMessage({ token, chatId, text, parseMode = 'HTML', photoUrl = null }) {
     const cleanToken = (token || env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').replace(/["']/g, '').trim();
-    const cleanChatId = (chatId || env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID || '').replace(/["']/g, '').trim();
+    const rawChatId = (chatId || env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID || '').replace(/["']/g, '').trim();
+    const cleanChatId = formatTelegramChatId(rawChatId);
 
     if (!cleanToken || !cleanChatId) {
       throw new Error('Telegram Bot Token dan Group Chat ID belum dikonfigurasi!');
@@ -251,7 +262,8 @@ export default defineConfig(({ mode }) => {
 
   async function testTelegramBot({ token, chatId }) {
     const cleanToken = (token || env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').replace(/["']/g, '').trim();
-    const cleanChatId = (chatId || env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID || '').replace(/["']/g, '').trim();
+    const rawChatId = (chatId || env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID || '').replace(/["']/g, '').trim();
+    const cleanChatId = formatTelegramChatId(rawChatId);
 
     if (!cleanToken) throw new Error('Token bot Telegram wajib diisi!');
     if (!cleanChatId) throw new Error('Telegram Group Chat ID wajib diisi!');

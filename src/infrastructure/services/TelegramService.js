@@ -79,12 +79,24 @@ export class TelegramService {
   }
 
   /**
+   * Normalisasi Telegram Chat ID (auto prefix minus untuk channel/supergroup)
+   */
+  _formatChatId(chatId) {
+    if (!chatId) return '';
+    let id = String(chatId).replace(/["']/g, '').trim();
+    if (/^100\d{7,}$/.test(id)) {
+      id = '-' + id;
+    }
+    return id;
+  }
+
+  /**
    * Mengirim pesan teks / foto ke Telegram API (via server proxy atau direct fetch)
    */
   async sendMessage({ text, photoUrl = null, token = null, chatId = null, parseMode = 'HTML', force = false }) {
     const config = this.getConfig();
     const effectiveToken = (token || config.token || '').trim();
-    const effectiveChatId = (chatId || config.chatId || '').trim();
+    const effectiveChatId = this._formatChatId(chatId || config.chatId);
 
     if (!force && !config.enabled) {
       return { success: true, skipped: true, reason: 'Telegram notifications disabled by admin' };
@@ -165,7 +177,7 @@ export class TelegramService {
    */
   async testConnection(token, chatId) {
     const cleanToken = String(token || '').trim();
-    const cleanChatId = String(chatId || '').trim();
+    const cleanChatId = this._formatChatId(chatId);
 
     if (!cleanToken) {
       return { success: false, error: 'Token Bot Telegram wajib diisi!' };
