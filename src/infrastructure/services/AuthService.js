@@ -24,10 +24,13 @@ export class AuthService {
     this._currentUser = null;
     this._isSyncingOAuth = false;
     this._isPasswordRecovery = false;
+    this._realtimeChannel = null;
+    this._syncBroadcast = null;
 
     this._session = null;
     this._loadSession();
     this._initSupabaseOAuthListener();
+    this._initCrossDeviceSync();
   }
 
   /**
@@ -63,6 +66,7 @@ export class AuthService {
 
     if (role !== 'admin' && user && user.id) {
       this._startPresenceHeartbeat(user.id);
+      this._setupRealtimeSubscription();
     }
   }
 
@@ -153,6 +157,128 @@ export class AuthService {
         }
       } catch (_) {}
     }
+  }
+
+  /**
+   * Menginisialisasi sinkronisasi profil lintas tab dan lintas perangkat (HP <-> Laptop)
+   * @private
+   */
+  _initCrossDeviceSync() {
+    if (typeof window === 'undefined') return;
+
+    // 1. Sinkronisasi antar-tab via BroadcastChannel
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        this._syncBroadcast = new BroadcastChannel('panenkunci_sync');
+        this._syncBroadcast.onmessage = (event) => {
+          const data = event.data;
+          if (!data) return;
+          if (data.type === 'USER_PROFILE_UPDATED' && (!data.userId || data.userId === this._currentUser?.id)) {
+            this.refreshCurrentUser().catch(() => {});
+          }
+        };
+      } catch (_) {}
+    }
+
+    // 2. Storage event untuk cross-tab
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'current_user' || e.key === 'session') {
+        const stored = this._storage.get('current_user');
+        if (stored && (!this._currentUser || stored.id === this._currentUser.id)) {
+          this._currentUser = new User(stored);
+          this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
+        }
+      }
+    });
+
+    // 3. Tab visibility & focus: sinkronkan ulang otomatis saat tab aktif kembali
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this._currentUser?.id) {
+        this.refreshCurrentUser().catch(() => {});
+      }
+    });
+    window.addEventListener('focus', () => {
+      if (this._currentUser?.id) {
+        this.refreshCurrentUser().catch(() => {});
+      }
+    });
+
+    // 4. Polling berkala setiap 4 detik saat tab aktif (failover jika websocket terputus)
+    setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && this._currentUser?.id) {
+        this.refreshCurrentUser().catch(() => {});
+      }
+    }, 4000);
+
+    // 5. Setup Realtime subscription
+    this._setupRealtimeSubscription();
+  }
+
+  /**
+   * Menghubungkan Supabase Realtime channel untuk memantau pembaruan profil user di tabel users
+   * @private
+   */
+  _setupRealtimeSubscription() {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    try {
+      if (this._realtimeChannel) {
+        supabase.removeChannel(this._realtimeChannel);
+        this._realtimeChannel = null;
+      }
+
+      if (!this._currentUser || !this._currentUser.id) return;
+      const userId = this._currentUser.id;
+
+      this._realtimeChannel = supabase
+        .channel(`client_user_${userId}_${Date.now()}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'users',
+            filter: `id=eq.${userId}`
+          },
+          async () => {
+            await this.refreshCurrentUser();
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn('[AuthService] Realtime subscription init warning:', e.message);
+    }
+  }
+
+  /**
+   * Menyinkronkan dan memuat ulang data user terkini dari database Supabase
+   * Menjamin data nama, bank, nomor HP, status verifikasi, dan referral identik di HP dan Laptop
+   * @returns {Promise<User|null>}
+   */
+  async refreshCurrentUser() {
+    if (!this._currentUser || !this._currentUser.id || !this._userRepository) {
+      return this._currentUser;
+    }
+
+    try {
+      const remote = await this._userRepository.getById(this._currentUser.id) ||
+                     await this._userRepository.getByEmail(this._currentUser.email);
+
+      if (remote) {
+        const prevJson = JSON.stringify(this._currentUser.toJSON ? this._currentUser.toJSON() : this._currentUser);
+        const nextJson = JSON.stringify(remote.toJSON ? remote.toJSON() : remote);
+
+        if (prevJson !== nextJson) {
+          this._currentUser = remote;
+          this._saveSession(this._currentUser, remote.role || 'user');
+          this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
+        }
+        return this._currentUser;
+      }
+    } catch (err) {
+      console.warn('[AuthService] refreshCurrentUser warning:', err.message);
+    }
+    return this._currentUser;
   }
 
   /**
@@ -762,6 +888,16 @@ export class AuthService {
     }
 
     this._eventBus.emit(AppEvents.USER_UPDATED, this._currentUser);
+
+    if (this._syncBroadcast) {
+      try {
+        this._syncBroadcast.postMessage({
+          type: 'USER_PROFILE_UPDATED',
+          userId: this._currentUser.id,
+          user: this._currentUser.toJSON()
+        });
+      } catch (_) {}
+    }
   }
 
   /**
@@ -1103,6 +1239,14 @@ export class AuthService {
   async logout() {
     const oldUserId = this._currentUser ? this._currentUser.id : null;
     this._stopPresenceHeartbeat(oldUserId);
+
+    if (this._realtimeChannel && supabase) {
+      try {
+        supabase.removeChannel(this._realtimeChannel);
+        this._realtimeChannel = null;
+      } catch (_) {}
+    }
+
     this._currentUser = null;
     this._session = null;
     this._storage.remove('current_user');

@@ -263,6 +263,29 @@ export class WalletService {
             }
           }
         )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'api_keys' },
+          (payload) => {
+            const currentUserId = this._getUserId();
+            const isTargetUser = !payload.new?.user_id || payload.new?.user_id === currentUserId || payload.old?.user_id === currentUserId;
+            if (isTargetUser) {
+              this._loadWallet();
+              this._syncFromRemote();
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'users' },
+          (payload) => {
+            const currentUserId = this._getUserId();
+            if (payload.new?.id === currentUserId || payload.old?.id === currentUserId) {
+              this._loadWallet();
+              this._syncFromRemote();
+            }
+          }
+        )
         .subscribe();
 
       // Realtime channel untuk memantau perubahan batas penarikan & konfigurasi sistem dari admin secara instan
@@ -667,33 +690,35 @@ export class WalletService {
       const globalKeys = (this._storage.get('api_keys') || []).filter(k => k.userId === userId);
       let combinedKeys = savedUserKeys.length > 0 ? savedUserKeys : globalKeys;
 
-      // Ambil data remoteKeys untuk menyelaraskan data key, tetapi JANGAN PERNAH menghapus cache lokal jika remote kosong!
+      // Ambil data remoteKeys untuk menyelaraskan data key secara presisi lintas perangkat (HP <-> Laptop)
       if (this._apiKeyRepository) {
         try {
           const remoteKeys = await this._apiKeyRepository.getAll(userId);
-          if (Array.isArray(remoteKeys) && remoteKeys.length > 0) {
-            const keyMap = new Map();
-            combinedKeys.forEach(k => {
-              const id = k.id || k.keyString;
-              keyMap.set(id, k);
-            });
-
-            remoteKeys.forEach(rk => {
-              const id = rk.id || rk.keyString;
-              if (keyMap.has(id)) {
-                const existing = keyMap.get(id);
-                // Jika lokal sudah valid, pertahankan status valid (jangan downgrade ke pending)
-                if (existing.status === 'valid' && rk.status !== 'valid') {
-                  // Tetap valid
-                } else {
-                  keyMap.set(id, { ...existing, ...rk });
-                }
-              } else {
+          if (Array.isArray(remoteKeys)) {
+            if (remoteKeys.length > 0) {
+              const keyMap = new Map();
+              remoteKeys.forEach(rk => {
+                const id = rk.id || rk.keyString;
                 keyMap.set(id, rk);
-              }
-            });
-
-            combinedKeys = Array.from(keyMap.values());
+              });
+              // Pertahankan key lokal baru (< 60 detik) jika belum sempat tersinkron ke remote
+              combinedKeys.forEach(k => {
+                const id = k.id || k.keyString;
+                if (!keyMap.has(id)) {
+                  const age = Date.now() - new Date(k.createdAt || 0).getTime();
+                  if (age < 60000) {
+                    keyMap.set(id, k);
+                  }
+                }
+              });
+              combinedKeys = Array.from(keyMap.values());
+            } else if (remoteKeys.length === 0) {
+              // Jika di remote sudah bersih (dihapus semua), sinkronkan penghapusan ke lokal
+              combinedKeys = combinedKeys.filter(k => {
+                const age = Date.now() - new Date(k.createdAt || 0).getTime();
+                return age < 15000;
+              });
+            }
             this._storage.set(userKeysKey, combinedKeys);
           }
         } catch (e) {}

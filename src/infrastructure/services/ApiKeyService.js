@@ -229,35 +229,41 @@ export class ApiKeyService {
     try {
       // Filter key HANYA untuk pengguna yang sedang aktif
       const remoteKeys = await this._apiKeyRepository.getAll(userId);
-      if (remoteKeys && Array.isArray(remoteKeys) && remoteKeys.length > 0) {
-        const keyMap = new Map();
-        // Masukkan key lokal terlebih dahulu
-        (this._keys || []).forEach(k => {
-          const id = k.id || k.keyString;
-          keyMap.set(id, k);
-        });
-
-        remoteKeys.forEach(rk => {
-          const id = rk.id || rk.keyString;
-          if (keyMap.has(id)) {
-            const existing = keyMap.get(id);
-            // Jika lokal sudah valid, pertahankan status valid (jangan downgrade ke pending!)
-            if (existing.status === 'valid' && rk.status !== 'valid') {
-              // Jika remote masih pending, sync kembali ke Supabase di background agar data Supabase konsisten
-              if (this._apiKeyRepository && existing.id && typeof this._apiKeyRepository.update === 'function') {
-                this._apiKeyRepository.update(existing.id, { status: 'valid', error_message: '' }).catch(() => {});
-              }
-            } else {
-              keyMap.set(id, rk);
-            }
-          } else {
+      if (Array.isArray(remoteKeys)) {
+        if (remoteKeys.length > 0) {
+          const keyMap = new Map();
+          // Remote adalah sumber kebenaran lintas perangkat (HP <-> Laptop)
+          remoteKeys.forEach(rk => {
+            const id = rk.id || rk.keyString;
             keyMap.set(id, rk);
-          }
-        });
+          });
 
-        this._keys = Array.from(keyMap.values()).map(k => (k instanceof ApiKey ? k : new ApiKey(k)));
+          // Pertahankan key lokal baru (< 60 detik) jika belum ter-index oleh remote
+          (this._keys || []).forEach(k => {
+            const id = k.id || k.keyString;
+            if (!keyMap.has(id)) {
+              const age = Date.now() - new Date(k.createdAt || 0).getTime();
+              if (age < 60000) {
+                keyMap.set(id, k);
+              }
+            }
+          });
+
+          this._keys = Array.from(keyMap.values()).map(k => (k instanceof ApiKey ? k : new ApiKey(k)));
+        } else {
+          // Jika remote kosong, bersihkan key lama yang sudah dihapus
+          this._keys = (this._keys || []).filter(k => {
+            const age = Date.now() - new Date(k.createdAt || 0).getTime();
+            return age < 15000;
+          });
+        }
+
         this._persist();
-        this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});
+        if (this._walletService && typeof this._walletService.syncFromRemote === 'function') {
+          this._walletService.syncFromRemote().catch(() => {});
+        } else {
+          this._eventBus.emit(AppEvents.BALANCE_UPDATED, {});
+        }
       }
     } catch (err) {
       console.warn('[ApiKeyService] Remote sync fallback to cache:', err.message);

@@ -559,6 +559,19 @@ export class AdminDataService {
         notification: notifItem
       });
 
+      // 4. Simpan ke Supabase Cloud (menjamin notifikasi masuk ke HP & Laptop pengguna secara sinkron)
+      fetch('/api/supabase-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add_notification',
+          userId,
+          notification: notifItem
+        })
+      }).catch(err => {
+        console.warn('[AdminDataService] Push notification to cloud proxy warning:', err.message);
+      });
+
       return notifItem;
     } catch (e) {
       console.warn('[AdminDataService] sendUserNotification error:', e.message);

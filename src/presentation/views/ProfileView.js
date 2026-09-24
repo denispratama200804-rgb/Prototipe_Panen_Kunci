@@ -520,6 +520,19 @@ export class ProfileView extends IComponent {
   }
 
   mount(container) {
+    if (this._unsubUserUpdated) {
+      this._unsubUserUpdated();
+      this._unsubUserUpdated = null;
+    }
+
+    this._unsubUserUpdated = this._eventBus.on(AppEvents.USER_UPDATED, () => {
+      const currentHash = (window.location.hash || '').replace(/^#\/?/, '/');
+      if (currentHash.startsWith('profil') || currentHash.startsWith('/profil')) {
+        container.innerHTML = this.render();
+        this.mount(container);
+      }
+    });
+
     // Sinkronkan status kelayakan ganti nickname di background jika belum ada data lokal
     const currentUser = this._authService.getCurrentUser();
     if (currentUser && !currentUser.nicknameUpdatedAt) {
@@ -1560,5 +1573,12 @@ export class ProfileView extends IComponent {
       reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
       reader.readAsDataURL(file);
     });
+  }
+
+  destroy() {
+    if (this._unsubUserUpdated) {
+      this._unsubUserUpdated();
+      this._unsubUserUpdated = null;
+    }
   }
 }

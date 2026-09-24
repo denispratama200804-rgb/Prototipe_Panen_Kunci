@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => {
 
   const CHAT_STORE_ID = '00000000-0000-0000-0000-000000000002';
   const REFERRAL_STORE_ID = '00000000-0000-0000-0000-000000000003';
+  const NOTIFICATION_STORE_ID = '00000000-0000-0000-0000-000000000004';
 
   async function getLiveChatsFromSupabase(targetUserId = null) {
     if (!adminSupabase) return [];
@@ -178,6 +179,184 @@ export default defineConfig(({ mode }) => {
         }
       }
     } catch (_) {}
+    return true;
+  }
+
+  // ── Notifikasi Pengguna Terpusat (Sinkronisasi Lintas Device: HP <-> Laptop) ──
+
+  async function getUserNotificationsFromSupabase(targetUserId = null) {
+    if (!adminSupabase) return [];
+
+    // 1. Coba baca dari tabel notifications jika ada
+    try {
+      let query = adminSupabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (targetUserId) {
+        query = query.eq('user_id', targetUserId);
+      }
+      const { data, error } = await query;
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data.map(row => ({
+          id: row.id,
+          userId: row.user_id,
+          transactionId: row.transaction_id,
+          type: row.type || 'info',
+          title: row.title || 'Notifikasi',
+          message: row.message || '',
+          amount: row.amount,
+          fee: row.fee,
+          netPayout: row.net_payout,
+          method: row.method,
+          recipient: row.recipient,
+          proofImage: row.proof_image,
+          proofNotes: row.proof_notes,
+          rejectionReason: row.rejection_reason,
+          createdAt: row.created_at,
+          isRead: Boolean(row.is_read)
+        }));
+      }
+    } catch (_) {}
+
+    // 2. Fallback: baca dari central store di users table (NOTIFICATION_STORE_ID)
+    try {
+      const { data: storeRow } = await adminSupabase
+        .from('users')
+        .select('avatar')
+        .eq('id', NOTIFICATION_STORE_ID)
+        .maybeSingle();
+
+      if (storeRow && storeRow.avatar) {
+        const parsed = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+        if (typeof parsed === 'object' && parsed !== null) {
+          if (targetUserId) {
+            return Array.isArray(parsed[targetUserId]) ? parsed[targetUserId] : [];
+          }
+          const all = [];
+          Object.values(parsed).forEach(list => {
+            if (Array.isArray(list)) all.push(...list);
+          });
+          return all.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        }
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
+  async function saveUserNotificationsToSupabase(userId, notifications) {
+    if (!adminSupabase || !userId || !Array.isArray(notifications)) return notifications;
+
+    // 1. Coba simpan ke tabel notifications jika ada
+    try {
+      const rows = notifications.map(n => ({
+        id: (n.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(n.id)) ? n.id : undefined,
+        user_id: userId,
+        transaction_id: n.transactionId || null,
+        type: n.type || 'info',
+        title: n.title || 'Notifikasi',
+        message: n.message || '',
+        amount: n.amount || null,
+        fee: n.fee || null,
+        net_payout: n.netPayout || null,
+        method: n.method || null,
+        recipient: n.recipient || null,
+        proof_image: n.proofImage || null,
+        proof_notes: n.proofNotes || null,
+        rejection_reason: n.rejectionReason || null,
+        is_read: Boolean(n.isRead),
+        created_at: n.createdAt || new Date().toISOString()
+      })).filter(r => r.id);
+
+      if (rows.length > 0) {
+        await adminSupabase.from('notifications').upsert(rows);
+      }
+    } catch (_) {}
+
+    // 2. Selalu simpan/sync ke central store di users table (NOTIFICATION_STORE_ID)
+    try {
+      const { data: storeRow } = await adminSupabase
+        .from('users')
+        .select('avatar')
+        .eq('id', NOTIFICATION_STORE_ID)
+        .maybeSingle();
+
+      let storeMap = {};
+      if (storeRow && storeRow.avatar) {
+        try {
+          storeMap = typeof storeRow.avatar === 'string' ? JSON.parse(storeRow.avatar) : storeRow.avatar;
+        } catch (_) {}
+      }
+      if (typeof storeMap !== 'object' || !storeMap) storeMap = {};
+
+      const sorted = [...notifications].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 100);
+      storeMap[userId] = sorted;
+
+      await adminSupabase.from('users').upsert({
+        id: NOTIFICATION_STORE_ID,
+        name: 'Notification Store',
+        email: 'notification_store@panenkunci.internal',
+        role: 'system_config',
+        avatar: JSON.stringify(storeMap),
+        is_verified: true,
+        updated_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn('[vite-proxy] saveUserNotificationsToSupabase error:', err.message);
+    }
+
+    return notifications;
+  }
+
+  async function addUserNotificationToSupabase(userId, notification) {
+    if (!userId || !notification) return notification;
+    const existing = await getUserNotificationsFromSupabase(userId);
+    const notifId = notification.id || 'notif_' + Math.random().toString(36).substring(2, 9);
+    const item = {
+      ...notification,
+      id: notifId,
+      userId,
+      isRead: Boolean(notification.isRead),
+      createdAt: notification.createdAt || new Date().toISOString()
+    };
+
+    const idx = existing.findIndex(n => n.id === item.id || (item.transactionId && n.transactionId === item.transactionId));
+    if (idx !== -1) {
+      existing[idx] = { ...existing[idx], ...item };
+    } else {
+      existing.unshift(item);
+    }
+
+    await saveUserNotificationsToSupabase(userId, existing);
+    return item;
+  }
+
+  async function markUserNotificationsReadInSupabase(userId, notificationId = null, all = false) {
+    if (!userId) return false;
+    const existing = await getUserNotificationsFromSupabase(userId);
+    let changed = false;
+
+    existing.forEach(n => {
+      if (all || n.id === notificationId || (notificationId && n.transactionId === notificationId)) {
+        if (!n.isRead) {
+          n.isRead = true;
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      await saveUserNotificationsToSupabase(userId, existing);
+    }
+    return true;
+  }
+
+  async function deleteUserNotificationFromSupabase(userId, notificationId) {
+    if (!userId || !notificationId) return false;
+    const existing = await getUserNotificationsFromSupabase(userId);
+    const filtered = existing.filter(n => n.id !== notificationId && n.transactionId !== notificationId);
+    await saveUserNotificationsToSupabase(userId, filtered);
     return true;
   }
 
@@ -567,6 +746,18 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
+                  if (url.includes('type=notifications')) {
+                    let targetUserId = null;
+                    try {
+                      const parsedUrl = new URL(url, 'http://localhost');
+                      targetUserId = parsedUrl.searchParams.get('userId');
+                    } catch (_) {}
+                    const notifs = await getUserNotificationsFromSupabase(targetUserId);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true, data: notifs }));
+                    return;
+                  }
+
                   if (url.includes('type=config')) {
                     const { data: cfgRow, error } = await adminSupabase
                       .from('users')
@@ -715,6 +906,52 @@ export default defineConfig(({ mode }) => {
 
                   if (action === 'mark_chat_read' && parsed.userId) {
                     await markLiveChatsReadInSupabase(parsed.userId, parsed.reader || 'user');
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true }));
+                    return;
+                  }
+
+                  // 1a-2. User Notifications Handlers (Sinkronisasi Notifikasi Lintas Device: HP <-> Laptop)
+                  if (action === 'get_notifications' || action === 'get_user_notifications') {
+                    const targetUserId = parsed.userId || parsed.user_id || null;
+                    const notifs = await getUserNotificationsFromSupabase(targetUserId);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true, data: notifs }));
+                    return;
+                  }
+
+                  if (action === 'save_notifications' || action === 'save_user_notifications') {
+                    const targetUserId = parsed.userId || parsed.user_id;
+                    const list = parsed.notifications || [];
+                    const saved = await saveUserNotificationsToSupabase(targetUserId, list);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true, data: saved }));
+                    return;
+                  }
+
+                  if (action === 'add_notification' || action === 'add_user_notification') {
+                    const targetUserId = parsed.userId || parsed.user_id || parsed.notification?.userId;
+                    const item = parsed.notification || parsed.data || parsed;
+                    const saved = await addUserNotificationToSupabase(targetUserId, item);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true, data: saved }));
+                    return;
+                  }
+
+                  if (action === 'mark_notifications_read') {
+                    const targetUserId = parsed.userId || parsed.user_id;
+                    const notifId = parsed.notificationId || parsed.id || null;
+                    const all = Boolean(parsed.all);
+                    await markUserNotificationsReadInSupabase(targetUserId, notifId, all);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ success: true }));
+                    return;
+                  }
+
+                  if (action === 'delete_notification') {
+                    const targetUserId = parsed.userId || parsed.user_id;
+                    const notifId = parsed.notificationId || parsed.id || null;
+                    await deleteUserNotificationFromSupabase(targetUserId, notifId);
                     res.statusCode = 200;
                     res.end(JSON.stringify({ success: true }));
                     return;

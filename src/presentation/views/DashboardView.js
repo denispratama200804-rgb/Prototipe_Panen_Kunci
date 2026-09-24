@@ -436,6 +436,10 @@ export class DashboardView extends IComponent {
       this._checkUnreadPayoutNotifications();
     });
 
+    this._unsubUserUpdated = this._eventBus.on(AppEvents.USER_UPDATED, () => {
+      this._updateDashboardUI(container);
+    });
+
     // Listener Tooltip interaktif untuk Saldo Aktif, Saldo Pasif, dan Status Akun
     const tooltipBtns = container.querySelectorAll('.btn-dashboard-tooltip');
     tooltipBtns.forEach(btn => {
@@ -919,6 +923,10 @@ export class DashboardView extends IComponent {
     if (this._unsubNotifsUpdated) {
       this._unsubNotifsUpdated();
       this._unsubNotifsUpdated = null;
+    }
+    if (this._unsubUserUpdated) {
+      this._unsubUserUpdated();
+      this._unsubUserUpdated = null;
     }
     if (this._onAppInstalled) {
       window.removeEventListener('appinstalled', this._onAppInstalled);

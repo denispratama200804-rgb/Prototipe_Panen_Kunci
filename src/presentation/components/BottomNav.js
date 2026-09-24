@@ -33,6 +33,10 @@ export class BottomNavComponent {
     this._eventBus.on(AppEvents.AUTH_STATE_CHANGED, () => {
       this.render();
     });
+
+    this._eventBus.on(AppEvents.USER_UPDATED, () => {
+      this.render();
+    });
   }
 
   render() {

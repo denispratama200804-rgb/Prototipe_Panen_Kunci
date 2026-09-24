@@ -1,9 +1,11 @@
 import { AppEvents } from '../../core/events/EventBus.js';
+import { supabase, isSupabaseConfigured } from '../supabase/supabaseClient.js';
 
 /**
  * NotificationService
  * Prinsip: Single Responsibility Principle (SRP)
- * Bertanggung jawab mengirim pesan notifikasi (Toast) dan memicu Modal dialog.
+ * Bertanggung jawab mengelola notifikasi, toast, modal dialog,
+ * serta sinkronisasi data notifikasi lintas-perangkat (HP <-> Laptop) via Supabase Cloud.
  */
 export class NotificationService {
   /**
@@ -13,9 +15,34 @@ export class NotificationService {
   constructor(eventBus, storage = null) {
     this._eventBus = eventBus;
     this._storage = storage;
+    this._realtimeChannel = null;
+    this._isSyncing = false;
+    this._broadcastChannel = null;
 
-    // Cross-tab synchronization via storage event (dengan filter ketat userId)
     if (typeof window !== 'undefined') {
+      // 1. Cross-tab synchronization via BroadcastChannel
+      if (typeof BroadcastChannel !== 'undefined') {
+        try {
+          this._broadcastChannel = new BroadcastChannel('panenkunci_sync');
+          this._broadcastChannel.onmessage = (event) => {
+            const data = event.data;
+            if (!data) return;
+            const currentUserId = this._getUserId();
+            if (data.userId && currentUserId && data.userId !== currentUserId) return;
+
+            if (
+              data.type === 'NOTIFICATION_ADDED' ||
+              data.type === 'NOTIFICATIONS_MARKED_READ' ||
+              data.type === 'NOTIFICATION_DELETED' ||
+              data.type === 'NOTIFICATIONS_UPDATED'
+            ) {
+              this.syncFromRemote().catch(() => {});
+            }
+          };
+        } catch (_) {}
+      }
+
+      // 2. Cross-tab synchronization via storage event
       window.addEventListener('storage', (e) => {
         if (!e.key) return;
         const userId = this._getUserId();
@@ -23,7 +50,36 @@ export class NotificationService {
           this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
         }
       });
+
+      // 3. Tab Visibility & Focus listener: sinkronisasi otomatis saat user membuka/beralih kembali ke tab
+      window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.syncFromRemote().catch(() => {});
+        }
+      });
+      window.addEventListener('focus', () => {
+        this.syncFromRemote().catch(() => {});
+      });
+
+      // 4. Polling berkala (failover jika websocket terputus) setiap 3.5 detik saat tab aktif
+      this._pollTimer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          const userId = this._getUserId();
+          if (userId) {
+            this.syncFromRemote().catch(() => {});
+          }
+        }
+      }, 3500);
+
+      // 5. Supabase Realtime Subscription untuk Notifikasi Terpusat
+      this._setupRealtimeSubscription();
     }
+
+    // Auto-sync notifications saat user login/logout/ganti akun
+    this._eventBus.on(AppEvents.AUTH_STATE_CHANGED, () => {
+      this._setupRealtimeSubscription();
+      this.syncFromRemote().catch(() => {});
+    });
 
     // Real-time Payout Notifications (Diterima / Ditolak)
     this._eventBus.on('PAYOUT_PROCESSED', (payload) => {
@@ -34,7 +90,7 @@ export class NotificationService {
       this.addNotification({
         id: 'notif_live_' + (payload.transactionId || Math.random().toString(36).substring(2, 9)),
         transactionId: payload.transactionId,
-        userId: payload.userId,
+        userId: payload.userId || this._getUserId(),
         type: isSuccess ? 'withdrawal_success' : 'withdrawal_failed',
         title,
         message: payload.message,
@@ -65,6 +121,228 @@ export class NotificationService {
         this.syncFromTransactions(payload.transactions);
       }
     });
+
+    // Jalankan sync perdana dari remote di background
+    this.syncFromRemote().catch(() => {});
+  }
+
+  /**
+   * Menghubungkan Supabase Realtime channel untuk memantau perubahan notifikasi langsung dari cloud
+   * @private
+   */
+  _setupRealtimeSubscription() {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    try {
+      if (this._realtimeChannel) {
+        supabase.removeChannel(this._realtimeChannel);
+        this._realtimeChannel = null;
+      }
+
+      const userId = this._getUserId();
+      this._realtimeChannel = supabase
+        .channel(`client_notifs_${userId || 'public'}_${Date.now()}`)
+        // 1. Pantau central store (NOTIFICATION_STORE_ID) di tabel users
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'users',
+            filter: 'id=eq.00000000-0000-0000-0000-000000000004'
+          },
+          () => {
+            this.syncFromRemote().catch(() => {});
+          }
+        )
+        // 2. Pantau perubahan transaksi penarikan user
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'transactions'
+          },
+          (payload) => {
+            const currentUserId = this._getUserId();
+            const isTarget = !payload.new?.user_id || payload.new?.user_id === currentUserId || payload.old?.user_id === currentUserId;
+            if (isTarget) {
+              this.syncFromRemote().catch(() => {});
+            }
+          }
+        )
+        // 3. Pantau tabel notifications langsung jika ada
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications'
+          },
+          (payload) => {
+            const currentUserId = this._getUserId();
+            const isTarget = !payload.new?.user_id || payload.new?.user_id === currentUserId || payload.old?.user_id === currentUserId;
+            if (isTarget) {
+              this.syncFromRemote().catch(() => {});
+            }
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn('[NotificationService] Realtime subscription init warning:', e.message);
+    }
+  }
+
+  /**
+   * Sinkronisasi data notifikasi dari database Supabase Cloud
+   * Menjamin notifikasi HP dan Laptop selalu identik secara real-time
+   * @returns {Promise<Array<Object>>}
+   */
+  async syncFromRemote() {
+    const userId = this._getUserId();
+    if (!userId || this._isSyncing) return this.getNotifications();
+    this._isSyncing = true;
+
+    try {
+      let remoteNotifs = null;
+
+      // Ambil notifikasi dari Server Proxy Supabase
+      try {
+        const res = await fetch('/api/supabase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'get_notifications',
+            userId: userId
+          })
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (Array.isArray(json.data)) {
+            remoteNotifs = json.data;
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('[NotificationService] Fetch remote notifications error:', fetchErr.message);
+      }
+
+      if (!Array.isArray(remoteNotifs)) {
+        return this.getNotifications();
+      }
+
+      const key = `notifications_${userId}`;
+      const localNotifs = this._storage?.get(key) || [];
+      const notifMap = new Map();
+
+      // Cloud adalah sumber kebenaran (authoritative)
+      remoteNotifs.forEach(rn => {
+        const id = rn.id || rn.transactionId;
+        if (id) notifMap.set(id, { ...rn });
+      });
+
+      let changed = false;
+
+      // Reconcile: jika ada notifikasi lokal yang belum tersimpan di cloud, unggah ke cloud
+      const unsavedLocal = [];
+      localNotifs.forEach(ln => {
+        const id = ln.id || ln.transactionId;
+        if (!notifMap.has(id)) {
+          unsavedLocal.push(ln);
+          notifMap.set(id, ln);
+          changed = true;
+        } else {
+          const rn = notifMap.get(id);
+          // Jika lokal sudah dibaca tapi remote belum, sinkronkan ke cloud
+          if (ln.isRead && !rn.isRead) {
+            rn.isRead = true;
+            changed = true;
+            this._sendMarkReadToRemote(id, false);
+          }
+        }
+      });
+
+      // Simpan item lokal yang belum ada di remote ke Supabase
+      if (unsavedLocal.length > 0) {
+        unsavedLocal.forEach(un => this._sendAddToRemote(un));
+      }
+
+      const merged = Array.from(notifMap.values())
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+      const prevJson = JSON.stringify(localNotifs.map(n => ({ id: n.id, isRead: Boolean(n.isRead) })));
+      const nextJson = JSON.stringify(merged.map(n => ({ id: n.id, isRead: Boolean(n.isRead) })));
+
+      if (changed || prevJson !== nextJson) {
+        if (this._storage) {
+          this._storage.set(key, merged);
+          this._storage.set('notifications', merged);
+        }
+        this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
+      }
+
+      return merged;
+    } catch (err) {
+      console.warn('[NotificationService] syncFromRemote error:', err.message);
+      return this.getNotifications();
+    } finally {
+      this._isSyncing = false;
+    }
+  }
+
+  /**
+   * Mengirim penambahan notifikasi ke serverless proxy Supabase
+   * @private
+   */
+  _sendAddToRemote(notification) {
+    const userId = this._getUserId();
+    if (!userId || !notification) return;
+    fetch('/api/supabase-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'add_notification',
+        userId,
+        notification
+      })
+    }).catch(() => {});
+  }
+
+  /**
+   * Mengirim penandaan sudah dibaca ke serverless proxy Supabase
+   * @private
+   */
+  _sendMarkReadToRemote(notificationId = null, all = false) {
+    const userId = this._getUserId();
+    if (!userId) return;
+    fetch('/api/supabase-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'mark_notifications_read',
+        userId,
+        notificationId,
+        all
+      })
+    }).catch(() => {});
+  }
+
+  /**
+   * Mengirim penghapusan notifikasi ke serverless proxy Supabase
+   * @private
+   */
+  _sendDeleteToRemote(notificationId) {
+    const userId = this._getUserId();
+    if (!userId || !notificationId) return;
+    fetch('/api/supabase-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'delete_notification',
+        userId,
+        notificationId
+      })
+    }).catch(() => {});
   }
 
   /**
@@ -113,10 +391,33 @@ export class NotificationService {
     const userId = this._getUserId();
     const key = `notifications_${userId}`;
     let notifs = this.getNotifications();
-    notifs = notifs.map(n => n.id === id ? { ...n, isRead: true } : n);
-    this._storage.set(key, notifs);
-    this._storage.set('notifications', notifs);
-    this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
+    let changed = false;
+
+    notifs = notifs.map(n => {
+      if (n.id === id || (n.transactionId && n.transactionId === id)) {
+        changed = true;
+        return { ...n, isRead: true };
+      }
+      return n;
+    });
+
+    if (changed) {
+      this._storage.set(key, notifs);
+      this._storage.set('notifications', notifs);
+      this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
+
+      if (this._broadcastChannel) {
+        try {
+          this._broadcastChannel.postMessage({
+            type: 'NOTIFICATIONS_MARKED_READ',
+            userId,
+            notificationId: id
+          });
+        } catch (_) {}
+      }
+
+      this._sendMarkReadToRemote(id, false);
+    }
   }
 
   /**
@@ -130,6 +431,45 @@ export class NotificationService {
     this._storage.set(key, notifs);
     this._storage.set('notifications', notifs);
     this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
+
+    if (this._broadcastChannel) {
+      try {
+        this._broadcastChannel.postMessage({
+          type: 'NOTIFICATIONS_MARKED_READ',
+          userId,
+          all: true
+        });
+      } catch (_) {}
+    }
+
+    this._sendMarkReadToRemote(null, true);
+  }
+
+  /**
+   * Menghapus satu notifikasi
+   * @param {string} id
+   */
+  deleteNotification(id) {
+    if (!this._storage || !id) return;
+    const userId = this._getUserId();
+    const key = `notifications_${userId}`;
+    let notifs = this.getNotifications();
+    notifs = notifs.filter(n => n.id !== id && n.transactionId !== id);
+    this._storage.set(key, notifs);
+    this._storage.set('notifications', notifs);
+    this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
+
+    if (this._broadcastChannel) {
+      try {
+        this._broadcastChannel.postMessage({
+          type: 'NOTIFICATION_DELETED',
+          userId,
+          notificationId: id
+        });
+      } catch (_) {}
+    }
+
+    this._sendDeleteToRemote(id);
   }
 
   /**
@@ -148,18 +488,40 @@ export class NotificationService {
       message: notif.message || '',
       type: notif.type || 'info',
       amount: notif.amount,
+      fee: notif.fee,
+      netPayout: notif.netPayout,
       method: notif.method,
       recipient: notif.recipient,
       transactionId: notif.transactionId,
       proofImage: notif.proofImage || '',
       proofNotes: notif.proofNotes || '',
+      rejectionReason: notif.rejectionReason || '',
       createdAt: notif.createdAt || new Date().toISOString(),
-      isRead: false
+      isRead: Boolean(notif.isRead)
     };
-    notifs.unshift(item);
+
+    const existingIdx = notifs.findIndex(n => n.id === item.id || (item.transactionId && n.transactionId === item.transactionId));
+    if (existingIdx !== -1) {
+      notifs[existingIdx] = { ...notifs[existingIdx], ...item };
+    } else {
+      notifs.unshift(item);
+    }
+
     this._storage.set(key, notifs);
     this._storage.set('notifications', notifs);
     this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED, item);
+
+    if (this._broadcastChannel) {
+      try {
+        this._broadcastChannel.postMessage({
+          type: 'NOTIFICATION_ADDED',
+          userId,
+          notification: item
+        });
+      } catch (_) {}
+    }
+
+    this._sendAddToRemote(item);
   }
 
   /**
@@ -238,6 +600,7 @@ export class NotificationService {
     const key = `notifications_${userId}`;
     let notifs = this.getNotifications();
     let hasNew = false;
+    const newItemsToCloud = [];
 
     // Filter transaksi penarikan milik user yang statusnya sudah selesai (success atau failed)
     const processedWithdrawals = transactions.filter(t =>
@@ -295,6 +658,7 @@ export class NotificationService {
         };
 
         notifs.unshift(newNotif);
+        newItemsToCloud.push(newNotif);
         hasNew = true;
       } else {
         // Lengkapi data jika sebelumnya belum lengkap
@@ -321,6 +685,9 @@ export class NotificationService {
       this._storage.set(key, notifs);
       this._storage.set('notifications', notifs);
       this._eventBus.emit(AppEvents.NOTIFICATIONS_UPDATED);
+
+      // Sinkronkan notifikasi penarikan baru ke cloud Supabase
+      newItemsToCloud.forEach(item => this._sendAddToRemote(item));
     }
   }
 }
