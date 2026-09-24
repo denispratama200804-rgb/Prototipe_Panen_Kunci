@@ -1,3 +1,5 @@
+import { aiKreativService } from '../services/AiKreativService.js';
+
 /**
  * ApiKeysView
  * Gudang API Key: Manajemen seluruh API Key Kie.ai yang disetor pengguna,
@@ -10,16 +12,19 @@ export class ApiKeysView {
     this.currentFilter = 'all';
     this.searchQuery = '';
     this.revealedKeys = new Set();
+    this.selectedKeyIds = new Set();
     this.hasSynced = false;
     this.isSyncing = false;
     this.isSyncingKie = false;
     this.isAutoValidating = false;
     this.isInspectingMidnight = false;
     this.isRefreshing = false;
+    this.isSendingAiKreativ = false;
   }
 
   destroy() {
     this.revealedKeys.clear();
+    this.selectedKeyIds.clear();
     if (this._unsubAutoValidated) {
       this._unsubAutoValidated();
       this._unsubAutoValidated = null;
@@ -313,12 +318,56 @@ export class ApiKeysView {
                 <span class="material-symbols-outlined text-sm ${this.isSyncing ? 'animate-spin text-emerald-400' : ''}">sync</span>
                 <span>${this.isSyncing ? 'Sinkron DB...' : 'Sinkron DB'}</span>
               </button>
+              <button
+                type="button"
+                id="btn-send-all-aikreativ"
+                title="Kirim API Key ke ai.kreativ (https://aikreativ.app/api/keys/receive)"
+                class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600/30 to-indigo-600/30 hover:from-purple-600/45 hover:to-indigo-600/45 active:scale-95 text-purple-200 border border-purple-500/50 flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-purple-500/20 ${
+                  this.isSendingAiKreativ ? 'opacity-70 cursor-not-allowed' : ''
+                }"
+                ${this.isSendingAiKreativ ? 'disabled' : ''}
+              >
+                <span class="material-symbols-outlined text-sm ${this.isSendingAiKreativ ? 'animate-spin text-purple-400' : 'text-purple-400'}">smart_toy</span>
+                <span>${this.isSendingAiKreativ ? 'Mengirim...' : (this.selectedKeyIds.size > 0 ? `Kirim (${this.selectedKeyIds.size}) ke ai.kreativ` : 'Kirim ke ai.kreativ')}</span>
+              </button>
               <div class="text-[11px] text-slate-500 font-mono hidden sm:block">
                 Total: ${allKeys.length} Kunci
               </div>
             </div>
           </div>
         </div>
+
+        <!-- Bulk Selection Action Bar jika ada kunci yang dipilih -->
+        ${
+          this.selectedKeyIds.size > 0
+            ? `
+          <div class="flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-purple-950/60 border border-purple-500/50 shadow-xl shadow-purple-950/40 text-xs animate-fade-in flex-wrap gap-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse"></span>
+              <span class="font-bold text-white font-mono text-sm">${this.selectedKeyIds.size}</span>
+              <span class="text-purple-200">kunci dipilih dari daftar</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                id="btn-bulk-send-aikreativ"
+                class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 text-white font-bold flex items-center gap-1.5 shadow-md shadow-purple-600/30 transition-all cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-base">smart_toy</span>
+                <span>Kirim ${this.selectedKeyIds.size} Kunci ke ai.kreativ</span>
+              </button>
+              <button
+                type="button"
+                id="btn-clear-selection"
+                class="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        `
+            : ''
+        }
 
         <!-- Table Container -->
         <div class="admin-card rounded-2xl overflow-hidden w-full max-w-full min-w-0 border border-slate-800/80 shadow-xl">
@@ -380,9 +429,19 @@ export class ApiKeysView {
             <table class="w-full text-left admin-table">
               <thead>
                 <tr>
+                  <th class="w-10 px-3 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      id="select-all-keys-checkbox"
+                      title="Pilih semua kunci di halaman ini"
+                      class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-purple-600 focus:ring-purple-500 focus:ring-offset-slate-900 cursor-pointer"
+                      ${keys.length > 0 && keys.every(k => this.selectedKeyIds.has(k.id)) ? 'checked' : ''}
+                    />
+                  </th>
                   <th class="whitespace-nowrap">API Key</th>
                   <th class="whitespace-nowrap">Pemilik</th>
                   <th class="whitespace-nowrap">Status</th>
+                  <th class="whitespace-nowrap">ai.kreativ</th>
                   <th class="whitespace-nowrap">Kredit</th>
                   <th class="whitespace-nowrap">Reward</th>
                   <th class="whitespace-nowrap">Waktu</th>
@@ -394,7 +453,7 @@ export class ApiKeysView {
                   keys.length === 0
                     ? `
                   <tr>
-                    <td colspan="7" class="text-center py-12 text-slate-400">
+                    <td colspan="9" class="text-center py-12 text-slate-400">
                       <span class="material-symbols-outlined text-4xl mb-2 ${
                         this.currentFilter === 'pending'
                           ? 'text-amber-500/60'
@@ -484,8 +543,43 @@ export class ApiKeysView {
                             statusBadge = '<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-rose-500/10 text-rose-400 border-rose-500/30 whitespace-nowrap">Invalid</span>';
                           }
 
+                          const aiStatus = aiKreativService.getKeyStatus(k.id, k.keyString);
+                          let aiKreativBadge = '<span class="text-[10px] text-slate-500 font-mono">-</span>';
+                          if (aiStatus) {
+                            if (aiStatus.status === 'added') {
+                              aiKreativBadge = `
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap" title="${aiStatus.message || 'Key baru berhasil diverifikasi & disimpan'} (${aiStatus.credits || 80} cr)">
+                                  <span class="material-symbols-outlined text-[12px]">smart_toy</span>
+                                  <span>Ditambahkan (${aiStatus.credits || 80} cr)</span>
+                                </span>
+                              `;
+                            } else if (aiStatus.status === 'updated') {
+                              aiKreativBadge = `
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30 whitespace-nowrap" title="${aiStatus.message || 'Key berhasil diperbarui'}">
+                                  <span class="material-symbols-outlined text-[12px]">smart_toy</span>
+                                  <span>Diperbarui</span>
+                                </span>
+                              `;
+                            } else {
+                              aiKreativBadge = `
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 whitespace-nowrap" title="${aiStatus.message || 'Key tidak valid di ai.kreativ'}">
+                                  <span class="material-symbols-outlined text-[12px]">error</span>
+                                  <span>Gagal</span>
+                                </span>
+                              `;
+                            }
+                          }
+
                           return `
                     <tr data-key-id="${k.id}">
+                      <td class="w-10 px-3 py-2.5 text-center">
+                        <input
+                          type="checkbox"
+                          data-key-checkbox="${k.id}"
+                          class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-purple-600 focus:ring-purple-500 focus:ring-offset-slate-900 cursor-pointer key-select-cb"
+                          ${this.selectedKeyIds.has(k.id) ? 'checked' : ''}
+                        />
+                      </td>
                       <td>
                         <div class="flex items-center gap-1 flex-nowrap">
                           <span class="font-mono text-xs font-semibold text-slate-200 select-all tracking-normal truncate max-w-[130px] sm:max-w-[150px]" title="${k.keyString || ''}">${displayKey}</span>
@@ -527,6 +621,9 @@ export class ApiKeysView {
                         ${statusBadge}
                       </td>
                       <td>
+                        ${aiKreativBadge}
+                      </td>
+                      <td>
                         <div class="flex items-center gap-1 whitespace-nowrap">
                           <span class="font-mono text-xs font-bold text-slate-200">${(k.credits !== null && k.credits !== undefined && !isNaN(Number(k.credits))) ? Number(k.credits) : 80} cr</span>
                           <button
@@ -550,6 +647,17 @@ export class ApiKeysView {
                       </td>
                       <td class="text-right pr-4 sm:pr-5 whitespace-nowrap">
                         <div class="flex items-center justify-end gap-1 flex-nowrap">
+                          <button
+                            type="button"
+                            data-action="send-aikreativ"
+                            data-id="${k.id}"
+                            data-keystring="${k.keyString}"
+                            title="Kirim API Key ini ke ai.kreativ (https://aikreativ.app/api/keys/receive)"
+                            class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-purple-500/15 hover:bg-purple-500/25 active:scale-95 text-purple-300 border border-purple-500/40 flex items-center gap-1 transition-all cursor-pointer shadow-sm shrink-0"
+                          >
+                            <span class="material-symbols-outlined text-xs text-purple-400">smart_toy</span>
+                            <span class="hidden xl:inline">ai.kreativ</span>
+                          </button>
                           ${
                             k.status === 'pending'
                               ? `
@@ -927,6 +1035,337 @@ export class ApiKeysView {
         }
         refreshCallback();
       });
+    });
+
+    // ── AI.KREATIV INTEGRATION EVENTS ──
+
+    // 1. Checkbox Select All
+    const selectAllCb = container.querySelector('#select-all-keys-checkbox');
+    if (selectAllCb) {
+      selectAllCb.addEventListener('change', () => {
+        const visibleKeys = this.getFilteredKeys();
+        if (selectAllCb.checked) {
+          visibleKeys.forEach(k => this.selectedKeyIds.add(k.id));
+        } else {
+          this.selectedKeyIds.clear();
+        }
+        refreshCallback();
+      });
+    }
+
+    // 2. Checkbox Row Single
+    container.querySelectorAll('.key-select-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const keyId = cb.getAttribute('data-key-checkbox');
+        if (cb.checked) {
+          this.selectedKeyIds.add(keyId);
+        } else {
+          this.selectedKeyIds.delete(keyId);
+        }
+        refreshCallback();
+      });
+    });
+
+    // 3. Tombol Batal Pilih
+    const clearSelBtn = container.querySelector('#btn-clear-selection');
+    if (clearSelBtn) {
+      clearSelBtn.addEventListener('click', () => {
+        this.selectedKeyIds.clear();
+        refreshCallback();
+      });
+    }
+
+    // 4. Tombol Kirim Terpilih ke ai.kreativ (Bulk Bar)
+    const bulkSendBtn = container.querySelector('#btn-bulk-send-aikreativ');
+    if (bulkSendBtn) {
+      bulkSendBtn.addEventListener('click', async () => {
+        if (this.selectedKeyIds.size === 0) return;
+        const allKeys = this.dataService.getApiKeys();
+        const selectedKeys = allKeys.filter(k => this.selectedKeyIds.has(k.id));
+        await this._executeSendToAiKreativ(selectedKeys, refreshCallback);
+      });
+    }
+
+    // 5. Tombol Kirim ke ai.kreativ di Top Action Bar
+    const topSendAiBtn = container.querySelector('#btn-send-all-aikreativ');
+    if (topSendAiBtn) {
+      topSendAiBtn.addEventListener('click', async () => {
+        const allKeys = this.dataService.getApiKeys();
+
+        // Jika ada kunci yang dicentang, kirim yang dicentang
+        if (this.selectedKeyIds.size > 0) {
+          const selectedKeys = allKeys.filter(k => this.selectedKeyIds.has(k.id));
+          await this._executeSendToAiKreativ(selectedKeys, refreshCallback);
+          return;
+        }
+
+        // Jika tidak ada yang dicentang, tawarkan kirim semua kunci valid
+        const validKeys = allKeys.filter(k => k.status === 'valid');
+        if (validKeys.length === 0) {
+          this.toast.info('Tidak ada Kunci Aktif (Valid) yang siap dikirim. Silakan centang kunci manual melalui checkbox di tabel.', 'Pilih Kunci');
+          return;
+        }
+
+        const confirmSend = confirm(
+          `Kirim semua ${validKeys.length} Kunci Aktif (Valid) ke ai.kreativ?\n\nEndpoint: https://aikreativ.app/api/keys/receive\nHeader: x-api-key: 4511d6a00b4f...`
+        );
+        if (confirmSend) {
+          await this._executeSendToAiKreativ(validKeys, refreshCallback);
+        }
+      });
+    }
+
+    // 6. Tombol Kirim Single Key ke ai.kreativ per Baris
+    container.querySelectorAll('[data-action="send-aikreativ"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        const keyString = btn.getAttribute('data-keystring');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin text-purple-400">progress_activity</span>';
+
+        try {
+          const targetKey = { id, keyString };
+          const response = await aiKreativService.sendSingleKey(targetKey);
+
+          if (response && (response.success || response.results)) {
+            this._showAiKreativResultModal(response, [targetKey], refreshCallback);
+          } else {
+            this.toast.error(response?.error || 'Gagal mengirim key ke ai.kreativ', 'ai.kreativ Gagal');
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+          }
+        } catch (err) {
+          this.toast.error(err.message, 'ai.kreativ Error');
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+      });
+    });
+  }
+
+  /**
+   * Eksekusi pengiriman batch kunci ke ai.kreativ
+   */
+  async _executeSendToAiKreativ(keyList, refreshCallback) {
+    if (!keyList || keyList.length === 0) return;
+
+    this.isSendingAiKreativ = true;
+    refreshCallback();
+
+    try {
+      this.toast.info(`Mengirim ${keyList.length} API Key ke ai.kreativ...`, 'Memproses', 4000);
+      const response = await aiKreativService.sendBatchKeys(keyList);
+
+      if (response && (response.success || response.results)) {
+        this._showAiKreativResultModal(response, keyList, refreshCallback);
+      } else {
+        this.toast.error(response?.error || 'Gagal mengirim kunci ke ai.kreativ.', 'Gagal');
+      }
+    } catch (err) {
+      this.toast.error(err.message, 'Kesalahan Jaringan');
+    } finally {
+      this.isSendingAiKreativ = false;
+      refreshCallback();
+    }
+  }
+
+  /**
+   * Render Modal Hasil Response API ai.kreativ
+   */
+  _showAiKreativResultModal(response, keyList = [], refreshCallback) {
+    const existing = document.getElementById('aikreativ-result-modal-overlay');
+    if (existing) existing.remove();
+
+    const stats = response.stats || {
+      totalReceived: keyList.length || 1,
+      added: 0,
+      updated: 0,
+      invalid: 0
+    };
+
+    const results = Array.isArray(response.results) ? response.results : [];
+    const isAllSuccess = stats.invalid === 0 && (stats.added > 0 || stats.updated > 0);
+    const isPartial = stats.invalid > 0 && (stats.added > 0 || stats.updated > 0);
+
+    let statusPill = '';
+    let alertBorderClass = '';
+    let alertIconColor = '';
+    let alertIcon = 'check_circle';
+
+    if (isAllSuccess) {
+      statusPill = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✓ Semua Berhasil</span>';
+      alertBorderClass = 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200';
+      alertIconColor = 'text-emerald-400';
+      alertIcon = 'check_circle';
+    } else if (isPartial) {
+      statusPill = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⚠️ Sebagian Berhasil</span>';
+      alertBorderClass = 'bg-amber-950/40 border-amber-500/40 text-amber-200';
+      alertIconColor = 'text-amber-400';
+      alertIcon = 'warning';
+    } else {
+      statusPill = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">✕ Gagal / Ditolak</span>';
+      alertBorderClass = 'bg-rose-950/40 border-rose-500/40 text-rose-200';
+      alertIconColor = 'text-rose-400';
+      alertIcon = 'error';
+    }
+
+    const modalHtml = `
+      <div id="aikreativ-result-modal-overlay" class="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fade-in">
+        <div class="relative w-full max-w-2xl bg-[#0b1329] border border-purple-500/40 rounded-2xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 space-y-5 text-left my-8">
+          
+          <!-- Modal Header -->
+          <div class="flex items-start justify-between gap-3 border-b border-slate-800/80 pb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-2xl">smart_toy</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="text-base sm:text-lg font-bold text-white font-['Plus_Jakarta_Sans']">
+                    Laporan Integrasi ai.kreativ
+                  </h3>
+                  ${statusPill}
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">
+                  Target Endpoint: <span class="font-mono text-purple-300">https://aikreativ.app/api/keys/receive</span>
+                </p>
+              </div>
+            </div>
+            <button type="button" id="btn-close-aikreativ-modal-x" class="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer">
+              <span class="material-symbols-outlined text-xl">close</span>
+            </button>
+          </div>
+
+          <!-- Alert Message Banner -->
+          <div class="p-3.5 sm:p-4 rounded-xl border ${alertBorderClass} flex items-center gap-3 text-xs sm:text-sm font-medium">
+            <span class="material-symbols-outlined text-2xl ${alertIconColor} shrink-0">${alertIcon}</span>
+            <span class="leading-relaxed">${response.message || response.error || 'Pemrosesan kunci selesai.'}</span>
+          </div>
+
+          <!-- 4 Stat Cards -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col">
+              <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Total Diterima</span>
+              <span class="text-lg sm:text-xl font-bold font-mono text-white mt-1">${stats.totalReceived ?? 0}</span>
+            </div>
+            <div class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex flex-col">
+              <span class="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Ditambahkan
+              </span>
+              <span class="text-lg sm:text-xl font-bold font-mono text-emerald-300 mt-1">+${stats.added ?? 0}</span>
+            </div>
+            <div class="p-3 rounded-xl bg-sky-950/30 border border-sky-500/30 flex flex-col">
+              <span class="text-[10px] text-sky-400 font-semibold uppercase tracking-wider flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span> Diperbarui
+              </span>
+              <span class="text-lg sm:text-xl font-bold font-mono text-sky-300 mt-1">${stats.updated ?? 0}</span>
+            </div>
+            <div class="p-3 rounded-xl bg-rose-950/30 border border-rose-500/30 flex flex-col">
+              <span class="text-[10px] text-rose-400 font-semibold uppercase tracking-wider flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Tidak Valid
+              </span>
+              <span class="text-lg sm:text-xl font-bold font-mono text-rose-300 mt-1">${stats.invalid ?? 0}</span>
+            </div>
+          </div>
+
+          <!-- Detail List Kunci -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-400 font-semibold">
+              <span>Hasil Verifikasi Per Kunci (${results.length} item):</span>
+              <span class="text-[10px] font-mono text-purple-400">header x-api-key: 4511d6a0...9230</span>
+            </div>
+
+            <div class="max-h-56 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              ${
+                results.length === 0
+                  ? `<div class="p-4 text-center text-xs text-slate-500 bg-slate-950/50 rounded-xl">Tidak ada rincian data kunci dari respons API.</div>`
+                  : results.map((r, i) => {
+                      let tagClass = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+                      let tagLabel = 'Invalid';
+                      if (r.status === 'added') {
+                        tagClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+                        tagLabel = 'Ditambahkan';
+                      } else if (r.status === 'updated') {
+                        tagClass = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
+                        tagLabel = 'Diperbarui';
+                      }
+
+                      return `
+                        <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col gap-1.5">
+                          <div class="flex items-center justify-between gap-2 flex-wrap">
+                            <div class="flex items-center gap-2">
+                              <span class="text-[11px] font-mono text-slate-400">#${i + 1}</span>
+                              <span class="font-mono text-xs font-bold text-slate-200 select-all">${r.key || '-'}</span>
+                              <span class="px-2 py-0.2 rounded-full text-[10px] font-bold border ${tagClass}">${tagLabel}</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs font-mono">
+                              <span class="text-amber-400 font-semibold">${r.credits !== undefined ? r.credits : '-'} cr</span>
+                              <span class="text-slate-500">•</span>
+                              <span class="${r.isActive ? 'text-emerald-400 font-semibold' : 'text-slate-400'}">${r.isActive ? 'Aktif' : 'Nonaktif'}</span>
+                            </div>
+                          </div>
+                          <p class="text-[11px] text-slate-400 leading-snug">${r.message || '-'}</p>
+                        </div>
+                      `;
+                    }).join('')
+              }
+            </div>
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="flex items-center justify-between pt-3 border-t border-slate-800/80 gap-2 flex-wrap">
+            <button
+              type="button"
+              id="btn-copy-aikreativ-summary"
+              class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-sm">content_copy</span>
+              <span>Salin Ringkasan</span>
+            </button>
+            <button
+              type="button"
+              id="btn-close-aikreativ-modal-done"
+              class="px-5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-600/30 transition-all cursor-pointer active:scale-95"
+            >
+              Selesai & Segarkan
+            </button>
+          </div>
+
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const overlay = document.getElementById('aikreativ-result-modal-overlay');
+    const closeBtnX = document.getElementById('btn-close-aikreativ-modal-x');
+    const closeBtnDone = document.getElementById('btn-close-aikreativ-modal-done');
+    const copyBtn = document.getElementById('btn-copy-aikreativ-summary');
+
+    const closeModal = () => {
+      overlay?.remove();
+      this.selectedKeyIds.clear();
+      if (typeof refreshCallback === 'function') refreshCallback();
+    };
+
+    closeBtnX?.addEventListener('click', closeModal);
+    closeBtnDone?.addEventListener('click', closeModal);
+    overlay?.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    copyBtn?.addEventListener('click', async () => {
+      const summaryText = `[LAPORAN PENGIRIMAN AI.KREATIV]\n` +
+        `Waktu: ${new Date().toLocaleString('id-ID')}\n` +
+        `Pesan: ${response.message || response.error || '-'}\n` +
+        `Total: ${stats.totalReceived || 0} | Ditambahkan: ${stats.added || 0} | Diperbarui: ${stats.updated || 0} | Invalid: ${stats.invalid || 0}\n\n` +
+        results.map(r => `- ${r.key}: ${r.status} (${r.credits} cr, active: ${r.isActive}) - ${r.message}`).join('\n');
+
+      try {
+        await navigator.clipboard.writeText(summaryText);
+        this.toast.success('Ringkasan hasil berhasil disalin ke clipboard!', 'Tersalin');
+      } catch (_) {}
     });
   }
 }

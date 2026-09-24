@@ -781,6 +781,107 @@ async function notifyTelegramSupportMessage(chatMessage) {
   }
 }
 
+// ── Integrasi AI Kreativ (https://aikreativ.app/api/keys/receive) ──
+const AI_KREATIV_DEFAULT_URL = 'https://aikreativ.app/api/keys/receive';
+const AI_KREATIV_DEFAULT_SECRET = '4511d6a00b4f76cd329fa1c011f0aa5f90ddc4b086e6b0d7ceb642a4e3969230';
+
+async function testAiKreativConnection({ endpoint, apiKey }) {
+  const targetUrl = endpoint || AI_KREATIV_DEFAULT_URL;
+  const targetSecret = apiKey || AI_KREATIV_DEFAULT_SECRET;
+
+  const testKey = '00000000000000000000000000000000';
+  const response = await fetch(targetUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': targetSecret
+    },
+    body: JSON.stringify({
+      key: testKey,
+      source: 'Panen Kunci (Connection Test)'
+    })
+  });
+
+  const resJson = await response.json().catch(() => null);
+
+  if (response.status === 200 || (resJson && resJson.stats)) {
+    return {
+      success: true,
+      statusCode: response.status,
+      message: 'Koneksi ke endpoint ai.kreativ BERHASIL! Header x-api-key valid & terautentikasi.',
+      stats: resJson?.stats || null
+    };
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return {
+      success: false,
+      statusCode: response.status,
+      error: `Autentikasi gagal (HTTP ${response.status}): Nilai header x-api-key tidak valid atau ditolak ai.kreativ.`
+    };
+  }
+
+  return {
+    success: false,
+    statusCode: response.status,
+    error: resJson?.error || resJson?.message || `Endpoint ai.kreativ merespon status HTTP ${response.status}`
+  };
+}
+
+async function sendKeysToAiKreativ({ keys, key, source = 'Panen Kunci', endpoint, apiKey }) {
+  const targetUrl = endpoint || AI_KREATIV_DEFAULT_URL;
+  const targetSecret = apiKey || AI_KREATIV_DEFAULT_SECRET;
+  const appSource = source || 'Panen Kunci';
+
+  let bodyPayload = {};
+  if (Array.isArray(keys) && keys.length > 0) {
+    const cleanKeys = keys.map(k => String(k).trim()).filter(Boolean);
+    if (cleanKeys.length === 1) {
+      bodyPayload = { key: cleanKeys[0], source: appSource };
+    } else {
+      bodyPayload = { keys: cleanKeys, source: appSource };
+    }
+  } else if (key) {
+    bodyPayload = { key: String(key).trim(), source: appSource };
+  } else {
+    throw new Error('API Key wajib disertakan.');
+  }
+
+  const response = await fetch(targetUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': targetSecret
+    },
+    body: JSON.stringify(bodyPayload)
+  });
+
+  const resJson = await response.json().catch(() => null);
+
+  if (!response.ok && (!resJson || !resJson.stats)) {
+    return {
+      success: false,
+      statusCode: response.status,
+      error: resJson?.error || resJson?.message || `HTTP ${response.status} dari ai.kreativ`,
+      raw: resJson
+    };
+  }
+
+  return {
+    success: resJson?.success ?? response.ok,
+    statusCode: response.status,
+    message: resJson?.message || 'Berhasil diproses oleh ai.kreativ',
+    stats: resJson?.stats || {
+      totalReceived: Array.isArray(keys) ? keys.length : 1,
+      added: 0,
+      updated: 0,
+      invalid: 0
+    },
+    results: resJson?.results || [],
+    raw: resJson
+  };
+}
+
 async function getOnlineUserIdsFromSupabase() {
   if (!adminSupabase) return [];
   try {
@@ -1169,6 +1270,46 @@ export default async function handler(req, res) {
       try {
         await notifyTelegramPayout({ tx: body.tx || body.transaction || body, user: body.user || null });
         return res.status(200).json({ success: true });
+      } catch (err) {
+        return res.status(400).json({ success: false, error: err.message });
+      }
+    }
+
+    // 1d. Actions AI Kreativ (Test Koneksi & Kirim API Key)
+    if (action === 'test_aikreativ_connection') {
+      try {
+        let endpoint = body.endpoint;
+        let apiKey = body.apiKey;
+
+        if (!endpoint || !apiKey) {
+          const cfg = await getSystemConfigInternal();
+          endpoint = endpoint || cfg?.aikreativ_config?.endpoint || AI_KREATIV_DEFAULT_URL;
+          apiKey = apiKey || cfg?.aikreativ_config?.apiKey || AI_KREATIV_DEFAULT_SECRET;
+        }
+
+        const testRes = await testAiKreativConnection({ endpoint, apiKey });
+        return res.status(200).json(testRes);
+      } catch (err) {
+        return res.status(400).json({ success: false, error: err.message });
+      }
+    }
+
+    if (action === 'send_to_aikreativ') {
+      try {
+        let keys = body.keys || (body.key ? [body.key] : []);
+        let source = body.source;
+        let endpoint = body.endpoint;
+        let apiKey = body.apiKey;
+
+        if (!endpoint || !apiKey || !source) {
+          const cfg = await getSystemConfigInternal();
+          endpoint = endpoint || cfg?.aikreativ_config?.endpoint || AI_KREATIV_DEFAULT_URL;
+          apiKey = apiKey || cfg?.aikreativ_config?.apiKey || AI_KREATIV_DEFAULT_SECRET;
+          source = source || cfg?.aikreativ_config?.source || 'Panen Kunci';
+        }
+
+        const sendResult = await sendKeysToAiKreativ({ keys, source, endpoint, apiKey });
+        return res.status(200).json(sendResult);
       } catch (err) {
         return res.status(400).json({ success: false, error: err.message });
       }

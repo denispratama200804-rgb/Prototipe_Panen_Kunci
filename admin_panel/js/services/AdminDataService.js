@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../../../src/infrastructure/supabase/supabaseClient.js';
 import { User } from '../../../src/domain/models/User.js';
 import { telegramService } from './TelegramAdminService.js';
+import { aiKreativService } from './AiKreativService.js';
 
 /**
  * AdminDataService
@@ -863,6 +864,16 @@ export class AdminDataService {
       newActive,
       newPassive
     });
+
+    // 9. Forward ke ai.kreativ secara otomatis jika diaktifkan di konfigurasi
+    try {
+      const aiCfg = aiKreativService.getConfig();
+      if (aiCfg && aiCfg.enabled && aiCfg.autoForwardOnValid) {
+        aiKreativService.sendSingleKey({ id: keyId, keyString: key.keyString }).catch(e => {
+          console.warn('[AdminDataService] Auto-forward ke ai.kreativ warning:', e.message);
+        });
+      }
+    } catch (_) {}
 
     return { success: true, key, rewardAmount, newActive, newPassive };
   }
