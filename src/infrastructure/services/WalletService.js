@@ -1514,4 +1514,123 @@ export class WalletService {
       message: `Permintaan penarikan Rp ${numAmount.toLocaleString('id-ID')} berhasil diajukan!`
     };
   }
+
+  /**
+   * Menukarkan saldo aktif menjadi hadiah/reward digital (Google Family, Akun Premium, dsb)
+   * @param {Object} params
+   * @param {string} params.rewardId
+   * @param {string} params.rewardTitle
+   * @param {number} params.cost
+   * @param {string} params.targetAccount
+   * @param {string} [params.userId]
+   * @param {string} [params.userName]
+   * @param {string} [params.userEmail]
+   * @returns {Promise<{ success: boolean, message: string, transaction?: Transaction, inviteCode?: string, inviteLink?: string }>}
+   */
+  async redeemReward({
+    rewardId,
+    rewardTitle,
+    cost,
+    targetAccount,
+    userId = 'usr_current',
+    userName = '',
+    userEmail = ''
+  }) {
+    const numCost = Number(cost);
+    if (isNaN(numCost) || numCost <= 0) {
+      return { success: false, message: 'Nominal reward tidak valid.' };
+    }
+
+    if (this._balance < numCost) {
+      return {
+        success: false,
+        message: `Saldo aktif Anda tidak mencukupi (Rp ${this._balance.toLocaleString('id-ID')}). Dibutuhkan Rp ${numCost.toLocaleString('id-ID')}.`
+      };
+    }
+
+    // 1. Kurangi saldo aktif pengguna
+    this._balance -= numCost;
+
+    // 2. Buat ID & kode unik penukaran hadiah
+    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const txId = 'RWD-' + Date.now().toString(36).toUpperCase() + '-' + randomSuffix;
+    const inviteCode = 'PK-' + (rewardId ? rewardId.toUpperCase().slice(0, 4) : 'RWD') + '-' + randomSuffix;
+    const inviteLink = rewardId && rewardId.includes('google')
+      ? `https://families.google.com/join/${randomSuffix.toLowerCase()}${Date.now().toString(36)}`
+      : `https://panenkunci.id/redeem?token=${inviteCode}`;
+
+    const tx = new Transaction({
+      id: txId,
+      userId,
+      userName,
+      userEmail,
+      accountHolder: userName,
+      bankName: 'Hadiah: ' + rewardTitle,
+      type: 'withdrawal',
+      amount: numCost,
+      fee: 0,
+      netPayout: numCost,
+      title: `Tukar Hadiah: ${rewardTitle}`,
+      description: `Penerima: ${targetAccount} • Kode Klaim: ${inviteCode}`,
+      status: 'success',
+      method: 'reward_exchange',
+      recipient: targetAccount,
+      createdAt: new Date().toISOString()
+    });
+
+    this._transactions.unshift(tx);
+    this._persist();
+
+    // Simpan ke Supabase jika repositori aktif
+    if (this._transactionRepository) {
+      try {
+        const saved = await this._transactionRepository.create(tx);
+        if (saved && saved.id) {
+          tx.id = saved.id;
+          this._persist();
+        }
+      } catch (err) {
+        console.warn('[WalletService] Supabase create reward tx fallback:', err.message);
+      }
+    }
+
+    // Siarkan ke Admin Panel / tab lain
+    if (this._broadcastChannel) {
+      try {
+        this._broadcastChannel.postMessage({
+          type: 'TRANSACTION_UPDATED',
+          transaction: tx,
+          userId,
+          amount: numCost,
+          timestamp: Date.now()
+        });
+      } catch (_) {}
+    }
+
+    // Notifikasi Telegram Admin jika ada bot aktif
+    try {
+      if (telegramService && typeof telegramService.sendNotification === 'function') {
+        telegramService.sendNotification(
+          `🎁 *PENUKARAN HADIAH BARU*\n` +
+          `• Pengguna: ${userName || userEmail || userId}\n` +
+          `• Hadiah: *${rewardTitle}*\n` +
+          `• Biaya Saldo: Rp ${numCost.toLocaleString('id-ID')}\n` +
+          `• Akun Tujuan: \`${targetAccount}\`\n` +
+          `• Kode / Link: \`${inviteLink}\``
+        ).catch(() => {});
+      }
+    } catch (_) {}
+
+    // Emit balance update
+    this._eventBus.emit(AppEvents.BALANCE_UPDATED, { balance: this._balance, lifetime: this._lifetimeEarnings });
+    this._eventBus.emit(AppEvents.WITHDRAWAL_COMPLETED, { transaction: tx, newBalance: this._balance });
+
+    return {
+      success: true,
+      transaction: tx,
+      inviteCode,
+      inviteLink,
+      message: `Selamat! Penukaran saldo untuk "${rewardTitle}" berhasil diproses.`
+    };
+  }
 }

@@ -2,6 +2,7 @@ import { IComponent } from '../../core/interfaces/IComponent.js';
 import { getPaymentMethodMetadata, identifyPaymentType } from '../utils/PaymentMethodHelper.js';
 import { User } from '../../domain/models/User.js';
 import { AppEvents } from '../../core/events/EventBus.js';
+import { RewardCatalogModal } from '../components/RewardCatalogModal.js';
 
 /**
  * ProfileView
@@ -430,6 +431,102 @@ export class ProfileView extends IComponent {
             </div>
           </section>
 
+          <!-- Reward & Penukaran Saldo Section (Di atas Keamanan Akun & Di Bawah Rekening) -->
+          <section class="flex flex-col gap-2">
+            <div class="flex items-center justify-between px-1">
+              <h3 class="font-headline-md text-xs font-bold text-text-heading uppercase tracking-wider flex items-center gap-1.5">
+                <span>Penukaran Saldo & Hadiah</span>
+                <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 uppercase tracking-wider">Spesial</span>
+              </h3>
+              <span class="text-[10px] text-secondary font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-[13px]">bolt</span>
+                <span>Tanpa Minimal WD</span>
+              </span>
+            </div>
+
+            <!-- Card Utama Penukaran Hadiah -->
+            <div class="bg-surface-card rounded-3xl p-5 shadow-sm border border-surface-container flex flex-col gap-4 relative overflow-hidden group">
+              <!-- Background Ambient Glow -->
+              <div class="absolute -right-8 -top-8 w-28 h-28 bg-amber-500/10 rounded-full blur-xl pointer-events-none transition-all group-hover:bg-amber-500/15"></div>
+              <div class="absolute -left-8 -bottom-8 w-24 h-24 bg-primary/10 rounded-full blur-xl pointer-events-none"></div>
+
+              <!-- Header Card -->
+              <div class="flex items-start justify-between gap-3 relative z-10">
+                <div class="flex items-center gap-3">
+                  <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-400 text-white flex items-center justify-center shadow-md shadow-amber-500/25 shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">redeem</span>
+                  </div>
+                  <div>
+                    <h4 class="font-headline-md text-sm text-text-heading font-bold">
+                      Tukar Saldo ke Hadiah Digital
+                    </h4>
+                    <p class="text-xs text-text-body mt-0.5">
+                      Tukarkan saldo aktif Anda langsung menjadi link undangan & voucher
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Preview Daftar Hadiah Populer -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 relative z-10">
+                <!-- Preview 1: Google Family One 2TB -->
+                <div
+                  data-preview-reward="google_family_2tb"
+                  class="btn-preview-reward bg-surface-container-low hover:bg-surface-container rounded-2xl p-3 border border-surface-container flex items-center justify-between gap-2.5 transition-all cursor-pointer group/item"
+                >
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 shadow-xs flex items-center justify-center shrink-0 border border-surface-container p-1">
+                      <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                      </svg>
+                    </div>
+                    <div class="flex flex-col min-w-0">
+                      <span class="text-xs font-bold text-text-heading group-hover/item:text-primary transition-colors truncate">Google Family One 2TB</span>
+                      <span class="text-[10px] text-text-body truncate">Invite Link Langsung</span>
+                    </div>
+                  </div>
+                  <span class="font-mono text-xs font-black text-amber-500 shrink-0">Rp 15.000</span>
+                </div>
+
+                <!-- Preview 2: YouTube Premium Family -->
+                <div
+                  data-preview-reward="youtube_premium_family"
+                  class="btn-preview-reward bg-surface-container-low hover:bg-surface-container rounded-2xl p-3 border border-surface-container flex items-center justify-between gap-2.5 transition-all cursor-pointer group/item"
+                >
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 border border-rose-500/20">
+                      <span class="material-symbols-outlined text-[18px]">smart_display</span>
+                    </div>
+                    <div class="flex flex-col min-w-0">
+                      <span class="text-xs font-bold text-text-heading group-hover/item:text-primary transition-colors truncate">YouTube Premium</span>
+                      <span class="text-[10px] text-text-body truncate">Slot Family 1 Bulan</span>
+                    </div>
+                  </div>
+                  <span class="font-mono text-xs font-black text-amber-500 shrink-0">Rp 12.000</span>
+                </div>
+              </div>
+
+              <!-- Footer Bar Card & Tombol Buka Katalog -->
+              <div class="pt-1 flex items-center justify-between gap-3 relative z-10 border-t border-surface-container">
+                <div class="flex items-center gap-1.5 text-[11px] text-text-body">
+                  <span class="material-symbols-outlined text-[15px] text-secondary">check_circle</span>
+                  <span>Langsung potong dari saldo aktif</span>
+                </div>
+                <button
+                  type="button"
+                  id="btnOpenRewardCatalog"
+                  class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-[0.98] text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-md shadow-amber-500/25 flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                >
+                  <span>Pilih Hadiah</span>
+                  <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                </button>
+              </div>
+            </div>
+          </section>
+
           <!-- Security Section -->
           <section class="flex flex-col gap-2">
             <h3 class="font-label-md text-xs font-bold text-text-heading px-1 uppercase tracking-wider">
@@ -850,6 +947,43 @@ export class ProfileView extends IComponent {
     const logoutBtn = container.querySelector('#btnLogout');
     const infoBtns = container.querySelectorAll('.btn-info-modal');
     const liveChatBtn = container.querySelector('#btnLiveChatAdmin');
+    const btnOpenRewardCatalog = container.querySelector('#btnOpenRewardCatalog');
+    const previewRewardBtns = container.querySelectorAll('.btn-preview-reward');
+
+    // Handler Buka Modal Katalog Penukaran Hadiah
+    btnOpenRewardCatalog?.addEventListener('click', () => {
+      RewardCatalogModal.show({
+        user: this._authService.getCurrentUser(),
+        walletService: this._walletService,
+        notificationService: this._notification,
+        onSuccess: () => {
+          const curHash = (window.location.hash || '').replace(/^#\/?/, '/');
+          if (curHash.startsWith('profil') || curHash.startsWith('/profil')) {
+            container.innerHTML = this.render();
+            this.mount(container);
+          }
+        }
+      });
+    });
+
+    previewRewardBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const rewardId = btn.getAttribute('data-preview-reward');
+        RewardCatalogModal.show({
+          user: this._authService.getCurrentUser(),
+          walletService: this._walletService,
+          notificationService: this._notification,
+          preselectedId: rewardId,
+          onSuccess: () => {
+            const curHash = (window.location.hash || '').replace(/^#\/?/, '/');
+            if (curHash.startsWith('profil') || curHash.startsWith('/profil')) {
+              container.innerHTML = this.render();
+              this.mount(container);
+            }
+          }
+        });
+      });
+    });
 
     // Handler Ganti Nickname Pengguna (Aturan: 1 Bulan Sekali)
     editNicknameBtn?.addEventListener('click', async () => {
