@@ -51,14 +51,53 @@ function loadGoogleRecaptchaScript() {
 
 export class CaptchaModal {
   /**
+   * Mengecek apakah lingkungan saat ini adalah localhost / local development
+   * @returns {boolean}
+   */
+  static isLocalhost() {
+    if (typeof window === 'undefined') return false;
+
+    // Izinkan developer memaksa captcha muncul jika diperlukan (misal untuk testing UI)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('forceCaptcha') === 'true' || localStorage.getItem('panenkunci:force_captcha') === 'true') {
+        return false;
+      }
+    } catch (_) {}
+
+    // Jika secara eksplisit dinonaktifkan fitur bypass-nya lewat .env
+    if (import.meta.env?.VITE_BYPASS_CAPTCHA === 'false') {
+      return false;
+    }
+
+    const hostname = window.location.hostname || '';
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '[::1]' ||
+      hostname.endsWith('.localhost') ||
+      hostname.startsWith('192.168.') ||
+      Boolean(import.meta.env?.DEV) ||
+      import.meta.env?.VITE_BYPASS_CAPTCHA === 'true'
+    );
+  }
+
+  /**
    * Menampilkan modal Google reCAPTCHA dan mengembalikan Promise<boolean|string>
    * @param {Object} [options]
    * @param {string} [options.title='Verifikasi Google reCAPTCHA']
    * @param {string} [options.subtitle='Centang kotak di bawah untuk memverifikasi bahwa Anda bukan robot sebelum melanjutkan.']
    * @param {string} [options.cancelText='Batal']
+   * @param {boolean} [options.forceShow=false] Paksa tampilkan modal meskipun di localhost
    * @returns {Promise<boolean|string>} Mengembalikan token reCAPTCHA jika lolos, atau false jika dibatalkan
    */
   static show(options = {}) {
+    // Lewati (bypass) captcha secara otomatis jika sedang dibuka di localhost atau local development
+    if (!options.forceShow && CaptchaModal.isLocalhost()) {
+      console.log('[CaptchaModal] Lingkungan localhost terdeteksi. reCAPTCHA otomatis dilewati (bypass).');
+      return Promise.resolve('localhost-bypass-token');
+    }
+
     return new Promise(async (resolve) => {
       const {
         title = 'Verifikasi Google reCAPTCHA',
